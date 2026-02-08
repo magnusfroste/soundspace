@@ -155,50 +155,43 @@ export default function AdminSettings() {
     },
   });
 
-  // Approve/Reject song
-  const reviewSongMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: "approved" | "rejected" }) => {
+  // Approve song (downloads to Supabase Storage via edge function)
+  const approveSongMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { data, error } = await supabase.functions.invoke("download-song", {
+        body: { pending_song_id: id },
+      });
+      if (error) throw error;
+      if (!data.success) throw new Error(data.error || "Download failed");
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pending_songs"] });
+      queryClient.invalidateQueries({ queryKey: ["songs"] });
+      toast.success("Song approved and downloaded to library");
+    },
+    onError: (error: Error) => toast.error(`Failed to approve: ${error.message}`),
+  });
+
+  // Reject song
+  const rejectSongMutation = useMutation({
+    mutationFn: async (id: string) => {
       const { data: { user } } = await supabase.auth.getUser();
-      
-      if (status === "approved") {
-        // Get the pending song data
-        const { data: song, error: fetchError } = await supabase
-          .from("pending_songs")
-          .select("*")
-          .eq("id", id)
-          .single();
-        if (fetchError) throw fetchError;
-
-        // Insert into songs table
-        const { error: insertError } = await supabase.from("songs").insert({
-          title: song.title,
-          artist: song.artist,
-          file_url: song.external_url || "",
-          duration: song.duration || 0,
-          genre: song.genre,
-          mood: song.mood,
-          origin_source: "external_feed",
-        });
-        if (insertError) throw insertError;
-      }
-
-      // Update pending song status
       const { error } = await supabase
         .from("pending_songs")
         .update({ 
-          status, 
+          status: "rejected", 
           reviewed_at: new Date().toISOString(),
           reviewed_by: user?.id,
         })
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: (_, { status }) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pending_songs"] });
-      queryClient.invalidateQueries({ queryKey: ["songs"] });
-      toast.success(status === "approved" ? "Song approved and added to library" : "Song rejected");
+      toast.success("Song rejected");
     },
-    onError: () => toast.error("Failed to review song"),
+    onError: () => toast.error("Failed to reject song"),
   });
 
   const openFeedDialog = (feed?: SourceFeed) => {
@@ -239,20 +232,29 @@ export default function AdminSettings() {
 
   const handleSync = async () => {
     setIsSyncing(true);
-    // Simulate sync - in production this would call an edge function
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Update last_synced_at for active feeds
-    for (const feed of feeds.filter(f => f.is_active)) {
-      await supabase
-        .from("source_feeds")
-        .update({ last_synced_at: new Date().toISOString() })
-        .eq("id", feed.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("sync-feeds");
+      
+      if (error) {
+        toast.error(`Sync failed: ${error.message}`);
+        return;
+      }
+
+      if (data.success) {
+        queryClient.invalidateQueries({ queryKey: ["source_feeds"] });
+        queryClient.invalidateQueries({ queryKey: ["pending_songs"] });
+        toast.success(data.message);
+        if (data.errors?.length > 0) {
+          data.errors.forEach((err: string) => toast.warning(err));
+        }
+      } else {
+        toast.error(data.error || "Sync failed");
+      }
+    } catch (err) {
+      toast.error("Sync failed unexpectedly");
+    } finally {
+      setIsSyncing(false);
     }
-    
-    queryClient.invalidateQueries({ queryKey: ["source_feeds"] });
-    toast.success("Sync complete. Check incoming songs for new tracks.");
-    setIsSyncing(false);
   };
 
   const formatDate = (date: string | null) => {
@@ -453,8 +455,8 @@ export default function AdminSettings() {
                               variant="ghost"
                               size="icon"
                               className="text-primary hover:text-primary hover:bg-primary/10"
-                              onClick={() => reviewSongMutation.mutate({ id: song.id, status: "approved" })}
-                              disabled={reviewSongMutation.isPending}
+                              onClick={() => approveSongMutation.mutate(song.id)}
+                              disabled={approveSongMutation.isPending || rejectSongMutation.isPending}
                             >
                               <Check className="h-4 w-4" />
                             </Button>
@@ -462,8 +464,8 @@ export default function AdminSettings() {
                               variant="ghost"
                               size="icon"
                               className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={() => reviewSongMutation.mutate({ id: song.id, status: "rejected" })}
-                              disabled={reviewSongMutation.isPending}
+                              onClick={() => rejectSongMutation.mutate(song.id)}
+                              disabled={approveSongMutation.isPending || rejectSongMutation.isPending}
                             >
                               <X className="h-4 w-4" />
                             </Button>
