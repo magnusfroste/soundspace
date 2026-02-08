@@ -1,6 +1,6 @@
 import { useLocation } from "react-router-dom";
 import {
-  Home, ListMusic, Radio, LayoutDashboard, Upload, Settings, Music2, CalendarDays,
+  Home, ListMusic, Radio, LayoutDashboard, Upload, Settings, Music2, CalendarDays, Library,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,6 +29,7 @@ const businessNav = [
 const adminNav = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
   { title: "Song Ingestion", url: "/admin/ingestion", icon: Upload },
+  { title: "Song Library", url: "/admin/library", icon: Library },
   { title: "Manage Playlists", url: "/admin/playlists", icon: ListMusic },
   { title: "Integrations", url: "/admin/settings", icon: Settings },
 ];
