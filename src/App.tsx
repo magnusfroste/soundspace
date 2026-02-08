@@ -15,6 +15,7 @@ import NowPlaying from "@/pages/NowPlaying";
 import SchedulePage from "@/pages/Schedule";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminIngestion from "@/pages/AdminIngestion";
+import AdminLibrary from "@/pages/AdminLibrary";
 import AdminPlaylists from "@/pages/AdminPlaylists";
 import AdminSettings from "@/pages/AdminSettings";
 import NotFound from "@/pages/NotFound";
@@ -69,6 +70,7 @@ const App = () => (
               <Route path="/now-playing" element={<NowPlaying />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/ingestion" element={<AdminIngestion />} />
+              <Route path="/admin/library" element={<AdminLibrary />} />
               <Route path="/admin/playlists" element={<AdminPlaylists />} />
               <Route path="/admin/settings" element={<AdminSettings />} />
             </Route>
