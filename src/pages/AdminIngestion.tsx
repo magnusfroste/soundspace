@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from "react";
-import { Upload, Music, X, Loader2, Check, Plus } from "lucide-react";
+import { Upload, Music, X, Loader2, Check, Plus, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
+import { useAudioAnalysis } from "@/hooks/useAudioAnalysis";
+import { AudioWaveform } from "@/components/AudioWaveform";
 
 interface UploadedFile {
   file: File;
@@ -16,7 +18,9 @@ interface UploadedFile {
   genre: string;
   mood: string;
   bpm: string;
-  status: "pending" | "uploading" | "done" | "error";
+  duration: number;
+  waveform: number[];
+  status: "analyzing" | "pending" | "uploading" | "done" | "error";
   progress: number;
   playlistId: string;
 }
@@ -24,12 +28,19 @@ interface UploadedFile {
 const GENRES = ["Ambient", "Electronic", "Corporate", "Jazz", "Pop", "Folk", "Classical", "Rock", "Hip-Hop", "R&B"];
 const MOODS = ["Relaxed", "Energetic", "Uplifting", "Mellow", "Happy", "Calm", "Intense", "Romantic", "Focused"];
 
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 export default function AdminIngestion() {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { analyzeAudio } = useAudioAnalysis();
 
   const { data: playlists } = useQuery({
     queryKey: ["playlists-admin"],
@@ -50,21 +61,46 @@ export default function AdminIngestion() {
     setIsDragging(false);
   }, []);
 
-  const processFiles = (fileList: FileList) => {
+  const processFiles = async (fileList: FileList) => {
     const mp3Files = Array.from(fileList).filter((f) => f.type === "audio/mpeg" || f.name.endsWith(".mp3"));
-    const newFiles: UploadedFile[] = mp3Files.map((file) => ({
-      file,
-      id: crypto.randomUUID(),
-      title: file.name.replace(/\.mp3$/i, "").replace(/[-_]/g, " "),
-      artist: "Unknown Artist",
-      genre: "",
-      mood: "",
-      bpm: "",
-      status: "pending",
-      progress: 0,
-      playlistId: "",
-    }));
-    setFiles((prev) => [...prev, ...newFiles]);
+    
+    for (const file of mp3Files) {
+      const id = crypto.randomUUID();
+      
+      // Add file in analyzing state
+      const newFile: UploadedFile = {
+        file,
+        id,
+        title: file.name.replace(/\.mp3$/i, "").replace(/[-_]/g, " "),
+        artist: "Unknown Artist",
+        genre: "",
+        mood: "",
+        bpm: "",
+        duration: 0,
+        waveform: [],
+        status: "analyzing",
+        progress: 0,
+        playlistId: "",
+      };
+      
+      setFiles((prev) => [...prev, newFile]);
+      
+      // Analyze audio in background
+      const analysis = await analyzeAudio(file);
+      
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === id
+            ? {
+                ...f,
+                duration: analysis?.duration ?? 0,
+                waveform: analysis?.waveform ?? [],
+                status: "pending",
+              }
+            : f
+        )
+      );
+    }
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -73,7 +109,7 @@ export default function AdminIngestion() {
     if (e.dataTransfer.files.length > 0) {
       processFiles(e.dataTransfer.files);
     }
-  }, []);
+  }, [analyzeAudio]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -113,7 +149,7 @@ export default function AdminIngestion() {
         // Get public URL
         const { data: urlData } = supabase.storage.from("songs").getPublicUrl(safeName);
 
-        // Insert song record
+        // Insert song record with auto-detected duration
         const { data: songData, error: insertError } = await supabase
           .from("songs")
           .insert({
@@ -122,6 +158,7 @@ export default function AdminIngestion() {
             genre: fileItem.genre || null,
             mood: fileItem.mood || null,
             bpm: fileItem.bpm ? parseInt(fileItem.bpm) : null,
+            duration: Math.round(fileItem.duration),
             file_url: urlData.publicUrl,
             origin_source: "manual_upload",
           })
@@ -156,14 +193,16 @@ export default function AdminIngestion() {
     }
 
     setIsUploading(false);
+    const doneFiles = files.filter((f) => f.status === "done");
     toast({
       title: "Upload Complete",
-      description: `Successfully uploaded ${pending.filter((f) => files.find((x) => x.id === f.id)?.status === "done").length} songs.`,
+      description: `Successfully uploaded ${doneFiles.length} songs.`,
     });
   };
 
   const pendingCount = files.filter((f) => f.status === "pending").length;
   const doneCount = files.filter((f) => f.status === "done").length;
+  const analyzingCount = files.filter((f) => f.status === "analyzing").length;
 
   return (
     <div className="space-y-6">
@@ -176,8 +215,9 @@ export default function AdminIngestion() {
           <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground">
               {doneCount}/{files.length} uploaded
+              {analyzingCount > 0 && ` • ${analyzingCount} analyzing`}
             </span>
-            <Button onClick={uploadAll} disabled={isUploading || pendingCount === 0}>
+            <Button onClick={uploadAll} disabled={isUploading || pendingCount === 0 || analyzingCount > 0}>
               {isUploading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -216,7 +256,7 @@ export default function AdminIngestion() {
           <Plus className="h-8 w-8 text-muted-foreground" />
         </div>
         <h2 className="text-lg font-semibold mb-2">Drop MP3 files here</h2>
-        <p className="text-muted-foreground text-sm">or click to browse</p>
+        <p className="text-muted-foreground text-sm">or click to browse • Duration auto-detected</p>
       </div>
 
       {/* File List */}
@@ -232,24 +272,47 @@ export default function AdminIngestion() {
                 }`}
               >
                 <div className="flex items-start gap-4">
-                  {/* Status Icon */}
+                  {/* Status Icon & Waveform */}
+                  <div className="shrink-0 w-28">
+                    {f.status === "analyzing" ? (
+                      <div className="h-12 flex items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    ) : f.waveform.length > 0 ? (
+                      <AudioWaveform waveform={f.waveform} />
+                    ) : (
+                      <div className="h-12 flex items-center justify-center">
+                        <Music className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                    )}
+                    {f.duration > 0 && (
+                      <div className="flex items-center justify-center gap-1 mt-1 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {formatDuration(f.duration)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Status Badge */}
                   <div
-                    className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${
+                    className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
                       f.status === "done"
                         ? "bg-green-500/20 text-green-500"
                         : f.status === "error"
                         ? "bg-destructive/20 text-destructive"
                         : f.status === "uploading"
                         ? "bg-primary/20 text-primary"
+                        : f.status === "analyzing"
+                        ? "bg-yellow-500/20 text-yellow-500"
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {f.status === "done" ? (
-                      <Check className="h-5 w-5" />
-                    ) : f.status === "uploading" ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <Check className="h-4 w-4" />
+                    ) : f.status === "uploading" || f.status === "analyzing" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <Music className="h-5 w-5" />
+                      <Music className="h-4 w-4" />
                     )}
                   </div>
 
@@ -348,7 +411,7 @@ export default function AdminIngestion() {
                     variant="ghost"
                     size="icon"
                     onClick={() => removeFile(f.id)}
-                    disabled={f.status === "uploading"}
+                    disabled={f.status === "uploading" || f.status === "analyzing"}
                     className="shrink-0"
                   >
                     <X className="h-4 w-4" />
