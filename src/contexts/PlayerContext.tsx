@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useRef, useState, useCallback, useEffect } from "react";
 import type { Tables } from "@/integrations/supabase/types";
 import { supabase } from "@/integrations/supabase/client";
+import { connectAudioElement } from "@/hooks/useAudioAnalyser";
 
 type Song = Tables<"songs">;
 
@@ -104,12 +105,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const audio = new Audio();
     audio.volume = 0.8;
+    audio.crossOrigin = "anonymous"; // Required for audio analyser
     audioRef.current = audio;
 
     audio.addEventListener("timeupdate", () => setCurrentTime(audio.currentTime));
     audio.addEventListener("durationchange", () => setDuration(audio.duration || 0));
     audio.addEventListener("ended", () => handleEnded());
-    audio.addEventListener("play", () => setIsPlaying(true));
+    audio.addEventListener("play", () => {
+      setIsPlaying(true);
+      // Connect to audio analyser on first play
+      connectAudioElement(audio);
+    });
     audio.addEventListener("pause", () => setIsPlaying(false));
 
     return () => {
