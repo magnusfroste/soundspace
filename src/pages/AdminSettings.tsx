@@ -1,10 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   Settings, Plus, RefreshCw, Trash2, Check, X, ExternalLink, 
   Rss, FileJson, Globe, Clock 
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { MusicGenerator } from "@/components/admin/MusicGenerator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -299,6 +300,7 @@ export default function AdminSettings() {
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="generate">AI Generator</TabsTrigger>
         </TabsList>
 
         {/* Source Feeds Tab */}
@@ -478,6 +480,11 @@ export default function AdminSettings() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* AI Generator Tab */}
+        <TabsContent value="generate" className="space-y-4">
+          <MusicGenerator />
         </TabsContent>
       </Tabs>
 
