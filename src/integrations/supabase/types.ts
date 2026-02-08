@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_generations: {
+        Row: {
+          audio_url: string | null
+          created_at: string | null
+          duration: number
+          genre: string | null
+          id: string
+          mood: string | null
+          prompt: string
+          provider: string
+          saved_to_library: boolean | null
+          song_id: string | null
+          user_id: string
+        }
+        Insert: {
+          audio_url?: string | null
+          created_at?: string | null
+          duration: number
+          genre?: string | null
+          id?: string
+          mood?: string | null
+          prompt: string
+          provider: string
+          saved_to_library?: boolean | null
+          song_id?: string | null
+          user_id: string
+        }
+        Update: {
+          audio_url?: string | null
+          created_at?: string | null
+          duration?: number
+          genre?: string | null
+          id?: string
+          mood?: string | null
+          prompt?: string
+          provider?: string
+          saved_to_library?: boolean | null
+          song_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generations_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_songs: {
         Row: {
           artist: string
