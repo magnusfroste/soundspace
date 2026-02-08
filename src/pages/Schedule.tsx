@@ -83,6 +83,19 @@ export default function SchedulePage() {
     await handleDeleteBlock(id);
   }, [handleDeleteBlock]);
 
+  const handleResizeBlock = useCallback(async (id: string, newStartTime: string, newEndTime: string) => {
+    try {
+      await updateEntry({ id, start_time: newStartTime, end_time: newEndTime });
+      toast.success("Block resized");
+    } catch (error: any) {
+      if (error?.message?.includes("valid_time_range")) {
+        toast.error("End time must be after start time");
+      } else {
+        toast.error("Failed to resize block");
+      }
+    }
+  }, [updateEntry]);
+
   const handleCopyDay = useCallback(async (sourceDay: number, targetDays: number[]) => {
     setIsCopying(true);
     try {
@@ -196,6 +209,7 @@ export default function SchedulePage() {
           onAddBlock={handleAddBlock}
           onEditBlock={handleEditBlock}
           onDeleteBlock={handleDeleteBlock}
+          onResizeBlock={handleResizeBlock}
         />
       </div>
 
