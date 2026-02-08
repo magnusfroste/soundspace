@@ -45,13 +45,22 @@ const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.1 },
+    transition: { staggerChildren: 0.1, delayChildren: 0.2 },
   },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0 },
+  hidden: { opacity: 0, y: 40, scale: 0.95 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    scale: 1,
+    transition: { 
+      type: "spring" as const,
+      stiffness: 100,
+      damping: 15,
+    },
+  },
 };
 
 export function FeaturesSection() {
@@ -62,16 +71,33 @@ export function FeaturesSection() {
       <div className="container mx-auto px-6 relative z-10">
         <motion.div 
           className="text-center mb-16"
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ 
+            type: "spring",
+            stiffness: 100,
+            damping: 20,
+          }}
         >
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+          <motion.h2 
+            className="text-4xl md:text-5xl font-bold mb-4"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ delay: 0.1 }}
+          >
             Tudo que você precisa
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          </motion.h2>
+          <motion.p 
+            className="text-lg text-muted-foreground max-w-2xl mx-auto"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ delay: 0.2 }}
+          >
             Uma plataforma completa para gerenciar a música do seu estabelecimento
-          </p>
+          </motion.p>
         </motion.div>
 
         <motion.div 
@@ -79,17 +105,24 @@ export function FeaturesSection() {
           variants={containerVariants}
           initial="hidden"
           whileInView="visible"
-          viewport={{ once: true }}
+          viewport={{ once: true, margin: "-50px" }}
         >
           {features.map((feature, i) => (
             <motion.div
               key={i}
               variants={itemVariants}
               className="group p-6 rounded-2xl glass glass-hover cursor-default"
+              whileHover={{ 
+                y: -8, 
+                transition: { type: "spring", stiffness: 300 } 
+              }}
             >
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+              <motion.div 
+                className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors"
+                whileHover={{ rotate: 5, scale: 1.1 }}
+              >
                 <feature.icon className="h-6 w-6 text-primary" />
-              </div>
+              </motion.div>
               <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
               <p className="text-muted-foreground">{feature.description}</p>
             </motion.div>

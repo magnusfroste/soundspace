@@ -37,16 +37,33 @@ export function ShowcaseSection() {
       <div className="container mx-auto px-6">
         <motion.div 
           className="text-center mb-16"
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ 
+            type: "spring",
+            stiffness: 100,
+            damping: 20,
+          }}
         >
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+          <motion.h2 
+            className="text-4xl md:text-5xl font-bold mb-4"
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ delay: 0.1 }}
+          >
             Playlists para cada momento
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          </motion.h2>
+          <motion.p 
+            className="text-lg text-muted-foreground max-w-2xl mx-auto"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ delay: 0.2 }}
+          >
             Programação inteligente que se adapta ao ritmo do seu negócio
-          </p>
+          </motion.p>
         </motion.div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -56,10 +73,16 @@ export function ShowcaseSection() {
               className={`relative group rounded-2xl overflow-hidden cursor-pointer transition-all duration-500 ${
                 activeIndex === i ? "scale-105 z-10" : "hover:scale-102"
               }`}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
+              initial={{ opacity: 0, y: 60, rotateX: 10 }}
+              whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ 
+                delay: i * 0.1,
+                type: "spring",
+                stiffness: 100,
+                damping: 15,
+              }}
+              whileHover={{ y: -10 }}
               onClick={() => setActiveIndex(activeIndex === i ? null : i)}
             >
               {/* Background gradient */}
