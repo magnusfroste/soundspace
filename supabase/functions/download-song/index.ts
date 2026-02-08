@@ -83,12 +83,51 @@ Deno.serve(async (req) => {
     console.log(`Downloading: ${pendingSong.external_url}`);
 
     // Download the audio file
-    const audioResponse = await fetch(pendingSong.external_url);
+    const audioResponse = await fetch(pendingSong.external_url, {
+      headers: {
+        "User-Agent": "SomHonesto/1.0 (Music Library)",
+      },
+    });
+    
     if (!audioResponse.ok) {
-      console.error(`Download failed: ${audioResponse.status}`);
+      console.error(`Download failed: ${audioResponse.status} from ${pendingSong.external_url}`);
+      
+      // Handle specific error codes with user-friendly messages
+      if (audioResponse.status === 404) {
+        // Mark the pending song as unavailable
+        await supabase
+          .from("pending_songs")
+          .update({ status: "unavailable" })
+          .eq("id", pending_song_id);
+          
+        return new Response(
+          JSON.stringify({ 
+            error: "Source file no longer available",
+            details: "The external source has removed or moved this file. The song has been marked as unavailable.",
+            status_code: 404
+          }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      if (audioResponse.status === 403) {
+        return new Response(
+          JSON.stringify({ 
+            error: "Access denied by source",
+            details: "The external source is blocking access to this file.",
+            status_code: 403
+          }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
       return new Response(
-        JSON.stringify({ error: `Failed to download audio: ${audioResponse.status}` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ 
+          error: `Failed to download audio`,
+          details: `Source returned status ${audioResponse.status}`,
+          status_code: audioResponse.status
+        }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
