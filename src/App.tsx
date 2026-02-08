@@ -15,10 +15,9 @@ import NowPlaying from "@/pages/NowPlaying";
 import SchedulePage from "@/pages/Schedule";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminAIStudio from "@/pages/AdminAIStudio";
-import AdminIngestion from "@/pages/AdminIngestion";
 import AdminLibrary from "@/pages/AdminLibrary";
 import AdminPlaylists from "@/pages/AdminPlaylists";
-import AdminSettings from "@/pages/AdminSettings";
+import AdminIntegrations from "@/pages/AdminIntegrations";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -71,10 +70,9 @@ const App = () => (
               <Route path="/now-playing" element={<NowPlaying />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/studio" element={<AdminAIStudio />} />
-              <Route path="/admin/ingestion" element={<AdminIngestion />} />
               <Route path="/admin/library" element={<AdminLibrary />} />
               <Route path="/admin/playlists" element={<AdminPlaylists />} />
-              <Route path="/admin/settings" element={<AdminSettings />} />
+              <Route path="/admin/integrations" element={<AdminIntegrations />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
