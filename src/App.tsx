@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PlayerProvider } from "@/contexts/PlayerContext";
 import { AppLayout } from "@/components/AppLayout";
+import Index from "@/pages/Index";
 import AuthPage from "@/pages/Auth";
 import HomePage from "@/pages/Home";
 import PlaylistsPage from "@/pages/Playlists";
@@ -43,7 +44,7 @@ function ProtectedRoutes() {
 function AuthGuard() {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/app" replace />;
   return <AuthPage />;
 }
 
@@ -55,9 +56,13 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthGuard />} />
+            
+            {/* Protected app routes */}
             <Route element={<ProtectedRoutes />}>
-              <Route path="/" element={<HomePage />} />
+              <Route path="/app" element={<HomePage />} />
               <Route path="/playlists" element={<PlaylistsPage />} />
               <Route path="/playlists/:id" element={<PlaylistDetail />} />
               <Route path="/schedule" element={<SchedulePage />} />
