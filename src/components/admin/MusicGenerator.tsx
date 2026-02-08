@@ -1,11 +1,12 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Music, Play, Pause, Download, Loader2, Save, ListMusic } from "lucide-react";
+import { Sparkles, Music, Play, Pause, Download, Loader2, Save, ListMusic, Wand2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -40,6 +41,7 @@ export function MusicGenerator() {
   const [mood, setMood] = useState<string>("");
   const [title, setTitle] = useState("");
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>("");
+  const [suggestionReason, setSuggestionReason] = useState<string>("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -58,29 +60,41 @@ export function MusicGenerator() {
     },
   });
 
-  // Smart playlist suggestions based on genre/mood
-  const suggestedPlaylists = useMemo(() => {
-    if (!genre && !mood) return playlists;
-    
-    const searchTerms = [
-      genre?.toLowerCase(),
-      mood?.toLowerCase(),
-    ].filter(Boolean);
+  // AI playlist suggestion
+  const suggestMutation = useMutation({
+    mutationFn: async ({ prompt, genre, mood }: { prompt: string; genre: string; mood: string }) => {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest-playlist`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ prompt, genre, mood, playlists }),
+        }
+      );
 
-    // Score playlists by relevance
-    const scored = playlists.map((playlist) => {
-      const text = `${playlist.title} ${playlist.category || ""} ${playlist.description || ""}`.toLowerCase();
-      const score = searchTerms.reduce((acc, term) => {
-        return acc + (text.includes(term!) ? 1 : 0);
-      }, 0);
-      return { playlist, score };
-    });
+      if (!response.ok) {
+        throw new Error("Failed to get suggestion");
+      }
 
-    // Sort by score (highest first), then alphabetically
-    return scored
-      .sort((a, b) => b.score - a.score || a.playlist.title.localeCompare(b.playlist.title))
-      .map((s) => s.playlist);
-  }, [playlists, genre, mood]);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.suggestedPlaylistId) {
+        setSelectedPlaylistId(data.suggestedPlaylistId);
+        setSuggestionReason(data.reason || "");
+        toast.success(`AI föreslår: "${data.suggestedPlaylistTitle}"`);
+      } else {
+        setSuggestionReason(data.reason || "Ingen matchning hittades");
+      }
+    },
+    onError: () => {
+      toast.error("Kunde inte analysera musik");
+    },
+  });
 
   const generateMutation = useMutation({
     mutationFn: async ({ prompt, duration }: { prompt: string; duration: number }) => {
@@ -111,6 +125,11 @@ export function MusicGenerator() {
       setAudioBlob(blob);
       setAudioUrl(URL.createObjectURL(blob));
       toast.success("Music generated successfully!");
+
+      // Auto-suggest playlist after generation
+      if (playlists.length > 0) {
+        suggestMutation.mutate({ prompt, genre, mood });
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -158,7 +177,6 @@ export function MusicGenerator() {
 
       // Add to playlist if selected
       if (selectedPlaylistId && songData) {
-        // Get current max position in playlist
         const { data: maxPosData } = await supabase
           .from("playlist_songs")
           .select("position")
@@ -203,6 +221,7 @@ export function MusicGenerator() {
       setTitle("");
       setPrompt("");
       setSelectedPlaylistId("");
+      setSuggestionReason("");
       setIsPlaying(false);
     },
     onError: (error: Error) => {
@@ -365,20 +384,37 @@ export function MusicGenerator() {
               </div>
 
               <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <ListMusic className="h-4 w-4" />
-                  Add to Playlist (optional)
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2">
+                    <ListMusic className="h-4 w-4" />
+                    Add to Playlist
+                  </Label>
+                  {suggestMutation.isPending && (
+                    <Badge variant="secondary" className="gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Analyzing...
+                    </Badge>
+                  )}
+                  {suggestionReason && !suggestMutation.isPending && (
+                    <Badge variant="outline" className="gap-1">
+                      <Wand2 className="h-3 w-3" />
+                      AI suggestion
+                    </Badge>
+                  )}
+                </div>
                 <Select 
                   value={selectedPlaylistId} 
-                  onValueChange={setSelectedPlaylistId}
+                  onValueChange={(val) => {
+                    setSelectedPlaylistId(val);
+                    setSuggestionReason(""); // Clear AI reason when manually changed
+                  }}
                   disabled={saveMutation.isPending}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a playlist" />
                   </SelectTrigger>
                   <SelectContent>
-                    {suggestedPlaylists.map((playlist) => (
+                    {playlists.map((playlist) => (
                       <SelectItem key={playlist.id} value={playlist.id}>
                         {playlist.title}
                         {playlist.category && (
@@ -390,9 +426,10 @@ export function MusicGenerator() {
                     ))}
                   </SelectContent>
                 </Select>
-                {(genre || mood) && suggestedPlaylists.length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Playlists sorted by relevance to {[genre, mood].filter(Boolean).join(" / ")}
+                {suggestionReason && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Wand2 className="h-3 w-3" />
+                    {suggestionReason}
                   </p>
                 )}
               </div>
