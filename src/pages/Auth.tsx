@@ -1,0 +1,133 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Music2, Mail, Lock } from "lucide-react";
+import { toast } from "sonner";
+import { z } from "zod";
+
+const emailSchema = z.string().email("E-mail inválido");
+const passwordSchema = z.string().min(6, "Senha deve ter no mínimo 6 caracteres");
+
+export default function AuthPage() {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { signIn, signUp } = useAuth();
+  const navigate = useNavigate();
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    const emailResult = emailSchema.safeParse(email);
+    if (!emailResult.success) {
+      toast.error(emailResult.error.errors[0].message);
+      return;
+    }
+    const passResult = passwordSchema.safeParse(password);
+    if (!passResult.success) {
+      toast.error(passResult.error.errors[0].message);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (isLogin) {
+        const { error } = await signIn(email, password);
+        if (error) {
+          if (error.message.includes("Invalid login credentials")) {
+            toast.error("E-mail ou senha incorretos.");
+          } else {
+            toast.error(error.message);
+          }
+          return;
+        }
+        navigate("/");
+      } else {
+        const { error } = await signUp(email, password);
+        if (error) {
+          if (error.message.includes("already registered")) {
+            toast.error("Este e-mail já está cadastrado. Tente fazer login.");
+          } else {
+            toast.error(error.message);
+          }
+          return;
+        }
+        toast.success("Conta criada! Verifique seu e-mail para confirmar o cadastro.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md">
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-8">
+          <div className="h-14 w-14 rounded-2xl bg-primary flex items-center justify-center mb-4">
+            <Music2 className="h-7 w-7 text-primary-foreground" />
+          </div>
+          <h1 className="text-2xl font-bold" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            SomHonesto
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">Música ambiente para seu negócio</p>
+        </div>
+
+        {/* Card */}
+        <div className="glass rounded-2xl p-6">
+          <h2 className="text-lg font-semibold mb-6 text-center">
+            {isLogin ? "Entrar na sua conta" : "Criar nova conta"}
+          </h2>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">E-mail</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="seu@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10 bg-background border-border"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Senha</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 bg-background border-border"
+                />
+              </div>
+            </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar conta"}
+            </Button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => setIsLogin(!isLogin)}
+              className="text-sm text-muted-foreground hover:text-primary transition-colors"
+            >
+              {isLogin ? "Não tem conta? Cadastre-se" : "Já tem conta? Faça login"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
