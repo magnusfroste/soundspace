@@ -24,47 +24,90 @@ export function CTASection() {
       <div className="container mx-auto px-6 relative z-10">
         <motion.div 
           className="max-w-3xl mx-auto text-center"
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 60 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ 
+            type: "spring",
+            stiffness: 100,
+            damping: 20,
+          }}
         >
           <motion.div 
             className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/20 mb-8"
+            initial={{ opacity: 0, scale: 0, rotate: -180 }}
+            whileInView={{ opacity: 1, scale: 1, rotate: 0 }}
+            viewport={{ once: true }}
+            transition={{ 
+              delay: 0.2,
+              type: "spring",
+              stiffness: 200,
+            }}
             animate={{ rotate: [0, 5, -5, 0] }}
-            transition={{ duration: 4, repeat: Infinity }}
           >
             <Music className="h-8 w-8 text-primary" />
           </motion.div>
 
-          <h2 className="text-4xl md:text-6xl font-bold mb-6">
+          <motion.h2 
+            className="text-4xl md:text-6xl font-bold mb-6"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.1 }}
+          >
             Pronto para transformar
             <br />
-            <span className="text-gradient">seu ambiente?</span>
-          </h2>
+            <motion.span 
+              className="text-gradient"
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+            >
+              seu ambiente?
+            </motion.span>
+          </motion.h2>
 
-          <p className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto">
+          <motion.p 
+            className="text-lg text-muted-foreground mb-10 max-w-xl mx-auto"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.3 }}
+          >
             Comece gratuitamente hoje e descubra como a música certa 
             pode elevar a experiência dos seus clientes.
-          </p>
+          </motion.p>
 
           <motion.div
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ delay: 0.2 }}
+            transition={{ delay: 0.4, type: "spring" }}
           >
-            <Button 
-              size="lg" 
-              className="h-14 px-8 text-lg rounded-full bg-primary hover:bg-primary/90 group"
-              onClick={() => navigate("/auth")}
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.98 }}
             >
-              Criar conta grátis
-              <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
-            </Button>
-            <span className="text-sm text-muted-foreground">
+              <Button 
+                size="lg" 
+                className="h-14 px-8 text-lg rounded-full bg-primary hover:bg-primary/90 group"
+                onClick={() => navigate("/auth")}
+              >
+                Criar conta grátis
+                <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </motion.div>
+            <motion.span 
+              className="text-sm text-muted-foreground"
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.5 }}
+            >
               Sem cartão de crédito • Cancele quando quiser
-            </span>
+            </motion.span>
           </motion.div>
         </motion.div>
       </div>

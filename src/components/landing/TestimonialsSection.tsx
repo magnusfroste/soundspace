@@ -33,16 +33,33 @@ export function TestimonialsSection() {
       <div className="container mx-auto px-6 relative z-10">
         <motion.div 
           className="text-center mb-16"
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
+          viewport={{ once: true, margin: "-100px" }}
+          transition={{ 
+            type: "spring",
+            stiffness: 100,
+            damping: 20,
+          }}
         >
-          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+          <motion.h2 
+            className="text-4xl md:text-5xl font-bold mb-4"
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ delay: 0.1 }}
+          >
             Amado por empresas
-          </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          </motion.h2>
+          <motion.p 
+            className="text-lg text-muted-foreground max-w-2xl mx-auto"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ delay: 0.2 }}
+          >
             Milhares de estabelecimentos já transformaram sua experiência musical
-          </p>
+          </motion.p>
         </motion.div>
 
         <div className="grid md:grid-cols-3 gap-8">
@@ -50,17 +67,40 @@ export function TestimonialsSection() {
             <motion.div
               key={i}
               className="p-6 rounded-2xl glass"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.15 }}
+              initial={{ opacity: 0, y: 50, scale: 0.9 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ 
+                delay: i * 0.15,
+                type: "spring",
+                stiffness: 100,
+                damping: 15,
+              }}
+              whileHover={{ 
+                y: -8,
+                transition: { type: "spring", stiffness: 300 }
+              }}
             >
               {/* Stars */}
-              <div className="flex gap-1 mb-4">
+              <motion.div 
+                className="flex gap-1 mb-4"
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.15 + 0.2 }}
+              >
                 {[...Array(testimonial.rating)].map((_, j) => (
-                  <Star key={j} className="h-4 w-4 fill-primary text-primary" />
+                  <motion.div
+                    key={j}
+                    initial={{ opacity: 0, scale: 0 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.15 + 0.3 + j * 0.05 }}
+                  >
+                    <Star className="h-4 w-4 fill-primary text-primary" />
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
 
               {/* Quote */}
               <p className="text-foreground mb-6 leading-relaxed">
@@ -69,9 +109,12 @@ export function TestimonialsSection() {
 
               {/* Author */}
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold">
+                <motion.div 
+                  className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold"
+                  whileHover={{ scale: 1.1, rotate: 5 }}
+                >
                   {testimonial.name.charAt(0)}
-                </div>
+                </motion.div>
                 <div>
                   <div className="font-medium text-foreground">{testimonial.name}</div>
                   <div className="text-sm text-muted-foreground">
