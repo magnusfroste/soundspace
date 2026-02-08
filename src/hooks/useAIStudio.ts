@@ -9,6 +9,7 @@ import {
   type GenerateOptions,
   type GenerationHistoryItem,
 } from "@/lib/ai-providers";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Playlist {
   id: string;
@@ -16,15 +17,60 @@ interface Playlist {
   category: string | null;
 }
 
+interface DBGeneration {
+  id: string;
+  user_id: string;
+  provider: string;
+  prompt: string;
+  genre: string | null;
+  mood: string | null;
+  duration: number;
+  audio_url: string | null;
+  saved_to_library: boolean;
+  song_id: string | null;
+  created_at: string;
+}
+
+function mapDBToHistoryItem(db: DBGeneration): GenerationHistoryItem {
+  return {
+    id: db.id,
+    provider: db.provider,
+    prompt: db.prompt,
+    genre: db.genre || undefined,
+    mood: db.mood || undefined,
+    duration: db.duration,
+    audioUrl: db.audio_url || "",
+    savedToLibrary: db.saved_to_library,
+    songId: db.song_id || undefined,
+    createdAt: new Date(db.created_at),
+  };
+}
+
 export function useAIStudio() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [activeProviderId, setActiveProviderId] = useState("elevenlabs");
-  const [history, setHistory] = useState<GenerationHistoryItem[]>([]);
   const [currentGeneration, setCurrentGeneration] = useState<GenerationHistoryItem | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const activeProvider = getProviderById(activeProviderId) || allProviders[0];
+
+  // Fetch generation history from database
+  const { data: history = [] } = useQuery({
+    queryKey: ["ai_generations"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ai_generations")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      return (data as DBGeneration[]).map(mapDBToHistoryItem);
+    },
+    enabled: !!user,
+  });
 
   // Fetch playlists for save dialog
   const { data: playlists = [] } = useQuery({
@@ -42,24 +88,50 @@ export function useAIStudio() {
   // Generate music mutation
   const generateMutation = useMutation({
     mutationFn: async (options: GenerateOptions) => {
-      return activeProvider.generate(options);
-    },
-    onSuccess: (result, options) => {
-      const newItem: GenerationHistoryItem = {
-        id: crypto.randomUUID(),
-        provider: activeProvider.id,
-        prompt: options.prompt,
-        genre: options.genre,
-        mood: options.mood,
-        duration: options.duration,
-        audioUrl: result.audioUrl,
-        audioBlob: result.audioBlob,
-        savedToLibrary: false,
-        createdAt: new Date(),
-      };
+      const result = await activeProvider.generate(options);
       
+      // Upload the blob to storage
+      const fileName = `ai-gen/${crypto.randomUUID()}.mp3`;
+      const { error: uploadError } = await supabase.storage
+        .from("songs")
+        .upload(fileName, result.audioBlob, {
+          contentType: "audio/mpeg",
+          cacheControl: "3600",
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage.from("songs").getPublicUrl(fileName);
+
+      // Save to database
+      const { data: dbRecord, error: insertError } = await supabase
+        .from("ai_generations")
+        .insert({
+          user_id: user!.id,
+          provider: activeProvider.id,
+          prompt: options.prompt,
+          genre: options.genre || null,
+          mood: options.mood || null,
+          duration: options.duration,
+          audio_url: urlData.publicUrl,
+          saved_to_library: false,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      return {
+        ...result,
+        audioUrl: urlData.publicUrl,
+        dbRecord: dbRecord as DBGeneration,
+      };
+    },
+    onSuccess: (result) => {
+      const newItem = mapDBToHistoryItem(result.dbRecord);
       setCurrentGeneration(newItem);
-      setHistory((prev) => [newItem, ...prev]);
+      queryClient.invalidateQueries({ queryKey: ["ai_generations"] });
       toast.success("Music generated successfully!");
     },
     onError: (error: Error) => {
@@ -78,23 +150,9 @@ export function useAIStudio() {
       title: string;
       playlistId?: string;
     }) => {
-      if (!item.audioBlob) throw new Error("No audio to save");
+      if (!item.audioUrl) throw new Error("No audio to save");
 
       const songTitle = title.trim() || `AI Generated - ${new Date().toLocaleDateString()}`;
-      const fileName = `${crypto.randomUUID()}.mp3`;
-
-      // Upload to storage
-      const { error: uploadError } = await supabase.storage
-        .from("songs")
-        .upload(fileName, item.audioBlob, {
-          contentType: "audio/mpeg",
-          cacheControl: "3600",
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: urlData } = supabase.storage.from("songs").getPublicUrl(fileName);
 
       // Insert into songs table
       const { data: songData, error: insertError } = await supabase
@@ -102,7 +160,7 @@ export function useAIStudio() {
         .insert({
           title: songTitle,
           artist: "SomHonesto AI",
-          file_url: urlData.publicUrl,
+          file_url: item.audioUrl,
           duration: item.duration,
           genre: item.genre || null,
           mood: item.mood || null,
@@ -112,6 +170,17 @@ export function useAIStudio() {
         .single();
 
       if (insertError) throw insertError;
+
+      // Update generation record
+      const { error: updateError } = await supabase
+        .from("ai_generations")
+        .update({
+          saved_to_library: true,
+          song_id: songData.id,
+        })
+        .eq("id", item.id);
+
+      if (updateError) throw updateError;
 
       // Add to playlist if selected
       if (playlistId && songData) {
@@ -139,19 +208,14 @@ export function useAIStudio() {
       return { songId: songData.id, songTitle, playlistId };
     },
     onSuccess: ({ songId, songTitle, playlistId }, { item }) => {
-      // Update history item
-      setHistory((prev) =>
-        prev.map((h) =>
-          h.id === item.id ? { ...h, savedToLibrary: true, songId } : h
-        )
-      );
-      
+      // Update local state
       if (currentGeneration?.id === item.id) {
         setCurrentGeneration((prev) =>
           prev ? { ...prev, savedToLibrary: true, songId } : null
         );
       }
 
+      queryClient.invalidateQueries({ queryKey: ["ai_generations"] });
       queryClient.invalidateQueries({ queryKey: ["songs"] });
       queryClient.invalidateQueries({ queryKey: ["playlist_songs"] });
 
@@ -164,6 +228,30 @@ export function useAIStudio() {
     },
     onError: (error: Error) => {
       toast.error(`Failed to save: ${error.message}`);
+    },
+  });
+
+  // Delete from history mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("ai_generations")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: (id) => {
+      if (currentGeneration?.id === id) {
+        setCurrentGeneration(null);
+        setIsPlaying(false);
+      }
+      queryClient.invalidateQueries({ queryKey: ["ai_generations"] });
+      toast.success("Generation deleted");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to delete: ${error.message}`);
     },
   });
 
@@ -182,23 +270,11 @@ export function useAIStudio() {
   const playItem = useCallback((item: GenerationHistoryItem) => {
     setCurrentGeneration(item);
     setIsPlaying(false);
-    // Auto-play will be handled by the audio element
   }, []);
 
   const deleteFromHistory = useCallback((id: string) => {
-    setHistory((prev) => {
-      const item = prev.find((h) => h.id === id);
-      if (item?.audioUrl) {
-        URL.revokeObjectURL(item.audioUrl);
-      }
-      return prev.filter((h) => h.id !== id);
-    });
-
-    if (currentGeneration?.id === id) {
-      setCurrentGeneration(null);
-      setIsPlaying(false);
-    }
-  }, [currentGeneration]);
+    deleteMutation.mutate(id);
+  }, [deleteMutation]);
 
   return {
     // Providers
@@ -223,6 +299,7 @@ export function useAIStudio() {
     history,
     playItem,
     deleteFromHistory,
+    isDeleting: deleteMutation.isPending,
 
     // Save
     playlists,
