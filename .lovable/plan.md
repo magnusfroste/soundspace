@@ -1,199 +1,252 @@
 
-# Admin Song Library with Drag-and-Drop Playlist Management
+
+# AI Music Studio - Unified Cockpit for AI Music Generation
 
 ## Overview
 
-Create a new "Song Library" admin page that provides a centralized view of all songs with metadata, preview capabilities, and drag-and-drop functionality for organizing songs into playlists. This will serve as the primary workspace for content curators.
+Transform the admin experience by creating a dedicated "AI Studio" page that serves as the central cockpit for AI-powered music generation. This will be a professional studio interface (inspired by Udio, Suno, and ElevenLabs) that supports multiple AI providers through a modular integration system.
 
 ## Architecture (Model-View-Data)
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              DATA LAYER                                 │
-├─────────────────────────────────────────────────────────────────────────┤
-│  songs table          │  playlists table      │  playlist_songs table   │
-│  - id, title, artist  │  - id, title          │  - playlist_id          │
-│  - genre, mood, bpm   │  - category           │  - song_id              │
-│  - duration, cover    │  - cover_image_url    │  - position             │
-│  - file_url           │                       │                         │
-└─────────────────────────────────────────────────────────────────────────┘
-                                   │
-                     ┌─────────────┴─────────────┐
-                     ▼                           ▼
-┌─────────────────────────────┐    ┌─────────────────────────────┐
-│        MODEL LAYER          │    │        VIEW LAYER           │
-├─────────────────────────────┤    ├─────────────────────────────┤
-│  useSongsLibrary hook       │    │  AdminLibrary page          │
-│  - Fetch all songs          │    │  - Split-panel layout       │
-│  - Filter/search logic      │    │                             │
-│  - Drag-and-drop state      │    │  SongCard component         │
-│                             │    │  - Cover, metadata, preview │
-│  usePlaylistManager hook    │    │  - Drag handle              │
-│  - Add song to playlist     │    │                             │
-│  - Remove from playlist     │    │  PlaylistDropZone           │
-│  - Reorder songs            │    │  - Visual drop target       │
-└─────────────────────────────┘    │  - Song count badge         │
-                                   └─────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           INTEGRATION LAYER                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ElevenLabs    │  Mubert       │  MusicGen      │  Local AI               │
+│  (Cloud API)   │  (Cloud API)  │  (Replicate)   │  (Ollama/LMStudio)      │
+│                │               │                │                          │
+│  Status: Ready │  Status: -    │  Status: -     │  Status: Configurable   │
+└────────┬───────┴───────┬───────┴────────┬───────┴──────────┬───────────────┘
+         │               │                │                  │
+         └───────────────┴────────────────┴──────────────────┘
+                                 │
+                    ┌────────────┴────────────┐
+                    ▼                         ▼
+┌─────────────────────────────┐  ┌───────────────────────────────────────────┐
+│        MODEL LAYER          │  │              VIEW LAYER                   │
+├─────────────────────────────┤  ├───────────────────────────────────────────┤
+│  useAIStudio hook           │  │  AdminAIStudio page                       │
+│  - Active provider          │  │  - Provider selector (top bar)            │
+│  - Provider configs         │  │  - Generation interface                   │
+│  - Generation history       │  │  - Generation history panel               │
+│                             │  │                                           │
+│  Providers:                 │  │  Components:                              │
+│  - ElevenLabs adapter       │  │  - ProviderCard (status, config)          │
+│  - Mubert adapter           │  │  - StudioPromptPanel                      │
+│  - MusicGen adapter         │  │  - GenerationHistoryList                  │
+│  - LocalAI adapter          │  │  - OutputPreview (player + actions)       │
+└─────────────────────────────┘  └───────────────────────────────────────────┘
+                                              │
+                                              ▼
+                              ┌───────────────────────────────────┐
+                              │         DATA LAYER                │
+                              ├───────────────────────────────────┤
+                              │  ai_generations (new table)       │
+                              │  - id, provider, prompt           │
+                              │  - audio_url, duration            │
+                              │  - genre, mood, created_at        │
+                              │  - saved_to_library (boolean)     │
+                              └───────────────────────────────────┘
 ```
 
-## UI Design (Reference Image Inspired)
-
-The layout follows the reference image pattern with a dual-panel approach:
+## UI Design (Studio Layout)
 
 ```text
-┌──────────────────────────────────────────────────────────────────────────┐
-│  SONG LIBRARY                                    [Search...] [Filters ▼] │
-├──────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│  ┌─────────────────────────────────────┐   ┌───────────────────────────┐ │
-│  │         SONG CARDS GRID             │   │      PLAYLISTS PANEL     │ │
-│  │                                     │   │                           │ │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐│   │  ┌───────────────────┐   │ │
-│  │  │  ▶ ⋮   │ │  ▶ ⋮   │ │  ▶ ⋮   ││   │  │ Relaxed Ambience  │   │ │
-│  │  │ [cover] │ │ [cover] │ │ [cover] ││   │  │ 🎵 3 songs        │   │ │
-│  │  │ Title   │ │ Title   │ │ Title   ││   │  │ [Drop to add]     │   │ │
-│  │  │ Artist  │ │ Artist  │ │ Artist  ││   │  └───────────────────┘   │ │
-│  │  │ Jazz    │ │ Pop     │ │ Ambient ││   │                           │ │
-│  │  │ 3:45    │ │ 2:30    │ │ 4:00    ││   │  ┌───────────────────┐   │ │
-│  │  └─────────┘ └─────────┘ └─────────┘│   │  │ Energetic Beats   │   │ │
-│  │                                     │   │  │ 🎵 2 songs        │   │ │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐│   │  └───────────────────┘   │ │
-│  │  │  ▶ ⋮   │ │  ▶ ⋮   │ │  ▶ ⋮   ││   │                           │ │
-│  │  │ ...    │ │ ...    │ │ ...    ││   │  ┌───────────────────┐   │ │
-│  │  └─────────┘ └─────────┘ └─────────┘│   │  │ Professional      │   │ │
-│  │                                     │   │  │ Settings          │   │ │
-│  └─────────────────────────────────────┘   │  │ 🎵 2 songs        │   │ │
-│                                            │  └───────────────────┘   │ │
-│                                            └───────────────────────────┘ │
-└──────────────────────────────────────────────────────────────────────────┘
-│                            PLAYER BAR                                    │
-└──────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  AI MUSIC STUDIO                                                             │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐                        │
+│  │ElevenLabs│ │  Mubert  │ │ MusicGen │ │ Local AI │    [Settings]          │
+│  │    ●     │ │    ○     │ │    ○     │ │    ○     │                        │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘                        │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌───────────────────────────────────────────┐  ┌──────────────────────────┐│
+│  │           GENERATION PANEL                │  │    GENERATION HISTORY    ││
+│  │                                           │  │                          ││
+│  │  Describe your music...                   │  │  ┌────────────────────┐  ││
+│  │  ┌─────────────────────────────────────┐  │  │  │ Jazz Coffee Shop   │  ││
+│  │  │                                     │  │  │  │ ElevenLabs - 30s   │  ││
+│  │  │                                     │  │  │  │ ▶ [Save] [Delete]  │  ││
+│  │  └─────────────────────────────────────┘  │  │  └────────────────────┘  ││
+│  │                                           │  │                          ││
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐   │  │  ┌────────────────────┐  ││
+│  │  │  Jazz    │ │ Ambient  │ │Electronic│   │  │  │ Relaxed Ambient    │  ││
+│  │  └──────────┘ └──────────┘ └──────────┘   │  │  │ Mubert - 45s       │  ││
+│  │                                           │  │  │ ▶ [Save] [Delete]  │  ││
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐   │  │  └────────────────────┘  ││
+│  │  │ Relaxed  │ │Energetic │ │  Focused │   │  │                          ││
+│  │  └──────────┘ └──────────┘ └──────────┘   │  │  ┌────────────────────┐  ││
+│  │                                           │  │  │ Electronic Beats   │  ││
+│  │  Duration: ═══════●══════════ 30s         │  │  │ Local AI - 60s     │  ││
+│  │                                           │  │  │ ▶ [Saved]          │  ││
+│  │  ┌─────────────────────────────────────┐  │  │  └────────────────────┘  ││
+│  │  │          ✨ Generate Music          │  │  │                          ││
+│  │  └─────────────────────────────────────┘  │  │                          ││
+│  │                                           │  │                          ││
+│  │  ┌─────────────────────────────────────┐  │  └──────────────────────────┘│
+│  │  │  ▶ ━━━━━●━━━━━━━━━━━━━━━ 0:15/0:30  │  │                              │
+│  │  │                                     │  │                              │
+│  │  │  Title: [________________]          │  │                              │
+│  │  │  Playlist: [Select playlist    ▼]  │  │                              │
+│  │  │                                     │  │                              │
+│  │  │  [💾 Save to Library]              │  │                              │
+│  │  └─────────────────────────────────────┘  │                              │
+│  └───────────────────────────────────────────┘                              │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Song Card Design
+## Provider Integration System
 
-Each card displays essential metadata with quick-action capabilities:
+Each provider follows a common interface for seamless switching:
+
+| Provider | Type | Status | Features |
+|----------|------|--------|----------|
+| ElevenLabs | Cloud API | Active (needs key fix) | Text-to-music, high quality |
+| Mubert | Cloud API | Future | Royalty-free, infinite streaming |
+| MusicGen | Replicate | Future | Open model, customizable |
+| Local AI | Self-hosted | Future | Ollama/LMStudio, privacy-first |
+
+### Local AI Integration Concept
+
+For users who want privacy or offline generation:
 
 ```text
-┌──────────────────────────────┐
-│  [⋮ drag]  ▶ play    [more] │
-├──────────────────────────────┤
-│  ┌────────────────────────┐  │
-│  │                        │  │
-│  │      Cover Image       │  │
-│  │      (or icon)         │  │
-│  │                        │  │
-│  └────────────────────────┘  │
-│                              │
-│  Jazz Lounge Session         │
-│  Smooth Keys                 │
-│                              │
-│  ┌──────┐ ┌──────┐ ┌──────┐  │
-│  │ Jazz │ │Mellow│ │ 4:00 │  │
-│  └──────┘ └──────┘ └──────┘  │
-│                              │
-│  In: Relaxed Ambience        │
-└──────────────────────────────┘
+Local AI Settings:
+┌─────────────────────────────────────────┐
+│  Endpoint URL: [http://localhost:11434] │
+│  Model: [_____________________]         │
+│  [Test Connection]                      │
+│                                         │
+│  Status: ● Connected (Ollama)           │
+└─────────────────────────────────────────┘
 ```
 
 ## Implementation Steps
 
-### 1. New Page: AdminLibrary.tsx
-- Create `/admin/library` route
-- Split-panel layout using ResizablePanelGroup from existing UI components
-- Left panel: Song grid with filtering
-- Right panel: Playlist drop zones
+### Phase 1: Core Studio Page
 
-### 2. New Component: SongCard.tsx
-- Compact card showing: cover, title, artist, genre, mood, duration
-- Play button for inline preview (uses PlayerContext)
-- Drag handle for drag-and-drop
-- "Currently in playlist" indicator
-- Context menu for additional actions
+1. **Create AdminAIStudio.tsx** - Main studio page with provider tabs
+2. **Refactor MusicGenerator** - Extract into a more modular StudioPromptPanel
+3. **Add provider selector** - Tab bar for switching between providers
+4. **Create GenerationHistory** - Right panel showing recent generations
 
-### 3. New Component: PlaylistDropZone.tsx
-- Collapsible playlist cards in right panel
-- Visual feedback when dragging over (highlight border)
-- Shows current song count
-- Expands to show songs already in playlist
+### Phase 2: Multi-Provider Architecture
 
-### 4. Drag-and-Drop Implementation
-- Use native HTML5 drag-and-drop (no extra dependencies)
-- Store dragged song ID in dataTransfer
-- Visual cues: ghost element, drop zone highlighting
-- Prevent duplicate additions
+1. **Create provider adapter pattern** - Common interface for all providers
+2. **ElevenLabs adapter** - Wrap existing generate-music function
+3. **Stub adapters** - Mubert, MusicGen, LocalAI (UI ready, implementation later)
 
-### 5. Filter System
-- Search by title/artist
-- Filter by genre dropdown
-- Filter by mood dropdown
-- Filter by "not in any playlist" toggle
+### Phase 3: History & Storage
 
-### 6. Navigation Update
-- Add "Song Library" to admin sidebar between "Song Ingestion" and "Manage Playlists"
+1. **Create ai_generations table** - Store all generations
+2. **History panel** - List recent generations with replay/save options
+3. **Batch save** - Save multiple generations to library at once
 
 ## Files to Create
 
 | File | Purpose |
 |------|---------|
-| `src/pages/AdminLibrary.tsx` | Main page with split layout |
-| `src/components/admin/SongCard.tsx` | Draggable song card |
-| `src/components/admin/PlaylistDropZone.tsx` | Drop target for playlists |
-| `src/hooks/useSongLibrary.ts` | Song fetching/filtering logic |
+| `src/pages/AdminAIStudio.tsx` | Main AI Studio page |
+| `src/components/admin/studio/ProviderTabs.tsx` | Provider selection tabs |
+| `src/components/admin/studio/StudioPromptPanel.tsx` | Prompt input and controls |
+| `src/components/admin/studio/GenerationHistory.tsx` | History panel |
+| `src/components/admin/studio/OutputPreview.tsx` | Audio player and save actions |
+| `src/components/admin/studio/LocalAISettings.tsx` | Local AI configuration dialog |
+| `src/hooks/useAIStudio.ts` | Studio state management |
+| `src/lib/ai-providers/types.ts` | Provider interface definitions |
+| `src/lib/ai-providers/elevenlabs.ts` | ElevenLabs adapter |
+| `src/lib/ai-providers/local.ts` | Local AI adapter (stub) |
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/App.tsx` | Add `/admin/library` route |
-| `src/components/AppSidebar.tsx` | Add "Song Library" nav item |
+| `src/App.tsx` | Add `/admin/studio` route |
+| `src/components/AppSidebar.tsx` | Add "AI Studio" nav item, rename "Integrations" |
+| `supabase/config.toml` | Add new edge functions if needed |
+
+## Navigation Restructure
+
+```text
+ADMIN SECTION:
+├── Dashboard          (analytics)
+├── AI Studio          (NEW - primary music generation)
+├── Song Ingestion     (manual uploads)
+├── Song Library       (browse & organize)
+├── Manage Playlists   (playlist CRUD)
+└── Integrations       (feeds, external sources - formerly "Settings")
+```
 
 ## Technical Details
 
-### Drag-and-Drop Data Flow
+### Provider Interface
 
-```text
-1. User starts dragging SongCard
-   → onDragStart: set dataTransfer with song.id
-   → Visual: card gets reduced opacity
+```typescript
+interface AIProvider {
+  id: string;
+  name: string;
+  icon: LucideIcon;
+  status: "ready" | "configuring" | "unavailable";
+  
+  generate(options: GenerateOptions): Promise<GenerationResult>;
+  checkStatus(): Promise<ProviderStatus>;
+}
 
-2. User hovers over PlaylistDropZone
-   → onDragEnter/onDragOver: highlight drop zone
-   → Show "Add to playlist" visual feedback
+interface GenerateOptions {
+  prompt: string;
+  duration: number;
+  genre?: string;
+  mood?: string;
+}
 
-3. User drops on PlaylistDropZone
-   → onDrop: extract song.id from dataTransfer
-   → Check if song already in playlist
-   → If not: INSERT into playlist_songs with next position
-   → Invalidate queries to refresh UI
+interface GenerationResult {
+  audioBlob: Blob;
+  audioUrl: string;
+  metadata: {
+    provider: string;
+    prompt: string;
+    duration: number;
+  };
+}
 ```
 
-### Query Keys for Cache Management
+### Generation History Data Model
 
-```text
-["admin-songs-library"]     - All songs with metadata
-["admin-playlists-zones"]   - Playlists with song counts
-["playlist-songs", id]      - Songs in specific playlist
+```sql
+create table ai_generations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  provider text not null,
+  prompt text not null,
+  genre text,
+  mood text,
+  duration integer not null,
+  audio_url text,
+  saved_to_library boolean default false,
+  song_id uuid references songs(id) on delete set null,
+  created_at timestamptz default now()
+);
 ```
-
-### Inline Preview Logic
-
-- Click play button on card → playSong(song) from PlayerContext
-- Current song is highlighted with primary color
-- Pause button appears when that song is playing
 
 ## Keep It Simple (Phase 1)
 
-Initial implementation will NOT include:
-- Reordering songs within playlists (future)
-- Bulk select/drag multiple songs (future)
-- Remove song from playlist via drag (future)
-- Batch editing metadata (future)
+Initial implementation will focus on:
 
-These can be added incrementally after the core drag-to-add workflow is solid.
+- Studio page layout with ElevenLabs as default
+- Provider tabs (only ElevenLabs active, others show "Coming Soon")
+- Move generation logic from current MusicGenerator
+- Simple in-memory history (no database yet)
+- Local AI settings dialog (UI only, no implementation)
+
+NOT included in Phase 1:
+- Mubert integration
+- MusicGen/Replicate integration
+- Database-backed history
+- Actual Local AI inference
 
 ## Security Considerations
 
-- All operations use existing RLS policies
-- Admins already have INSERT/DELETE on playlist_songs
-- No new database changes required
+- Provider API keys stored as Supabase secrets
+- Local AI runs entirely client-side (no secrets needed)
+- Generation history is user-scoped via RLS
+
