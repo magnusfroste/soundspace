@@ -18,6 +18,7 @@ import AdminAIStudio from "@/pages/AdminAIStudio";
 import AdminLibrary from "@/pages/AdminLibrary";
 import AdminPlaylists from "@/pages/AdminPlaylists";
 import AdminIntegrations from "@/pages/AdminIntegrations";
+import AdminSettings from "@/pages/AdminSettings";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -73,6 +74,7 @@ const App = () => (
               <Route path="/admin/library" element={<AdminLibrary />} />
               <Route path="/admin/playlists" element={<AdminPlaylists />} />
               <Route path="/admin/integrations" element={<AdminIntegrations />} />
+              <Route path="/admin/settings" element={<AdminSettings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

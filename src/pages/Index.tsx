@@ -6,6 +6,7 @@ import { ShowcaseSection } from "@/components/landing/ShowcaseSection";
 import { TestimonialsSection } from "@/components/landing/TestimonialsSection";
 import { CTASection } from "@/components/landing/CTASection";
 import { Footer } from "@/components/landing/Footer";
+import { AmbientPlayer } from "@/components/landing/AmbientPlayer";
 
 const Index = () => {
   // Enable smooth scrolling for the page
@@ -25,6 +26,7 @@ const Index = () => {
       <TestimonialsSection />
       <CTASection />
       <Footer />
+      <AmbientPlayer />
     </div>
   );
 };
