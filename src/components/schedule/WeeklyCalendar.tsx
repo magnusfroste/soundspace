@@ -15,9 +15,10 @@ interface WeeklyCalendarProps {
   onAddBlock: (day: number, hour: number) => void;
   onEditBlock: (entry: ScheduleEntry) => void;
   onDeleteBlock: (id: string) => void;
+  onResizeBlock?: (id: string, newStartTime: string, newEndTime: string) => void;
 }
 
-export function WeeklyCalendar({ entries, onAddBlock, onEditBlock, onDeleteBlock }: WeeklyCalendarProps) {
+export function WeeklyCalendar({ entries, onAddBlock, onEditBlock, onDeleteBlock, onResizeBlock }: WeeklyCalendarProps) {
   const hours = useMemo(() => {
     const arr = [];
     for (let h = START_HOUR; h < END_HOUR; h++) {
@@ -124,8 +125,10 @@ export function WeeklyCalendar({ entries, onAddBlock, onEditBlock, onDeleteBlock
                 entry={entry}
                 hourHeight={HOUR_HEIGHT}
                 startHour={START_HOUR}
+                endHour={END_HOUR}
                 onEdit={onEditBlock}
                 onDelete={onDeleteBlock}
+                onResize={onResizeBlock}
               />
             ))}
 
