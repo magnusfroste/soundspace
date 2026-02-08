@@ -14,6 +14,62 @@ export type Database = {
   }
   public: {
     Tables: {
+      pending_songs: {
+        Row: {
+          artist: string
+          created_at: string
+          duration: number | null
+          external_url: string | null
+          genre: string | null
+          id: string
+          metadata: Json | null
+          mood: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_feed_id: string | null
+          status: string
+          title: string
+        }
+        Insert: {
+          artist?: string
+          created_at?: string
+          duration?: number | null
+          external_url?: string | null
+          genre?: string | null
+          id?: string
+          metadata?: Json | null
+          mood?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_feed_id?: string | null
+          status?: string
+          title: string
+        }
+        Update: {
+          artist?: string
+          created_at?: string
+          duration?: number | null
+          external_url?: string | null
+          genre?: string | null
+          id?: string
+          metadata?: Json | null
+          mood?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_feed_id?: string | null
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_songs_source_feed_id_fkey"
+            columns: ["source_feed_id"]
+            isOneToOne: false
+            referencedRelation: "source_feeds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       play_logs: {
         Row: {
           duration_listened: number | null
@@ -238,6 +294,39 @@ export type Database = {
           mood?: string | null
           origin_source?: string | null
           title?: string
+        }
+        Relationships: []
+      }
+      source_feeds: {
+        Row: {
+          created_at: string
+          feed_type: string
+          id: string
+          is_active: boolean
+          last_synced_at: string | null
+          name: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          feed_type?: string
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          name: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          feed_type?: string
+          id?: string
+          is_active?: boolean
+          last_synced_at?: string | null
+          name?: string
+          updated_at?: string
+          url?: string
         }
         Relationships: []
       }
