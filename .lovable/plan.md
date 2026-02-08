@@ -1,56 +1,173 @@
 
-# SomHonesto — App Shell & Persistent Player
+# Music Scheduling System for Business
 
 ## Overview
-Build the foundational app shell for "SomHonesto", a B2B royalty-free music streaming service for Brazilian businesses. This phase sets up the database, authentication, premium dark UI, role-aware navigation, and a **fully functional persistent music player** connected to Supabase Storage.
+Adding Soundtrack-style weekly music scheduling so businesses can pre-program their entire week's music atmosphere. Instead of manually picking playlists, the system will automatically play the right music at the right time.
 
-## Visual Identity
-- **Premium Dark Mode** theme: deep gray background (#121212), glassmorphism cards, rounded corners
-- Vibrant green (#1DB954-style) and purple accents for playback controls and active states
-- Clean, modern typography — polished, Spotify-inspired aesthetic
+## The Difference: Personal vs Business
 
-## 1. Supabase Setup & Database Schema
-- Connect Lovable Cloud (Supabase)
-- Create tables:
-  - **user_roles** — stores admin/business roles per user (security best practice, separate from profiles)
-  - **profiles** — extends auth.users with business_name, location
-  - **songs** — title, artist, genre, mood, duration, file_url (pointing to Supabase Storage), bpm, origin_source
-  - **playlists** — title, description, cover_image_url, category
-  - **playlist_songs** — join table (playlist_id, song_id, position)
-  - **play_logs** — user_id, song_id, played_at, duration_listened
-- RLS policies: business users can read songs/playlists, admins can read/write everything
-- Create a Supabase Storage bucket for audio files ("songs" bucket, public read)
+| Personal Player | Business Scheduler |
+|-----------------|-------------------|
+| Pick a playlist manually | Set it and forget it |
+| Play what you want now | Plan ahead for the week |
+| One mood at a time | Different moods throughout the day |
 
-## 2. Authentication
-- Auth page (/auth) with email/password login and signup
-- Styled to match the premium dark theme
-- After login, redirect to the main app
-- Role is checked from user_roles table to determine navigation
+## What We'll Build
 
-## 3. App Shell & Layout
-- **Sidebar navigation** (collapsible):
-  - **Business users** see: Home, Browse Playlists, Now Playing
-  - **Admins** see: Dashboard, Ingestion Engine, Playlists Management, Integration Settings
-- **Main content area** — renders routed pages
-- **Persistent Player Footer** — always visible at the bottom, outside of the router, so navigation never interrupts playback
+### 1. Database: Schedule Storage
 
-## 4. Persistent Music Player (Functional)
-- HTML5 Audio element managed via React Context at the layout level
-- Player UI: current song info (title, artist, cover), play/pause, next/previous, seek bar, volume control, elapsed/total time
-- Fetches real audio files from the Supabase "songs" storage bucket
-- Plays songs from a queue; clicking a playlist loads its songs into the queue
-- Playback continues seamlessly across page navigation
+A new `schedule_entries` table to store time-block assignments:
 
-## 5. Placeholder Pages
-- **Home** — welcome message with a few featured playlists (cards linking to playlist detail)
-- **Browse Playlists** — grid of playlist cards (fetched from DB)
-- **Playlist Detail** — list of songs in a playlist, click to play
-- **Admin Dashboard** — placeholder stats cards (active users, top playlists)
-- **Ingestion Engine** — placeholder UI for uploading MP3s (will be built out in a later phase)
+```text
+schedule_entries
+├── id (uuid)
+├── profile_id (links to business)
+├── playlist_id (which playlist to play)
+├── day_of_week (0-6, Sunday=0)
+├── start_time (e.g., "09:00")
+├── end_time (e.g., "12:00")
+├── is_active (boolean)
+└── created_at / updated_at
+```
 
-## What's NOT in this phase
-- Full ingestion engine with metadata editing
-- Analytics with real data
-- Integration/API key management
-- Subscription/billing
-- Mobile-responsive polish (will be refined later)
+Each entry represents a colored block like "Breakfast diner 9AM-11AM on Monday".
+
+### 2. Weekly Schedule Page (Business Users)
+
+A new `/schedule` page with a visual weekly calendar:
+
+```text
+┌──────────────────────────────────────────────────────┐
+│  SCHEDULE                                            │
+│  Diner Restaurant                                    │
+├────────┬────────┬────────┬────────┬────────┬────────┤
+│        │ Mon    │ Tue    │ Wed    │ Thu    │ Fri    │
+├────────┼────────┼────────┼────────┼────────┼────────┤
+│  9 AM  │ ░░░░░░ │ ░░░░░░ │ ░░░░░░ │ ░░░░░░ │        │
+│        │Relaxed │ Jazzy  │Relaxed │ Jazzy  │        │
+├────────┼────────┼────────┼────────┼────────┼────────┤
+│ 12 PM  │ ░░░░░░ │ ░░░░░░ │ ░░░░░░ │ ░░░░░░ │        │
+│        │ Lunch  │ Lunch  │ Lunch  │ Lunch  │        │
+├────────┼────────┼────────┼────────┼────────┼────────┤
+│  3 PM  │ ░░░░░░ │ ░░░░░░ │ ░░░░░░ │ ░░░░░░ │        │
+│        │Jazzy   │ Chill  │ Jazzy  │ Chill  │        │
+└────────┴────────┴────────┴────────┴────────┴────────┘
+         [+ Add Time Block]      ── Current time indicator
+```
+
+Features:
+- Visual time grid (hours on left, days across top)
+- Colored blocks showing scheduled playlists
+- Red line showing current time
+- Click to add new blocks
+- Drag/resize blocks (future enhancement)
+
+### 3. Auto-Play Engine
+
+The PlayerContext will gain schedule awareness:
+
+```text
+Every minute, check:
+  1. Is schedule mode enabled?
+  2. What's the current day/time?
+  3. Which playlist should be playing?
+  4. If different from current → switch automatically
+```
+
+This runs in the background so when it's noon, the music automatically transitions from "Breakfast" to "Lunch Rush" without anyone touching anything.
+
+### 4. Navigation Updates
+
+Add "Schedule" to the business user sidebar:
+- Home
+- Playlists
+- **Schedule** (new)
+- Now Playing
+
+### 5. Profile Enhancement
+
+Add business type to profiles so we can offer relevant defaults:
+
+```text
+profiles.business_type: 
+  - restaurant
+  - retail
+  - gym
+  - hotel
+  - office
+  - (etc.)
+```
+
+## Implementation Steps
+
+1. **Database Migration**
+   - Create `schedule_entries` table
+   - Add `business_type` column to profiles
+   - RLS policies for business users
+
+2. **Schedule Page UI**
+   - Weekly calendar grid component
+   - Time block component with playlist info
+   - Add/edit block dialog
+   - Current time indicator
+
+3. **PlayerContext Enhancement**
+   - Add schedule mode toggle
+   - Add interval check for current schedule
+   - Automatic playlist switching logic
+
+4. **Navigation & Settings**
+   - Add Schedule to sidebar
+   - Add schedule on/off toggle to settings
+
+## Technical Details
+
+### Schedule Entry Model
+```text
+{
+  id: "uuid",
+  profile_id: "uuid",           // Which business
+  playlist_id: "uuid",          // Which playlist
+  day_of_week: 1,              // 0=Sun, 1=Mon, etc.
+  start_time: "09:00",         // 24-hour format
+  end_time: "12:00",           // 24-hour format
+  color: "#9b87f5",            // Visual identification
+  is_active: true
+}
+```
+
+### Auto-Play Check Logic (runs every 60 seconds)
+```text
+1. Get current day (0-6) and time (HH:MM)
+2. Query schedule_entries WHERE:
+   - profile_id = current user's profile
+   - day_of_week = today
+   - start_time <= now <= end_time
+   - is_active = true
+3. If found and different from current playlist:
+   - Load playlist songs
+   - Start playing from beginning
+```
+
+### RLS Policies
+- Business users can only see/edit their own schedule
+- Admins can view all schedules (for support)
+
+## Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| `schedule_entries` table | Create via migration |
+| `src/pages/Schedule.tsx` | New page with weekly calendar |
+| `src/components/ScheduleBlock.tsx` | Time block component |
+| `src/components/ScheduleDialog.tsx` | Add/edit entry dialog |
+| `src/contexts/PlayerContext.tsx` | Add schedule-aware auto-play |
+| `src/components/AppSidebar.tsx` | Add Schedule nav item |
+| `src/App.tsx` | Add /schedule route |
+
+## Future Enhancements (not in this phase)
+- Drag-and-drop block resizing
+- Copy day/week schedules
+- Holiday exceptions
+- Multi-location schedules
+- Schedule templates by business type
