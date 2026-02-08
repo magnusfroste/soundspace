@@ -1,6 +1,6 @@
 import { useLocation } from "react-router-dom";
 import {
-  Home, ListMusic, Radio, LayoutDashboard, Upload, Settings, Music2,
+  Home, ListMusic, Radio, LayoutDashboard, Upload, Settings, Music2, CalendarDays,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,16 +20,17 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 
 const businessNav = [
-  { title: "Início", url: "/", icon: Home },
+  { title: "Home", url: "/", icon: Home },
   { title: "Playlists", url: "/playlists", icon: ListMusic },
-  { title: "Tocando Agora", url: "/now-playing", icon: Radio },
+  { title: "Schedule", url: "/schedule", icon: CalendarDays },
+  { title: "Now Playing", url: "/now-playing", icon: Radio },
 ];
 
 const adminNav = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
-  { title: "Ingestão de Músicas", url: "/admin/ingestion", icon: Upload },
-  { title: "Gerenciar Playlists", url: "/admin/playlists", icon: ListMusic },
-  { title: "Integrações", url: "/admin/settings", icon: Settings },
+  { title: "Song Ingestion", url: "/admin/ingestion", icon: Upload },
+  { title: "Manage Playlists", url: "/admin/playlists", icon: ListMusic },
+  { title: "Integrations", url: "/admin/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -80,7 +81,7 @@ export function AppSidebar() {
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground">
-            Navegação
+            Navigation
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -104,7 +105,7 @@ export function AppSidebar() {
           <p className="text-xs text-muted-foreground truncate mb-2">{user?.email}</p>
           <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground hover:text-foreground" onClick={signOut}>
             <LogOut className="h-4 w-4 mr-2" />
-            Sair
+            Sign Out
           </Button>
         </div>
       </SidebarFooter>

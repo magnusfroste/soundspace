@@ -11,6 +11,7 @@ import HomePage from "@/pages/Home";
 import PlaylistsPage from "@/pages/Playlists";
 import PlaylistDetail from "@/pages/PlaylistDetail";
 import NowPlaying from "@/pages/NowPlaying";
+import SchedulePage from "@/pages/Schedule";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminIngestion from "@/pages/AdminIngestion";
 import AdminPlaylists from "@/pages/AdminPlaylists";
@@ -25,7 +26,7 @@ function ProtectedRoutes() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">Carregando...</div>
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
       </div>
     );
   }
@@ -59,6 +60,7 @@ const App = () => (
               <Route path="/" element={<HomePage />} />
               <Route path="/playlists" element={<PlaylistsPage />} />
               <Route path="/playlists/:id" element={<PlaylistDetail />} />
+              <Route path="/schedule" element={<SchedulePage />} />
               <Route path="/now-playing" element={<NowPlaying />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/ingestion" element={<AdminIngestion />} />

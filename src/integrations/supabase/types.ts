@@ -118,6 +118,7 @@ export type Database = {
       profiles: {
         Row: {
           business_name: string | null
+          business_type: string | null
           created_at: string
           id: string
           location: string | null
@@ -126,6 +127,7 @@ export type Database = {
         }
         Insert: {
           business_name?: string | null
+          business_type?: string | null
           created_at?: string
           id?: string
           location?: string | null
@@ -134,6 +136,7 @@ export type Database = {
         }
         Update: {
           business_name?: string | null
+          business_type?: string | null
           created_at?: string
           id?: string
           location?: string | null
@@ -141,6 +144,60 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      schedule_entries: {
+        Row: {
+          color: string | null
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          is_active: boolean
+          playlist_id: string
+          profile_id: string
+          start_time: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_active?: boolean
+          playlist_id: string
+          profile_id: string
+          start_time: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_active?: boolean
+          playlist_id?: string
+          profile_id?: string
+          start_time?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_entries_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_entries_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       songs: {
         Row: {

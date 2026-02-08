@@ -11,13 +11,16 @@ interface PlayerContextType {
   currentTime: number;
   duration: number;
   volume: number;
+  scheduleMode: boolean;
+  currentPlaylistId: string | null;
   playSong: (song: Song) => void;
-  playQueue: (songs: Song[], startIndex?: number) => void;
+  playQueue: (songs: Song[], startIndex?: number, playlistId?: string) => void;
   togglePlay: () => void;
   nextTrack: () => void;
   prevTrack: () => void;
   seek: (time: number) => void;
   setVolume: (vol: number) => void;
+  setScheduleMode: (enabled: boolean) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -37,6 +40,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
+  const [scheduleMode, setScheduleModeState] = useState(false);
+  const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null);
   
   // Track play session for logging
   const playStartTimeRef = useRef<number | null>(null);
@@ -161,14 +166,97 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const playSong = useCallback((song: Song) => {
     setQueue([song]);
     setQueueIndex(0);
+    setCurrentPlaylistId(null);
     loadAndPlay(song);
   }, []);
 
-  const playQueue = useCallback((songs: Song[], startIndex = 0) => {
+  const playQueue = useCallback((songs: Song[], startIndex = 0, playlistId?: string) => {
     setQueue(songs);
     setQueueIndex(startIndex);
+    setCurrentPlaylistId(playlistId || null);
     if (songs[startIndex]) loadAndPlay(songs[startIndex]);
   }, []);
+
+  const setScheduleMode = useCallback((enabled: boolean) => {
+    setScheduleModeState(enabled);
+    localStorage.setItem("scheduleMode", enabled ? "true" : "false");
+  }, []);
+
+  // Load schedule mode from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("scheduleMode");
+    if (saved === "true") setScheduleModeState(true);
+  }, []);
+
+  // Schedule auto-play engine
+  useEffect(() => {
+    if (!scheduleMode) return;
+
+    const checkSchedule = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Get user's profile
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        
+        if (!profile) return;
+
+        const now = new Date();
+        const dayOfWeek = now.getDay();
+        const currentTime = now.toTimeString().slice(0, 5);
+
+        // Find active schedule entry
+        const { data: entries } = await supabase
+          .from("schedule_entries")
+          .select("playlist_id")
+          .eq("profile_id", profile.id)
+          .eq("day_of_week", dayOfWeek)
+          .eq("is_active", true)
+          .lte("start_time", currentTime)
+          .gt("end_time", currentTime)
+          .limit(1);
+
+        if (!entries || entries.length === 0) return;
+
+        const scheduledPlaylistId = entries[0].playlist_id;
+
+        // Only switch if different playlist
+        if (scheduledPlaylistId === currentPlaylistId) return;
+
+        // Fetch playlist songs
+        const { data: playlistSongs } = await supabase
+          .from("playlist_songs")
+          .select("song:songs(*)")
+          .eq("playlist_id", scheduledPlaylistId)
+          .order("position");
+
+        if (!playlistSongs || playlistSongs.length === 0) return;
+
+        const songs = playlistSongs
+          .map(ps => ps.song)
+          .filter((s): s is Song => s !== null);
+
+        if (songs.length > 0) {
+          console.log("Schedule: switching to playlist", scheduledPlaylistId);
+          playQueue(songs, 0, scheduledPlaylistId);
+        }
+      } catch (err) {
+        console.error("Schedule check failed:", err);
+      }
+    };
+
+    // Initial check
+    checkSchedule();
+
+    // Check every minute
+    const interval = setInterval(checkSchedule, 60000);
+    return () => clearInterval(interval);
+  }, [scheduleMode, currentPlaylistId, playQueue]);
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
@@ -216,7 +304,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     <PlayerContext.Provider
       value={{
         currentSong, queue, isPlaying, currentTime, duration, volume,
+        scheduleMode, currentPlaylistId,
         playSong, playQueue, togglePlay, nextTrack, prevTrack, seek, setVolume,
+        setScheduleMode,
       }}
     >
       {children}
