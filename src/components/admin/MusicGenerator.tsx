@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Sparkles, Music, Play, Pause, Download, Loader2, Save } from "lucide-react";
+import { useState, useRef, useMemo } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Sparkles, Music, Play, Pause, Download, Loader2, Save, ListMusic } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,13 @@ import { toast } from "sonner";
 const GENRES = ["Jazz", "Ambient", "Acoustic", "Electronic", "Classical", "Lo-Fi", "World"];
 const MOODS = ["Relaxed", "Energetic", "Focused", "Uplifting", "Calm", "Romantic"];
 
+interface Playlist {
+  id: string;
+  title: string;
+  category: string | null;
+  description: string | null;
+}
+
 export function MusicGenerator() {
   const queryClient = useQueryClient();
   const [prompt, setPrompt] = useState("");
@@ -32,10 +39,48 @@ export function MusicGenerator() {
   const [genre, setGenre] = useState<string>("");
   const [mood, setMood] = useState<string>("");
   const [title, setTitle] = useState("");
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Fetch playlists
+  const { data: playlists = [] } = useQuery({
+    queryKey: ["playlists"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("playlists")
+        .select("id, title, category, description")
+        .order("title");
+      if (error) throw error;
+      return data as Playlist[];
+    },
+  });
+
+  // Smart playlist suggestions based on genre/mood
+  const suggestedPlaylists = useMemo(() => {
+    if (!genre && !mood) return playlists;
+    
+    const searchTerms = [
+      genre?.toLowerCase(),
+      mood?.toLowerCase(),
+    ].filter(Boolean);
+
+    // Score playlists by relevance
+    const scored = playlists.map((playlist) => {
+      const text = `${playlist.title} ${playlist.category || ""} ${playlist.description || ""}`.toLowerCase();
+      const score = searchTerms.reduce((acc, term) => {
+        return acc + (text.includes(term!) ? 1 : 0);
+      }, 0);
+      return { playlist, score };
+    });
+
+    // Sort by score (highest first), then alphabetically
+    return scored
+      .sort((a, b) => b.score - a.score || a.playlist.title.localeCompare(b.playlist.title))
+      .map((s) => s.playlist);
+  }, [playlists, genre, mood]);
 
   const generateMutation = useMutation({
     mutationFn: async ({ prompt, duration }: { prompt: string; duration: number }) => {
@@ -60,7 +105,6 @@ export function MusicGenerator() {
       return response.blob();
     },
     onSuccess: (blob) => {
-      // Revoke previous URL to prevent memory leaks
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl);
       }
@@ -81,7 +125,7 @@ export function MusicGenerator() {
       const fileName = `${crypto.randomUUID()}.mp3`;
       
       // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from("songs")
         .upload(fileName, audioBlob, {
           contentType: "audio/mpeg",
@@ -96,28 +140,69 @@ export function MusicGenerator() {
         .getPublicUrl(fileName);
 
       // Insert into songs table
-      const { error: insertError } = await supabase.from("songs").insert({
-        title: songTitle,
-        artist: "SomHonesto AI",
-        file_url: urlData.publicUrl,
-        duration: duration,
-        genre: genre || null,
-        mood: mood || null,
-        origin_source: "ai_generated",
-      });
+      const { data: songData, error: insertError } = await supabase
+        .from("songs")
+        .insert({
+          title: songTitle,
+          artist: "SomHonesto AI",
+          file_url: urlData.publicUrl,
+          duration: duration,
+          genre: genre || null,
+          mood: mood || null,
+          origin_source: "ai_generated",
+        })
+        .select("id")
+        .single();
 
       if (insertError) throw insertError;
 
-      return songTitle;
+      // Add to playlist if selected
+      if (selectedPlaylistId && songData) {
+        // Get current max position in playlist
+        const { data: maxPosData } = await supabase
+          .from("playlist_songs")
+          .select("position")
+          .eq("playlist_id", selectedPlaylistId)
+          .order("position", { ascending: false })
+          .limit(1)
+          .single();
+
+        const nextPosition = (maxPosData?.position ?? -1) + 1;
+
+        const { error: playlistError } = await supabase
+          .from("playlist_songs")
+          .insert({
+            playlist_id: selectedPlaylistId,
+            song_id: songData.id,
+            position: nextPosition,
+          });
+
+        if (playlistError) throw playlistError;
+      }
+
+      return { 
+        songTitle, 
+        playlistTitle: selectedPlaylistId 
+          ? playlists.find((p) => p.id === selectedPlaylistId)?.title 
+          : null 
+      };
     },
-    onSuccess: (songTitle) => {
+    onSuccess: ({ songTitle, playlistTitle }) => {
       queryClient.invalidateQueries({ queryKey: ["songs"] });
-      toast.success(`"${songTitle}" saved to library!`);
+      queryClient.invalidateQueries({ queryKey: ["playlist_songs"] });
+      
+      if (playlistTitle) {
+        toast.success(`"${songTitle}" saved and added to "${playlistTitle}"!`);
+      } else {
+        toast.success(`"${songTitle}" saved to library!`);
+      }
+      
       // Reset form
       setAudioUrl(null);
       setAudioBlob(null);
       setTitle("");
       setPrompt("");
+      setSelectedPlaylistId("");
       setIsPlaying(false);
     },
     onError: (error: Error) => {
@@ -131,7 +216,6 @@ export function MusicGenerator() {
       return;
     }
     
-    // Build enhanced prompt with genre/mood
     let fullPrompt = prompt;
     if (genre) fullPrompt += `, ${genre.toLowerCase()} style`;
     if (mood) fullPrompt += `, ${mood.toLowerCase()} mood`;
@@ -251,22 +335,10 @@ export function MusicGenerator() {
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Generated Track</span>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={togglePlay}
-                >
-                  {isPlaying ? (
-                    <Pause className="h-4 w-4" />
-                  ) : (
-                    <Play className="h-4 w-4" />
-                  )}
+                <Button variant="outline" size="icon" onClick={togglePlay}>
+                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                 </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleDownload}
-                >
+                <Button variant="outline" size="icon" onClick={handleDownload}>
                   <Download className="h-4 w-4" />
                 </Button>
               </div>
@@ -280,15 +352,51 @@ export function MusicGenerator() {
             />
             
             {/* Save to Library section */}
-            <div className="border-t pt-4 mt-4 space-y-3">
-              <Label htmlFor="songTitle">Song Title</Label>
-              <Input
-                id="songTitle"
-                placeholder="Enter a title for this track"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                disabled={saveMutation.isPending}
-              />
+            <div className="border-t pt-4 mt-4 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="songTitle">Song Title</Label>
+                <Input
+                  id="songTitle"
+                  placeholder="Enter a title for this track"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  disabled={saveMutation.isPending}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <ListMusic className="h-4 w-4" />
+                  Add to Playlist (optional)
+                </Label>
+                <Select 
+                  value={selectedPlaylistId} 
+                  onValueChange={setSelectedPlaylistId}
+                  disabled={saveMutation.isPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a playlist" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suggestedPlaylists.map((playlist) => (
+                      <SelectItem key={playlist.id} value={playlist.id}>
+                        {playlist.title}
+                        {playlist.category && (
+                          <span className="text-muted-foreground ml-2">
+                            ({playlist.category})
+                          </span>
+                        )}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {(genre || mood) && suggestedPlaylists.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Playlists sorted by relevance to {[genre, mood].filter(Boolean).join(" / ")}
+                  </p>
+                )}
+              </div>
+
               <Button 
                 onClick={() => saveMutation.mutate()}
                 disabled={saveMutation.isPending}
@@ -298,12 +406,12 @@ export function MusicGenerator() {
                 {saveMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving to Library...
+                    Saving...
                   </>
                 ) : (
                   <>
                     <Save className="h-4 w-4 mr-2" />
-                    Save to Library
+                    {selectedPlaylistId ? "Save & Add to Playlist" : "Save to Library"}
                   </>
                 )}
               </Button>
