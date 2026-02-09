@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
-import { Search, Filter, X, Library, Sparkles } from "lucide-react";
+import { Search, Filter, X, Library, Sparkles, LayoutGrid, List } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   Select,
   SelectContent,
@@ -24,6 +25,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { SongCard } from "@/components/admin/SongCard";
+import { SongListRow } from "@/components/admin/SongListRow";
 import { PlaylistDropZone } from "@/components/admin/PlaylistDropZone";
 import {
   useSongsLibrary,
@@ -34,12 +36,15 @@ import {
   hasPromptData,
 } from "@/hooks/useSongLibrary";
 
+type ViewMode = "grid" | "list";
+
 export default function AdminLibrary() {
   const [search, setSearch] = useState("");
   const [promptSearch, setPromptSearch] = useState("");
   const [genre, setGenre] = useState<string | null>(null);
   const [mood, setMood] = useState<string | null>(null);
   const [notInPlaylist, setNotInPlaylist] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
   const { data: songs = [], isLoading: songsLoading } = useSongsLibrary();
   const { data: playlists = [], isLoading: playlistsLoading } = usePlaylistsWithCounts();
@@ -90,6 +95,21 @@ export default function AdminLibrary() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* View toggle */}
+            <ToggleGroup
+              type="single"
+              value={viewMode}
+              onValueChange={(v) => v && setViewMode(v as ViewMode)}
+              className="border rounded-md"
+            >
+              <ToggleGroupItem value="grid" aria-label="Grid view" className="h-8 w-8 p-0">
+                <LayoutGrid className="h-4 w-4" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="list" aria-label="List view" className="h-8 w-8 p-0">
+                <List className="h-4 w-4" />
+              </ToggleGroupItem>
+            </ToggleGroup>
+
             {/* Search */}
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -201,19 +221,27 @@ export default function AdminLibrary() {
       {/* Main content */}
       <div className="flex-1 min-h-0">
         <ResizablePanelGroup direction="horizontal">
-          {/* Songs grid panel */}
+          {/* Songs panel */}
           <ResizablePanel defaultSize={70} minSize={50}>
             <ScrollArea className="h-full">
               <div className="p-4">
                 {songsLoading ? (
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                    {[...Array(10)].map((_, i) => (
-                      <div
-                        key={i}
-                        className="aspect-square bg-muted animate-pulse rounded-lg"
-                      />
-                    ))}
-                  </div>
+                  viewMode === "grid" ? (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                      {[...Array(10)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="aspect-square bg-muted animate-pulse rounded-lg"
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {[...Array(10)].map((_, i) => (
+                        <div key={i} className="h-14 bg-muted animate-pulse rounded-lg" />
+                      ))}
+                    </div>
+                  )
                 ) : filteredSongs.length === 0 ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <Library className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -224,10 +252,32 @@ export default function AdminLibrary() {
                         : "Try adjusting your filters"}
                     </p>
                   </div>
-                ) : (
+                ) : viewMode === "grid" ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                     {filteredSongs.map((song) => (
                       <SongCard
+                        key={song.id}
+                        song={song}
+                        playlistNames={playlistNames}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {/* List header */}
+                    <div className="flex items-center gap-3 px-3 py-2 text-xs text-muted-foreground uppercase tracking-wider border-b border-border mb-2">
+                      <div className="w-4" /> {/* Drag handle space */}
+                      <div className="w-8" /> {/* Play button space */}
+                      <div className="w-10" /> {/* Cover space */}
+                      <div className="flex-1">Title</div>
+                      <div className="w-24 hidden md:block">Genre</div>
+                      <div className="w-20 hidden lg:block">Mood</div>
+                      <div className="w-48 hidden xl:block">AI Prompt</div>
+                      <div className="w-12 text-right">Time</div>
+                      <div className="w-32 hidden lg:block">Playlists</div>
+                    </div>
+                    {filteredSongs.map((song) => (
+                      <SongListRow
                         key={song.id}
                         song={song}
                         playlistNames={playlistNames}
