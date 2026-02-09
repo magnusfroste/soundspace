@@ -70,19 +70,19 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r border-border">
       <SidebarHeader className="p-4 group-data-[collapsible=icon]:p-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
+          <div className="flex items-center gap-2 min-w-0 group-data-[collapsible=icon]:hidden">
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
               <Music2 className="h-4 w-4 text-primary-foreground" />
             </div>
-            <div className="group-data-[collapsible=icon]:hidden min-w-0">
+            <div className="min-w-0">
               <h1 className="text-sm font-bold tracking-tight truncate" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                 SomHonesto
               </h1>
               <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Honest Sound</p>
             </div>
           </div>
-          <SidebarTrigger className="h-7 w-7 flex-shrink-0 group-data-[collapsible=icon]:hidden" />
+          <SidebarTrigger className="h-7 w-7 flex-shrink-0" />
         </div>
       </SidebarHeader>
 
