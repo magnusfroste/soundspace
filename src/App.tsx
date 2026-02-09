@@ -21,6 +21,8 @@ import AdminLibrary from "@/pages/AdminLibrary";
 import AdminPlaylists from "@/pages/AdminPlaylists";
 import AdminIntegrations from "@/pages/AdminIntegrations";
 import AdminSettings from "@/pages/AdminSettings";
+import MyPlaylists from "@/pages/MyPlaylists";
+import MyPlaylistDetail from "@/pages/MyPlaylistDetail";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -80,6 +82,8 @@ const App = () => (
               <Route path="/schedule" element={<SchedulePage />} />
               <Route path="/now-playing" element={<NowPlaying />} />
               <Route path="/announcements" element={<AnnouncementsPage />} />
+              <Route path="/my-playlists" element={<MyPlaylists />} />
+              <Route path="/my-playlists/:id" element={<MyPlaylistDetail />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/studio" element={<AdminAIStudio />} />
               <Route path="/admin/library" element={<AdminLibrary />} />

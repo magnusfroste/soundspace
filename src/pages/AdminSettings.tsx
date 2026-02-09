@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Settings, Music, Globe, Save, Loader2, Mic, Crown } from "lucide-react";
+import { Settings, Music, Globe, Save, Loader2, Mic, Crown, ListPlus } from "lucide-react";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -19,6 +19,7 @@ interface LandingPageSettings {
 
 interface PremiumFeatures {
   announcements_enabled: boolean;
+  custom_playlists_enabled: boolean;
 }
 
 export default function AdminSettings() {
@@ -29,6 +30,7 @@ export default function AdminSettings() {
   });
   const [premiumFeatures, setPremiumFeatures] = useState<PremiumFeatures>({
     announcements_enabled: false,
+    custom_playlists_enabled: false,
   });
 
   // Fetch landing page settings
@@ -92,6 +94,7 @@ export default function AdminSettings() {
       const value = premiumSettings.value as unknown as PremiumFeatures;
       setPremiumFeatures({
         announcements_enabled: value.announcements_enabled || false,
+        custom_playlists_enabled: value.custom_playlists_enabled || false,
       });
     }
   }, [premiumSettings]);
@@ -149,6 +152,12 @@ export default function AdminSettings() {
     savePremiumMutation.mutate(newFeatures);
   };
 
+  const handleToggleCustomPlaylists = (enabled: boolean) => {
+    const newFeatures = { ...premiumFeatures, custom_playlists_enabled: enabled };
+    setPremiumFeatures(newFeatures);
+    savePremiumMutation.mutate(newFeatures);
+  };
+
   const selectedPlaylist = playlists?.find((p) => p.id === landingSettings.playlist_id);
 
   return (
@@ -173,7 +182,7 @@ export default function AdminSettings() {
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
-                <Crown className="h-5 w-5 text-yellow-500" />
+                <Crown className="h-5 w-5 text-amber-500" />
                 <CardTitle>Premium Features</CardTitle>
               </div>
               <CardDescription>
@@ -198,6 +207,27 @@ export default function AdminSettings() {
                   id="announcements-toggle"
                   checked={premiumFeatures.announcements_enabled}
                   onCheckedChange={handleToggleAnnouncements}
+                  disabled={savePremiumMutation.isPending}
+                />
+              </div>
+
+              {/* Custom Playlists feature */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <ListPlus className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <Label htmlFor="custom-playlists-toggle">Custom Playlists</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Allow businesses to create and curate their own playlists
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="custom-playlists-toggle"
+                  checked={premiumFeatures.custom_playlists_enabled}
+                  onCheckedChange={handleToggleCustomPlaylists}
                   disabled={savePremiumMutation.isPending}
                 />
               </div>

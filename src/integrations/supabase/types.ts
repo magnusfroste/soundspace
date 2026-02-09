@@ -490,6 +490,83 @@ export type Database = {
         }
         Relationships: []
       }
+      user_playlist_songs: {
+        Row: {
+          added_at: string
+          id: string
+          position: number
+          song_id: string
+          user_playlist_id: string
+        }
+        Insert: {
+          added_at?: string
+          id?: string
+          position?: number
+          song_id: string
+          user_playlist_id: string
+        }
+        Update: {
+          added_at?: string
+          id?: string
+          position?: number
+          song_id?: string
+          user_playlist_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_playlist_songs_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_playlist_songs_user_playlist_id_fkey"
+            columns: ["user_playlist_id"]
+            isOneToOne: false
+            referencedRelation: "user_playlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_playlists: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          profile_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          profile_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          profile_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_playlists_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string

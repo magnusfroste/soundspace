@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Dialog,
   DialogContent,
@@ -18,13 +19,15 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from "@/components/ui/select";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { ChevronDown, Mic, Volume2 } from "lucide-react";
+import { ChevronDown, Mic, Volume2, Crown } from "lucide-react";
 import { useAnnouncements } from "@/hooks/useAnnouncements";
 import { useScheduleAnnouncements } from "@/hooks/useScheduleAnnouncements";
 import type { ScheduleEntry, CreateScheduleEntry, UpdateScheduleEntry } from "@/hooks/useSchedule";
@@ -63,7 +66,9 @@ export function ScheduleDialog({
   onDelete,
   isSaving,
 }: ScheduleDialogProps) {
+  const { user } = useAuth();
   const [playlistId, setPlaylistId] = useState("");
+  const [playlistType, setPlaylistType] = useState<"curated" | "user">("curated");
   const [dayOfWeek, setDayOfWeek] = useState(defaultDay);
   const [startTime, setStartTime] = useState(defaultTime);
   const [endTime, setEndTime] = useState("12:00");
@@ -73,8 +78,24 @@ export function ScheduleDialog({
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
 
-  // Fetch available playlists
-  const { data: playlists = [] } = useQuery({
+  // Fetch user's profile
+  const { data: profile } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch curated playlists
+  const { data: curatedPlaylists = [] } = useQuery({
     queryKey: ["playlists"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -84,6 +105,22 @@ export function ScheduleDialog({
       if (error) throw error;
       return data;
     },
+  });
+
+  // Fetch user playlists
+  const { data: userPlaylists = [] } = useQuery({
+    queryKey: ["user-playlists", profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+      const { data, error } = await supabase
+        .from("user_playlists")
+        .select("id, title, cover_image_url")
+        .eq("profile_id", profile.id)
+        .order("title");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profile?.id,
   });
 
   // Fetch premium features setting
@@ -100,7 +137,9 @@ export function ScheduleDialog({
     },
   });
 
-  const announcementsEnabled = (premiumSettings?.value as { announcements_enabled?: boolean })?.announcements_enabled ?? false;
+  const premiumFeatures = premiumSettings?.value as { announcements_enabled?: boolean; custom_playlists_enabled?: boolean } | null;
+  const announcementsEnabled = premiumFeatures?.announcements_enabled ?? false;
+  const customPlaylistsEnabled = premiumFeatures?.custom_playlists_enabled ?? false;
 
   // Fetch announcements
   const { announcements } = useAnnouncements();
@@ -234,11 +273,27 @@ export function ScheduleDialog({
                 <SelectValue placeholder="Select a playlist" />
               </SelectTrigger>
               <SelectContent>
-                {playlists.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.title}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectLabel>Curated Playlists</SelectLabel>
+                  {curatedPlaylists.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.title}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+                {customPlaylistsEnabled && userPlaylists.length > 0 && (
+                  <SelectGroup>
+                    <SelectLabel className="flex items-center gap-1">
+                      <Crown className="h-3 w-3 text-amber-500" />
+                      My Playlists
+                    </SelectLabel>
+                    {userPlaylists.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.title}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                )}
               </SelectContent>
             </Select>
           </div>
