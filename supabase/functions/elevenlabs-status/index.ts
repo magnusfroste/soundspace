@@ -43,23 +43,39 @@ serve(async (req) => {
       const errorText = await response.text();
       console.error("ElevenLabs API error:", response.status, errorText);
 
-      if (response.status === 401) {
-        return new Response(
-          JSON.stringify({
-            connected: false,
-            error: "Invalid API key",
-          }),
-          {
-            status: 200,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+      // Parse error details
+      let errorMessage = `API error: ${response.status}`;
+      try {
+        const errorData = JSON.parse(errorText);
+        if (errorData.detail?.status === "missing_permissions") {
+          // Key is valid but missing permissions - still show as connected
+          return new Response(
+            JSON.stringify({
+              connected: true,
+              tier: "unknown",
+              character_count: 0,
+              character_limit: 0,
+              usage_percent: 0,
+              next_reset: null,
+              limited_access: true,
+              error_detail: "API key lacks 'user_read' permission for usage stats",
+            }),
+            {
+              status: 200,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        } else if (response.status === 401) {
+          errorMessage = "Invalid API key";
+        }
+      } catch {
+        // Ignore JSON parse errors
       }
 
       return new Response(
         JSON.stringify({
           connected: false,
-          error: `API error: ${response.status}`,
+          error: errorMessage,
         }),
         {
           status: 200,
