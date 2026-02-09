@@ -26,33 +26,56 @@ interface MatchedPlaylist extends Playlist {
 // Energy level mapping for playlists
 const ENERGY_MAP: Record<string, string[]> = {
   calm: ["relaxed", "mellow", "peaceful", "zen", "quiet", "soothing"],
+  chill: ["chill", "lofi", "lo-fi", "laid-back", "easy", "smooth"],
   focus: ["focused", "productive", "background", "ambient", "work", "study"],
-  energy: ["energetic", "upbeat", "lively", "dynamic", "vibrant", "fun"],
+  upbeat: ["upbeat", "positive", "happy", "cheerful", "bright", "pop"],
+  groove: ["groove", "groovy", "rhythmic", "soul", "funk", "smooth"],
+  energy: ["energetic", "lively", "dynamic", "vibrant", "fun", "high-energy"],
 };
 
 // Match atmosphere to energy level
 function getEnergyForAtmosphere(atmosphere: string): string | null {
   const lower = atmosphere.toLowerCase();
   
-  // Direct matches to energy levels
+  // Direct matches to energy levels (exact playlist names)
+  if (lower === "calm") return "calm";
+  if (lower === "chill") return "chill";
+  if (lower === "focus") return "focus";
+  if (lower === "upbeat") return "upbeat";
+  if (lower === "groove") return "groove";
+  if (lower === "energy") return "energy";
+  
+  // Keyword matches
   if (lower.includes("calm") || lower.includes("relaxed") || lower.includes("peaceful") || lower.includes("zen")) {
     return "calm";
   }
-  if (lower.includes("focused") || lower.includes("professional") || lower.includes("productive") || lower.includes("work")) {
+  if (lower.includes("chill") || lower.includes("lofi") || lower.includes("laid-back")) {
+    return "chill";
+  }
+  if (lower.includes("focused") || lower.includes("professional") || lower.includes("productive") || lower.includes("work") || lower.includes("minimal")) {
     return "focus";
   }
-  if (lower.includes("energetic") || lower.includes("upbeat") || lower.includes("lively") || lower.includes("dynamic") || lower.includes("vibrant")) {
+  if (lower.includes("upbeat") || lower.includes("positive") || lower.includes("happy") || lower.includes("cheerful")) {
+    return "upbeat";
+  }
+  if (lower.includes("groove") || lower.includes("rhythmic") || lower.includes("soul") || lower.includes("funk")) {
+    return "groove";
+  }
+  if (lower.includes("energetic") || lower.includes("lively") || lower.includes("dynamic") || lower.includes("vibrant")) {
     return "energy";
   }
   
-  // Additional mappings
+  // Style mappings
   if (lower.includes("cozy") || lower.includes("intimate") || lower.includes("mellow")) {
-    return "calm";
+    return "chill";
   }
   if (lower.includes("modern") || lower.includes("sophisticated") || lower.includes("elegant")) {
     return "focus";
   }
-  if (lower.includes("fun") || lower.includes("party") || lower.includes("social")) {
+  if (lower.includes("casual") || lower.includes("social")) {
+    return "upbeat";
+  }
+  if (lower.includes("fun") || lower.includes("party")) {
     return "energy";
   }
   
