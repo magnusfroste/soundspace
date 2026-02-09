@@ -25,6 +25,9 @@ export function ScheduleBlock({
   const blockRef = useRef<HTMLDivElement>(null);
   const [isResizing, setIsResizing] = useState<"top" | "bottom" | null>(null);
   const [previewTimes, setPreviewTimes] = useState<{ start: string; end: string } | null>(null);
+  
+  // Ref to track latest preview times for use in event handlers (avoids stale closure)
+  const previewTimesRef = useRef<{ start: string; end: string } | null>(null);
 
   // Parse times
   const [startH, startM] = entry.start_time.split(":").map(Number);
@@ -80,14 +83,18 @@ export function ScheduleBlock({
         const [newH, newM] = newStartTime.split(":").map(Number);
         const newStartOffset = (newH - startHour) + (newM / 60);
         if (newStartOffset < endOffset - 0.25) {
-          setPreviewTimes({ start: newStartTime, end: entry.end_time });
+          const newTimes = { start: newStartTime, end: entry.end_time };
+          previewTimesRef.current = newTimes;
+          setPreviewTimes(newTimes);
         }
       } else {
         const newEndTime = pixelToTime(deltaY);
         const [newH, newM] = newEndTime.split(":").map(Number);
         const newEndOffset = (newH - startHour) + (newM / 60);
         if (newEndOffset > startOffset + 0.25) {
-          setPreviewTimes({ start: entry.start_time, end: newEndTime });
+          const newTimes = { start: entry.start_time, end: newEndTime };
+          previewTimesRef.current = newTimes;
+          setPreviewTimes(newTimes);
         }
       }
     };
@@ -97,8 +104,11 @@ export function ScheduleBlock({
       document.removeEventListener("mouseup", handleMouseUp);
       setIsResizing(null);
       
-      if (previewTimes) {
-        onResize(entry.id, previewTimes.start, previewTimes.end);
+      // Use ref to get the latest preview times (avoids stale closure)
+      const finalTimes = previewTimesRef.current;
+      if (finalTimes) {
+        onResize(entry.id, finalTimes.start, finalTimes.end);
+        previewTimesRef.current = null;
         setPreviewTimes(null);
       }
     };
