@@ -16,8 +16,7 @@ interface MatchedPlaylist {
 }
 
 interface MatchingStepProps {
-  businessType: string;
-  businessSubtype: string;
+  energy: string;
   atmospheres: string[];
   preferredGenres: string[];
   onComplete: (playlistIds: string[]) => Promise<void>;
@@ -25,8 +24,7 @@ interface MatchingStepProps {
 }
 
 export function MatchingStep({
-  businessType,
-  businessSubtype,
+  energy,
   atmospheres,
   preferredGenres,
   onComplete,
@@ -47,13 +45,14 @@ export function MatchingStep({
     setError(null);
 
     try {
+      // Combine energy with atmospheres for matching
+      const combinedAtmospheres = [energy, ...atmospheres];
+      
       const { data, error: fnError } = await supabase.functions.invoke(
         "match-business-playlists",
         {
           body: {
-            businessType,
-            businessSubtype,
-            atmospheres,
+            atmospheres: combinedAtmospheres,
             preferredGenres,
           },
         }
@@ -106,6 +105,16 @@ export function MatchingStep({
     }
   };
 
+  // Get friendly label for energy
+  const getEnergyLabel = (e: string) => {
+    switch (e) {
+      case "calm": return "calm";
+      case "focus": return "focused";
+      case "energy": return "energetic";
+      default: return e;
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-8">
@@ -115,7 +124,7 @@ export function MatchingStep({
             <span className="text-lg font-medium">Finding your perfect playlists...</span>
           </div>
           <p className="text-muted-foreground">
-            Analyzing your {businessSubtype?.replace("_", " ") || businessType}'s atmosphere
+            Looking for {getEnergyLabel(energy)} music that fits your vibe
           </p>
         </div>
 
@@ -163,7 +172,7 @@ export function MatchingStep({
           Here are your playlists
         </h2>
         <p className="text-muted-foreground">
-          Curated for your {businessSubtype?.replace("_", " ") || businessType}
+          Curated for a {getEnergyLabel(energy)} atmosphere
         </p>
       </div>
 

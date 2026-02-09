@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useOnboarding } from "@/hooks/useOnboarding";
-import { BusinessTypeStep } from "@/components/onboarding/BusinessTypeStep";
+import { EnergyStep } from "@/components/onboarding/EnergyStep";
 import { AtmosphereStep } from "@/components/onboarding/AtmosphereStep";
 import { GenreStep } from "@/components/onboarding/GenreStep";
 import { MatchingStep } from "@/components/onboarding/MatchingStep";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
-type Step = "business" | "atmosphere" | "genre" | "matching";
+type Step = "energy" | "atmosphere" | "genre" | "matching";
 
 export default function Onboarding() {
   const navigate = useNavigate();
@@ -17,19 +17,33 @@ export default function Onboarding() {
     onboardingCompleted,
     state,
     setBusinessType,
-    setBusinessSubtype,
     setAtmospheres,
     setPreferredGenres,
     completeOnboarding,
   } = useOnboarding();
 
-  const [step, setStep] = useState<Step>("business");
+  const [step, setStep] = useState<Step>("energy");
+  // Local energy state that maps to businessType for storage
+  const [energy, setEnergy] = useState(state.businessType || "");
 
   useEffect(() => {
     if (!loading && onboardingCompleted) {
       navigate("/app", { replace: true });
     }
   }, [loading, onboardingCompleted, navigate]);
+
+  // Sync energy from loaded state
+  useEffect(() => {
+    if (state.businessType) {
+      setEnergy(state.businessType);
+    }
+  }, [state.businessType]);
+
+  const handleEnergyChange = (value: string) => {
+    setEnergy(value);
+    // Store energy as businessType for backwards compatibility
+    setBusinessType(value);
+  };
 
   if (loading) {
     return (
@@ -72,11 +86,11 @@ export default function Onboarding() {
       {/* Progress indicator */}
       <div className="container mx-auto px-4 py-6">
         <div className="flex justify-center gap-2 mb-8">
-          {(["business", "atmosphere", "genre", "matching"] as Step[]).map((s, i) => (
+          {(["energy", "atmosphere", "genre", "matching"] as Step[]).map((s, i) => (
             <div
               key={s}
               className={`h-1.5 w-12 rounded-full transition-colors ${
-                ["business", "atmosphere", "genre", "matching"].indexOf(step) >= i
+                ["energy", "atmosphere", "genre", "matching"].indexOf(step) >= i
                   ? "bg-primary"
                   : "bg-muted"
               }`}
@@ -87,12 +101,10 @@ export default function Onboarding() {
 
       {/* Content */}
       <main className="container mx-auto px-4 pb-12">
-        {step === "business" && (
-          <BusinessTypeStep
-            businessType={state.businessType}
-            businessSubtype={state.businessSubtype}
-            onBusinessTypeChange={setBusinessType}
-            onBusinessSubtypeChange={setBusinessSubtype}
+        {step === "energy" && (
+          <EnergyStep
+            selectedEnergy={energy}
+            onEnergyChange={handleEnergyChange}
             onNext={() => setStep("atmosphere")}
           />
         )}
@@ -102,7 +114,7 @@ export default function Onboarding() {
             atmospheres={state.atmospheres}
             onAtmospheresChange={setAtmospheres}
             onNext={() => setStep("genre")}
-            onBack={() => setStep("business")}
+            onBack={() => setStep("energy")}
           />
         )}
 
@@ -117,8 +129,7 @@ export default function Onboarding() {
 
         {step === "matching" && (
           <MatchingStep
-            businessType={state.businessType}
-            businessSubtype={state.businessSubtype}
+            energy={energy}
             atmospheres={state.atmospheres}
             preferredGenres={state.preferredGenres}
             onComplete={completeOnboarding}
