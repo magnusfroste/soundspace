@@ -1,30 +1,57 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Zap, Wind, Brain } from "lucide-react";
+import { Zap, Wind, Brain, Coffee, Sun, Music2 } from "lucide-react";
 
 const ENERGY_LEVELS = [
   {
     value: "calm",
     label: "Calm",
-    description: "Relaxed, peaceful background music",
+    description: "Peaceful, soothing atmosphere",
     icon: Wind,
     color: "text-emerald-500",
     bgColor: "bg-emerald-500/10",
     borderColor: "border-emerald-500",
   },
   {
+    value: "chill",
+    label: "Chill",
+    description: "Relaxed beats with gentle pulse",
+    icon: Coffee,
+    color: "text-teal-500",
+    bgColor: "bg-teal-500/10",
+    borderColor: "border-teal-500",
+  },
+  {
     value: "focus",
     label: "Focus",
-    description: "Subtle, non-distracting atmosphere",
+    description: "Subtle, non-distracting background",
     icon: Brain,
     color: "text-blue-500",
     bgColor: "bg-blue-500/10",
     borderColor: "border-blue-500",
   },
   {
+    value: "upbeat",
+    label: "Upbeat",
+    description: "Positive energy that lifts mood",
+    icon: Sun,
+    color: "text-yellow-500",
+    bgColor: "bg-yellow-500/10",
+    borderColor: "border-yellow-500",
+  },
+  {
+    value: "groove",
+    label: "Groove",
+    description: "Rhythmic and smooth vibes",
+    icon: Music2,
+    color: "text-purple-500",
+    bgColor: "bg-purple-500/10",
+    borderColor: "border-purple-500",
+  },
+  {
     value: "energy",
     label: "Energy",
-    description: "Upbeat, vibrant and dynamic",
+    description: "Dynamic, vibrant and lively",
     icon: Zap,
     color: "text-amber-500",
     bgColor: "bg-amber-500/10",
@@ -52,7 +79,7 @@ export function EnergyStep({
         </p>
       </div>
 
-      <div className="grid gap-4 max-w-md mx-auto">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl mx-auto">
         {ENERGY_LEVELS.map((energy) => {
           const isSelected = selectedEnergy === energy.value;
           const Icon = energy.icon;
