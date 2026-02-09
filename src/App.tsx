@@ -8,6 +8,7 @@ import { PlayerProvider } from "@/contexts/PlayerContext";
 import { AppLayout } from "@/components/AppLayout";
 import Index from "@/pages/Index";
 import AuthPage from "@/pages/Auth";
+import Onboarding from "@/pages/Onboarding";
 import HomePage from "@/pages/Home";
 import PlaylistsPage from "@/pages/Playlists";
 import PlaylistDetail from "@/pages/PlaylistDetail";
@@ -50,6 +51,13 @@ function AuthGuard() {
   return <AuthPage />;
 }
 
+function OnboardingGuard() {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  if (!user) return <Navigate to="/auth" replace />;
+  return <Onboarding />;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -61,6 +69,7 @@ const App = () => (
             {/* Public routes */}
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthGuard />} />
+            <Route path="/onboarding" element={<OnboardingGuard />} />
             
             {/* Protected app routes */}
             <Route element={<ProtectedRoutes />}>

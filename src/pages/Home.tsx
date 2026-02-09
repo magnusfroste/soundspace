@@ -4,14 +4,62 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { Music, Play, ListMusic } from "lucide-react";
+import { Music, Play, ListMusic, Sparkles, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+
+interface Profile {
+  onboarding_completed: boolean | null;
+  suggested_playlist_ids: string[] | null;
+  business_type: string | null;
+  business_subtype: string | null;
+}
 
 export default function HomePage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { playQueue } = usePlayer();
 
-  const { data: playlists } = useQuery({
+  // Fetch profile to check onboarding status
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("onboarding_completed, suggested_playlist_ids, business_type, business_subtype")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data as Profile | null;
+    },
+    enabled: !!user,
+  });
+
+  // Redirect to onboarding if not completed
+  useEffect(() => {
+    if (!profileLoading && profile && !profile.onboarding_completed) {
+      navigate("/onboarding", { replace: true });
+    }
+  }, [profileLoading, profile, navigate]);
+
+  // Fetch suggested playlists if they exist
+  const { data: suggestedPlaylists } = useQuery({
+    queryKey: ["suggested-playlists", profile?.suggested_playlist_ids],
+    queryFn: async () => {
+      if (!profile?.suggested_playlist_ids?.length) return [];
+      const { data, error } = await supabase
+        .from("playlists")
+        .select("*")
+        .in("id", profile.suggested_playlist_ids);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profile?.suggested_playlist_ids?.length,
+  });
+
+  // Fetch all playlists for "Explore more"
+  const { data: allPlaylists } = useQuery({
     queryKey: ["playlists"],
     queryFn: async () => {
       const { data, error } = await supabase.from("playlists").select("*").limit(6);
@@ -21,29 +69,89 @@ export default function HomePage() {
     enabled: !!user,
   });
 
+  // Filter out suggested playlists from "Explore more" section
+  const explorePlaylists = allPlaylists?.filter(
+    (pl) => !profile?.suggested_playlist_ids?.includes(pl.id)
+  );
+
+  const hasSuggestedPlaylists = suggestedPlaylists && suggestedPlaylists.length > 0;
+  const businessLabel = profile?.business_subtype?.replace(/_/g, " ") || profile?.business_type;
+
+  if (profileLoading) {
+    return (
+      <div className="space-y-8">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-4 w-48" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-48 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Bem-vindo ao SomHonesto</h1>
+        <h1 className="text-3xl font-bold">Welcome to SomHonesto</h1>
         <p className="text-muted-foreground mt-2">
-          Música ambiente de alta qualidade para o seu negócio.
+          {hasSuggestedPlaylists
+            ? `Curated playlists for your ${businessLabel}`
+            : "High-quality ambient music for your business."}
         </p>
       </div>
 
+      {/* Suggested Playlists Section */}
+      {hasSuggestedPlaylists && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-semibold">Your Playlists</h2>
+            <Badge variant="secondary" className="ml-2">Recommended</Badge>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {suggestedPlaylists.map((pl) => (
+              <Link
+                key={pl.id}
+                to={`/playlists/${pl.id}`}
+                className="glass glass-hover rounded-xl p-4 group cursor-pointer border-2 border-primary/20"
+              >
+                <div className="h-32 rounded-lg bg-muted mb-3 flex items-center justify-center overflow-hidden relative">
+                  {pl.cover_image_url ? (
+                    <img src={pl.cover_image_url} alt={pl.title} className="h-full w-full object-cover" />
+                  ) : (
+                    <Music className="h-10 w-10 text-muted-foreground" />
+                  )}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Play className="h-10 w-10 text-primary" />
+                  </div>
+                </div>
+                <h3 className="font-semibold truncate">{pl.title}</h3>
+                <p className="text-xs text-muted-foreground truncate mt-1">{pl.description || pl.category || "Playlist"}</p>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Explore More Section */}
       <section>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold flex items-center gap-2">
             <ListMusic className="h-5 w-5 text-primary" />
-            Playlists em Destaque
+            {hasSuggestedPlaylists ? "Explore More" : "Featured Playlists"}
           </h2>
-          <Link to="/playlists" className="text-sm text-primary hover:underline">
-            Ver todas
+          <Link to="/playlists" className="text-sm text-primary hover:underline flex items-center gap-1">
+            View all
+            <ChevronRight className="h-4 w-4" />
           </Link>
         </div>
 
-        {playlists && playlists.length > 0 ? (
+        {explorePlaylists && explorePlaylists.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {playlists.map((pl) => (
+            {explorePlaylists.slice(0, hasSuggestedPlaylists ? 3 : 6).map((pl) => (
               <Link
                 key={pl.id}
                 to={`/playlists/${pl.id}`}
@@ -64,13 +172,13 @@ export default function HomePage() {
               </Link>
             ))}
           </div>
-        ) : (
+        ) : !hasSuggestedPlaylists ? (
           <div className="glass rounded-xl p-8 text-center">
             <Music className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground">Nenhuma playlist disponível ainda.</p>
-            <p className="text-xs text-muted-foreground mt-1">Um admin precisa criar playlists para começar.</p>
+            <p className="text-muted-foreground">No playlists available yet.</p>
+            <p className="text-xs text-muted-foreground mt-1">An admin needs to create playlists to get started.</p>
           </div>
-        )}
+        ) : null}
       </section>
     </div>
   );

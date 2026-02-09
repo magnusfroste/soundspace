@@ -223,29 +223,44 @@ export type Database = {
       }
       profiles: {
         Row: {
+          atmospheres: string[] | null
           business_name: string | null
+          business_subtype: string | null
           business_type: string | null
           created_at: string
           id: string
           location: string | null
+          onboarding_completed: boolean | null
+          preferred_genres: string[] | null
+          suggested_playlist_ids: string[] | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          atmospheres?: string[] | null
           business_name?: string | null
+          business_subtype?: string | null
           business_type?: string | null
           created_at?: string
           id?: string
           location?: string | null
+          onboarding_completed?: boolean | null
+          preferred_genres?: string[] | null
+          suggested_playlist_ids?: string[] | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          atmospheres?: string[] | null
           business_name?: string | null
+          business_subtype?: string | null
           business_type?: string | null
           created_at?: string
           id?: string
           location?: string | null
+          onboarding_completed?: boolean | null
+          preferred_genres?: string[] | null
+          suggested_playlist_ids?: string[] | null
           updated_at?: string
           user_id?: string
         }

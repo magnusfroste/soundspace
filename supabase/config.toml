@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.suggest-playlist]
 verify_jwt = false
+
+[functions.match-business-playlists]
+verify_jwt = false
+
+[functions.elevenlabs-status]
+verify_jwt = false
