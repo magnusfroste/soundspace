@@ -173,7 +173,7 @@ export function useAIStudio() {
 
       const songTitle = title.trim() || `AI Generated - ${new Date().toLocaleDateString()}`;
 
-      // Insert into songs table
+      // Insert into songs table with prompt metadata
       const { data: songData, error: insertError } = await supabase
         .from("songs")
         .insert({
@@ -184,6 +184,7 @@ export function useAIStudio() {
           genre: item.genre || null,
           mood: item.mood || null,
           origin_source: `ai_${item.provider}`,
+          prompt: item.prompt, // Store the original AI prompt for future matching
         })
         .select("id")
         .single();

@@ -32,6 +32,7 @@ export interface UserPlaylistSong {
     bpm: number | null;
     created_at: string;
     origin_source: string | null;
+    prompt: string | null;
   };
 }
 
