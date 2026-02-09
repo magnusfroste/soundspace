@@ -15,7 +15,6 @@ interface Playlist {
   id: string;
   title: string;
   description: string | null;
-  category: string | null;
   cover_image_url: string | null;
 }
 
@@ -96,11 +95,11 @@ function scorePlaylist(playlist: Playlist, targetEnergies: string[]): number {
     else if (title.includes(energy)) {
       score += 50;
     }
-    // Check category match
-    else if (playlist.category) {
-      const category = playlist.category.toLowerCase();
+    // Check description for keywords
+    else if (playlist.description) {
+      const description = playlist.description.toLowerCase();
       const energyKeywords = ENERGY_MAP[energy] || [];
-      if (energyKeywords.some(kw => category.includes(kw))) {
+      if (energyKeywords.some(kw => description.includes(kw))) {
         score += 25;
       }
     }
@@ -143,7 +142,7 @@ Deno.serve(async (req) => {
     // Fetch all playlists
     const { data: playlists, error: playlistError } = await supabase
       .from("playlists")
-      .select("id, title, description, category, cover_image_url");
+      .select("id, title, description, cover_image_url");
 
     if (playlistError) {
       console.error("Error fetching playlists:", playlistError);
@@ -207,7 +206,6 @@ Deno.serve(async (req) => {
         id: playlist.id,
         title: playlist.title,
         description: playlist.description,
-        category: playlist.category,
         cover_image_url: playlist.cover_image_url,
         reasoning,
       };
