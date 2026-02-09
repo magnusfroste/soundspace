@@ -17,11 +17,11 @@ const statusColors: Record<string, string> = {
 
 export function ProviderTabs({ providers, activeProviderId, onSelect }: ProviderTabsProps) {
   return (
-    <div className="flex items-center gap-2 p-1 bg-muted/50 rounded-lg">
+    <div className="flex items-center gap-2 p-1 bg-muted/50 rounded-lg overflow-x-auto">
       {providers.map((provider) => {
         const Icon = provider.icon;
         const isActive = provider.id === activeProviderId;
-        const isAvailable = provider.status === "ready" || provider.status === "configuring";
+        const isAvailable = provider.status !== "coming_soon";
 
         return (
           <button
@@ -29,7 +29,7 @@ export function ProviderTabs({ providers, activeProviderId, onSelect }: Provider
             onClick={() => isAvailable && onSelect(provider.id)}
             disabled={!isAvailable}
             className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
+              "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap",
               isActive
                 ? "bg-background text-foreground shadow-sm"
                 : isAvailable
@@ -48,6 +48,11 @@ export function ProviderTabs({ providers, activeProviderId, onSelect }: Provider
             {provider.status === "coming_soon" && (
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                 Soon
+              </Badge>
+            )}
+            {provider.status === "configuring" && isActive && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-yellow-500/50 text-yellow-600">
+                Setup
               </Badge>
             )}
           </button>

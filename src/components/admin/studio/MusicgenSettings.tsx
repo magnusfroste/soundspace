@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Settings, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Settings, Loader2, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,22 +11,28 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { getLocalConfig, setLocalConfig } from "@/lib/ai-providers";
+import { getMusicgenConfig, setMusicgenConfig, MUSICGEN_MODELS } from "@/lib/ai-providers";
 import { toast } from "sonner";
 
-export function LocalAISettings() {
-  const config = getLocalConfig();
-  const [endpointUrl, setEndpointUrl] = useState(config.endpointUrl || "http://localhost:11434");
-  const [model, setModel] = useState(config.model || "");
+export function MusicgenSettings() {
+  const config = getMusicgenConfig();
   const [apiKey, setApiKey] = useState(config.apiKey || "");
+  const [model, setModel] = useState(config.model || "facebook/musicgen-small");
   const [isTesting, setIsTesting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "connected" | "failed">("idle");
   const [open, setOpen] = useState(false);
 
   const handleTestConnection = async () => {
-    if (!endpointUrl) {
-      toast.error("Please enter an endpoint URL");
+    if (!apiKey) {
+      toast.error("Please enter an API key first");
       return;
     }
 
@@ -34,37 +40,35 @@ export function LocalAISettings() {
     setConnectionStatus("idle");
 
     try {
-      const headers: Record<string, string> = {};
-      if (apiKey) {
-        headers["Authorization"] = `Bearer ${apiKey}`;
-      }
-
-      const response = await fetch(`${endpointUrl}/api/tags`, {
-        method: "GET",
-        headers,
-        signal: AbortSignal.timeout(5000),
+      const response = await fetch("https://api.replicate.com/v1/account", {
+        headers: {
+          "Authorization": `Token ${apiKey}`,
+        },
+        signal: AbortSignal.timeout(10000),
       });
 
       if (response.ok) {
         setConnectionStatus("connected");
-        toast.success("Connected to local AI endpoint");
+        toast.success("Connected to Replicate API");
       } else {
         setConnectionStatus("failed");
-        toast.error("Failed to connect to endpoint");
+        toast.error("Invalid API key");
       }
     } catch {
       setConnectionStatus("failed");
-      toast.error("Connection failed - is Ollama/LMStudio running?");
+      toast.error("Connection failed");
     } finally {
       setIsTesting(false);
     }
   };
 
   const handleSave = () => {
-    setLocalConfig({ endpointUrl, model, apiKey });
-    toast.success("Local AI settings saved");
+    setMusicgenConfig({ apiKey, model });
+    toast.success("MusicGen settings saved");
     setOpen(false);
   };
+
+  const selectedModel = MUSICGEN_MODELS.find((m) => m.id === model);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -76,59 +80,67 @@ export function LocalAISettings() {
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Local AI Configuration</DialogTitle>
+          <DialogTitle>MusicGen Configuration</DialogTitle>
           <DialogDescription>
-            Configure your self-hosted AI endpoint for music generation.
-            Supports Ollama and LMStudio.
+            Connect to Replicate to use Meta's MusicGen model.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="endpoint">Endpoint URL</Label>
-            <Input
-              id="endpoint"
-              placeholder="http://localhost:11434"
-              value={endpointUrl}
-              onChange={(e) => setEndpointUrl(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Default Ollama: http://localhost:11434 • LMStudio: http://localhost:1234
+          <div className="p-3 rounded-lg bg-muted/50 text-sm">
+            <p className="font-medium mb-1">Getting a Replicate API Key</p>
+            <p className="text-muted-foreground text-xs mb-2">
+              Create a Replicate account and generate an API token to use MusicGen.
             </p>
+            <a
+              href="https://replicate.com/account/api-tokens"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline inline-flex items-center gap-1 text-xs"
+            >
+              Get API Token <ExternalLink className="h-3 w-3" />
+            </a>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="model">Model Name</Label>
+            <Label htmlFor="replicate-key">Replicate API Token</Label>
             <Input
-              id="model"
-              placeholder="e.g., audioldm2, musicgen"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              The model must support audio generation
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="api-key">API Key (Optional)</Label>
-            <Input
-              id="api-key"
+              id="replicate-key"
               type="password"
-              placeholder="Leave empty if not required"
+              placeholder="r8_..."
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">
-              Only needed if your endpoint requires authentication
-            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="model-select">Model</Label>
+            <Select value={model} onValueChange={setModel}>
+              <SelectTrigger id="model-select">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MUSICGEN_MODELS.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    <div className="flex flex-col">
+                      <span>{m.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedModel && (
+              <p className="text-xs text-muted-foreground">
+                {selectedModel.description}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               onClick={handleTestConnection}
-              disabled={isTesting || !endpointUrl}
+              disabled={isTesting || !apiKey}
             >
               {isTesting ? (
                 <>
@@ -159,7 +171,7 @@ export function LocalAISettings() {
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={!endpointUrl}>
+          <Button onClick={handleSave} disabled={!apiKey}>
             Save Settings
           </Button>
         </div>

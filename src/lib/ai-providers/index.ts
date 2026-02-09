@@ -1,8 +1,8 @@
 export * from "./types";
 export { elevenlabsProvider } from "./elevenlabs";
 export { localAIProvider, getLocalConfig, setLocalConfig } from "./local";
-export { mubertProvider } from "./mubert";
-export { musicgenProvider } from "./musicgen";
+export { mubertProvider, getMubertConfig, setMubertConfig } from "./mubert";
+export { musicgenProvider, getMusicgenConfig, setMusicgenConfig, MUSICGEN_MODELS } from "./musicgen";
 
 import { elevenlabsProvider } from "./elevenlabs";
 import { localAIProvider } from "./local";
