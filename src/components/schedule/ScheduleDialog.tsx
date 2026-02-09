@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -18,6 +19,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown, Mic, Volume2 } from "lucide-react";
+import { useAnnouncements } from "@/hooks/useAnnouncements";
+import { useScheduleAnnouncements } from "@/hooks/useScheduleAnnouncements";
 import type { ScheduleEntry, CreateScheduleEntry, UpdateScheduleEntry } from "@/hooks/useSchedule";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -59,6 +68,10 @@ export function ScheduleDialog({
   const [startTime, setStartTime] = useState(defaultTime);
   const [endTime, setEndTime] = useState("12:00");
   const [color, setColor] = useState(COLORS[0]);
+  const [selectedAnnouncementIds, setSelectedAnnouncementIds] = useState<string[]>([]);
+  const [announcementsOpen, setAnnouncementsOpen] = useState(false);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
 
   // Fetch available playlists
   const { data: playlists = [] } = useQuery({
@@ -72,6 +85,28 @@ export function ScheduleDialog({
       return data;
     },
   });
+
+  // Fetch premium features setting
+  const { data: premiumSettings } = useQuery({
+    queryKey: ["site-settings", "premium_features"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("site_settings")
+        .select("*")
+        .eq("key", "premium_features")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const announcementsEnabled = (premiumSettings?.value as { announcements_enabled?: boolean })?.announcements_enabled ?? false;
+
+  // Fetch announcements
+  const { announcements } = useAnnouncements();
+
+  // Fetch linked announcements for this entry
+  const { linkedAnnouncementIds, linkAnnouncements, isLinking } = useScheduleAnnouncements(entry?.id);
 
   // Populate form when editing
   useEffect(() => {
@@ -87,8 +122,16 @@ export function ScheduleDialog({
       setStartTime(defaultTime);
       setEndTime(calculateEndTime(defaultTime));
       setColor(COLORS[Math.floor(Math.random() * COLORS.length)]);
+      setSelectedAnnouncementIds([]);
     }
   }, [entry, defaultDay, defaultTime, open]);
+
+  // Load linked announcements when editing
+  useEffect(() => {
+    if (entry && linkedAnnouncementIds.length > 0) {
+      setSelectedAnnouncementIds(linkedAnnouncementIds);
+    }
+  }, [entry, linkedAnnouncementIds]);
 
   const calculateEndTime = (start: string): string => {
     const [h] = start.split(":").map(Number);
@@ -100,6 +143,8 @@ export function ScheduleDialog({
     e.preventDefault();
     if (!playlistId) return;
 
+    let savedEntryId = entry?.id;
+
     if (entry) {
       await onSave({
         id: entry.id,
@@ -110,14 +155,25 @@ export function ScheduleDialog({
         color,
       });
     } else {
-      await onSave({
+      // For new entries, we need to get the ID from the save operation
+      const result = await onSave({
         playlist_id: playlistId,
         day_of_week: dayOfWeek,
         start_time: startTime,
         end_time: endTime,
         color,
       });
+      // Note: result might contain the new entry ID if the parent passes it back
     }
+
+    // Link announcements if editing an existing entry
+    if (savedEntryId && announcementsEnabled) {
+      await linkAnnouncements({
+        scheduleEntryId: savedEntryId,
+        announcementIds: selectedAnnouncementIds,
+      });
+    }
+
     onOpenChange(false);
   };
 
@@ -128,9 +184,43 @@ export function ScheduleDialog({
     }
   };
 
+  const toggleAnnouncement = (id: string) => {
+    setSelectedAnnouncementIds((prev) =>
+      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id]
+    );
+  };
+
+  const handlePlayAnnouncement = (announcement: { id: string; file_url: string }) => {
+    if (audioElement) {
+      audioElement.pause();
+      audioElement.currentTime = 0;
+    }
+
+    if (playingId === announcement.id) {
+      setPlayingId(null);
+      setAudioElement(null);
+      return;
+    }
+
+    const audio = new Audio(announcement.file_url);
+    audio.onended = () => {
+      setPlayingId(null);
+      setAudioElement(null);
+    };
+    audio.play();
+    setPlayingId(announcement.id);
+    setAudioElement(audio);
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{entry ? "Edit Time Block" : "Add Time Block"}</DialogTitle>
         </DialogHeader>
@@ -215,6 +305,85 @@ export function ScheduleDialog({
             </div>
           </div>
 
+          {/* Announcements Section (Premium) */}
+          {announcementsEnabled && announcements.length > 0 && entry && (
+            <Collapsible open={announcementsOpen} onOpenChange={setAnnouncementsOpen}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    <Mic className="h-4 w-4" />
+                    <span>Announcements</span>
+                    {selectedAnnouncementIds.length > 0 && (
+                      <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
+                        {selectedAnnouncementIds.length}
+                      </span>
+                    )}
+                  </div>
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${
+                      announcementsOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-3">
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {announcements.map((announcement) => (
+                    <div
+                      key={announcement.id}
+                      className="flex items-center gap-3 p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                    >
+                      <Checkbox
+                        id={`announcement-${announcement.id}`}
+                        checked={selectedAnnouncementIds.includes(announcement.id)}
+                        onCheckedChange={() => toggleAnnouncement(announcement.id)}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 flex-shrink-0"
+                        onClick={() => handlePlayAnnouncement(announcement)}
+                      >
+                        <Volume2
+                          className={`h-4 w-4 ${
+                            playingId === announcement.id ? "text-primary" : ""
+                          }`}
+                        />
+                      </Button>
+                      <div className="flex-1 min-w-0">
+                        <label
+                          htmlFor={`announcement-${announcement.id}`}
+                          className="text-sm font-medium cursor-pointer block truncate"
+                        >
+                          {announcement.title}
+                        </label>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDuration(announcement.duration)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Selected announcements will play randomly during this block
+                </p>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {/* Show message for new entries */}
+          {announcementsEnabled && !entry && (
+            <p className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
+              <Mic className="h-4 w-4 inline mr-1" />
+              Save this block first, then edit it to add announcements
+            </p>
+          )}
+
           <DialogFooter className="flex gap-2 sm:gap-0">
             {entry && onDelete && (
               <Button
@@ -229,8 +398,8 @@ export function ScheduleDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!playlistId || isSaving}>
-              {isSaving ? "Saving..." : entry ? "Update" : "Add"}
+            <Button type="submit" disabled={!playlistId || isSaving || isLinking}>
+              {isSaving || isLinking ? "Saving..." : entry ? "Update" : "Add"}
             </Button>
           </DialogFooter>
         </form>
