@@ -3,8 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface OnboardingState {
-  businessType: string;
-  businessSubtype: string;
+  energy: string;
   atmospheres: string[];
   preferredGenres: string[];
 }
@@ -14,8 +13,7 @@ export function useOnboarding() {
   const [loading, setLoading] = useState(true);
   const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
   const [state, setState] = useState<OnboardingState>({
-    businessType: "",
-    businessSubtype: "",
+    energy: "",
     atmospheres: [],
     preferredGenres: [],
   });
@@ -32,7 +30,7 @@ export function useOnboarding() {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("onboarding_completed, business_type, business_subtype, atmospheres, preferred_genres")
+        .select("onboarding_completed, business_type, atmospheres, preferred_genres")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -41,8 +39,7 @@ export function useOnboarding() {
       if (data) {
         setOnboardingCompleted(data.onboarding_completed ?? false);
         setState({
-          businessType: data.business_type || "",
-          businessSubtype: data.business_subtype || "",
+          energy: data.business_type || "", // energy stored in business_type field
           atmospheres: data.atmospheres || [],
           preferredGenres: data.preferred_genres || [],
         });
@@ -57,12 +54,8 @@ export function useOnboarding() {
     }
   };
 
-  const setBusinessType = (value: string) => {
-    setState((prev) => ({ ...prev, businessType: value }));
-  };
-
-  const setBusinessSubtype = (value: string) => {
-    setState((prev) => ({ ...prev, businessSubtype: value }));
+  const setEnergy = (value: string) => {
+    setState((prev) => ({ ...prev, energy: value }));
   };
 
   const setAtmospheres = (value: string[]) => {
@@ -79,8 +72,7 @@ export function useOnboarding() {
     const { error } = await supabase
       .from("profiles")
       .update({
-        business_type: state.businessType,
-        business_subtype: state.businessSubtype,
+        business_type: state.energy, // Store energy in business_type field
         atmospheres: state.atmospheres,
         preferred_genres: state.preferredGenres.length > 0 ? state.preferredGenres : null,
         suggested_playlist_ids: suggestedPlaylistIds,
@@ -97,8 +89,7 @@ export function useOnboarding() {
     loading,
     onboardingCompleted,
     state,
-    setBusinessType,
-    setBusinessSubtype,
+    setEnergy,
     setAtmospheres,
     setPreferredGenres,
     completeOnboarding,

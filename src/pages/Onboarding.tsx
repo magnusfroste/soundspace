@@ -16,15 +16,15 @@ export default function Onboarding() {
     loading,
     onboardingCompleted,
     state,
-    setBusinessType,
+    setEnergy: updateEnergy,
     setAtmospheres,
     setPreferredGenres,
     completeOnboarding,
   } = useOnboarding();
 
   const [step, setStep] = useState<Step>("energy");
-  // Local energy state that maps to businessType for storage
-  const [energy, setEnergy] = useState(state.businessType || "");
+  // Local energy state synced with hook
+  const [energy, setEnergy] = useState(state.energy || "");
 
   useEffect(() => {
     if (!loading && onboardingCompleted) {
@@ -34,15 +34,14 @@ export default function Onboarding() {
 
   // Sync energy from loaded state
   useEffect(() => {
-    if (state.businessType) {
-      setEnergy(state.businessType);
+    if (state.energy) {
+      setEnergy(state.energy);
     }
-  }, [state.businessType]);
+  }, [state.energy]);
 
   const handleEnergyChange = (value: string) => {
     setEnergy(value);
-    // Store energy as businessType for backwards compatibility
-    setBusinessType(value);
+    updateEnergy(value);
   };
 
   if (loading) {
