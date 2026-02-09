@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface ElevenLabsStatus {
   connected: boolean;
   error?: string;
+  error_detail?: string;
   tier?: string;
   character_count?: number;
   character_limit?: number;
@@ -24,6 +25,7 @@ interface ElevenLabsStatus {
   can_extend_limit?: boolean;
   voice_limit?: number;
   professional_voice_limit?: number;
+  limited_access?: boolean;
 }
 
 function formatNumber(num: number): string {
@@ -125,43 +127,58 @@ function ElevenLabsCard() {
       <CardContent className="space-y-4">
         {isConnected && status ? (
           <>
+            {/* Limited access warning */}
+            {status.limited_access && (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 text-yellow-600 text-sm">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-medium">Limited API Access</p>
+                  <p className="text-xs opacity-80">
+                    {status.error_detail || "Usage stats unavailable. The API key works for generation but lacks read permissions."}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Tier Badge */}
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Plan</span>
               <Badge variant="secondary" className="capitalize">
-                {status.tier}
+                {status.tier === "unknown" ? "—" : status.tier}
               </Badge>
             </div>
 
-            {/* Character Usage */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Character Usage</span>
-                <span className="font-medium">
-                  {formatNumber(status.character_count ?? 0)} /{" "}
-                  {formatNumber(status.character_limit ?? 0)}
-                </span>
+            {/* Character Usage - only show if we have data */}
+            {!status.limited_access && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Character Usage</span>
+                  <span className="font-medium">
+                    {formatNumber(status.character_count ?? 0)} /{" "}
+                    {formatNumber(status.character_limit ?? 0)}
+                  </span>
+                </div>
+                <Progress
+                  value={usagePercent}
+                  className={`h-2 ${
+                    isHighUsage
+                      ? "[&>div]:bg-destructive"
+                      : isMediumUsage
+                      ? "[&>div]:bg-yellow-500"
+                      : "[&>div]:bg-green-500"
+                  }`}
+                />
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{usagePercent}% used</span>
+                  {status.next_reset && (
+                    <span>Resets {formatDate(status.next_reset)}</span>
+                  )}
+                </div>
               </div>
-              <Progress
-                value={usagePercent}
-                className={`h-2 ${
-                  isHighUsage
-                    ? "[&>div]:bg-destructive"
-                    : isMediumUsage
-                    ? "[&>div]:bg-yellow-500"
-                    : "[&>div]:bg-green-500"
-                }`}
-              />
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{usagePercent}% used</span>
-                {status.next_reset && (
-                  <span>Resets {formatDate(status.next_reset)}</span>
-                )}
-              </div>
-            </div>
+            )}
 
             {/* High usage warning */}
-            {isHighUsage && (
+            {isHighUsage && !status.limited_access && (
               <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
                 <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                 <div>
@@ -173,19 +190,21 @@ function ElevenLabsCard() {
               </div>
             )}
 
-            {/* Voice Limits */}
-            <div className="pt-2 border-t border-border">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground block">Voice Slots</span>
-                  <span className="font-medium">{status.voice_limit ?? "—"}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Pro Voices</span>
-                  <span className="font-medium">{status.professional_voice_limit ?? "—"}</span>
+            {/* Voice Limits - only show if we have data */}
+            {!status.limited_access && (
+              <div className="pt-2 border-t border-border">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground block">Voice Slots</span>
+                    <span className="font-medium">{status.voice_limit ?? "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground block">Pro Voices</span>
+                    <span className="font-medium">{status.professional_voice_limit ?? "—"}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </>
         ) : (
           <div className="text-center py-4">
