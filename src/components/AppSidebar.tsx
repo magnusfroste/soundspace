@@ -68,21 +68,21 @@ export function AppSidebar() {
   ] as Array<{ title: string; url: string; icon: typeof Home; premium?: boolean }>;
 
   return (
-    <Sidebar className="border-r border-border">
-      <SidebarHeader className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+    <Sidebar collapsible="icon" className="border-r border-border">
+      <SidebarHeader className="p-4 group-data-[collapsible=icon]:p-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
               <Music2 className="h-4 w-4 text-primary-foreground" />
             </div>
-            <div>
-              <h1 className="text-sm font-bold tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <div className="group-data-[collapsible=icon]:hidden min-w-0">
+              <h1 className="text-sm font-bold tracking-tight truncate" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                 SomHonesto
               </h1>
               <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Honest Sound</p>
             </div>
           </div>
-          <SidebarTrigger className="h-7 w-7" />
+          <SidebarTrigger className="h-7 w-7 flex-shrink-0 group-data-[collapsible=icon]:hidden" />
         </div>
       </SidebarHeader>
 
@@ -135,12 +135,17 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-3">
-        <div className="glass rounded-lg p-3">
-          <p className="text-xs text-muted-foreground truncate mb-2">{user?.email}</p>
-          <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground hover:text-foreground" onClick={signOut}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Sign Out
+      <SidebarFooter className="p-3 group-data-[collapsible=icon]:p-2">
+        <div className="glass rounded-lg p-3 group-data-[collapsible=icon]:p-2">
+          <p className="text-xs text-muted-foreground truncate mb-2 group-data-[collapsible=icon]:hidden">{user?.email}</p>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="w-full justify-start text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0" 
+            onClick={signOut}
+          >
+            <LogOut className="h-4 w-4 group-data-[collapsible=icon]:mr-0 mr-2" />
+            <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
           </Button>
         </div>
       </SidebarFooter>
