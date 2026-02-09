@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LocalAICard, MubertCard, MusicgenCard } from "@/components/integrations";
 
 interface ElevenLabsStatus {
   connected: boolean;
@@ -231,29 +232,15 @@ export default function AdminIntegrations() {
           Integrations
         </h1>
         <p className="text-muted-foreground mt-1">
-          Connected services and API status
+          Configure AI providers and external services
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <ElevenLabsCard />
-
-        {/* Placeholder for future integrations */}
-        <Card className="border-dashed opacity-60">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center">
-                <Plug className="h-6 w-6 text-muted-foreground" />
-              </div>
-              <div>
-                <CardTitle className="text-muted-foreground">More Coming Soon</CardTitle>
-                <CardDescription>
-                  Additional integrations will be added here
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
+        <MubertCard />
+        <MusicgenCard />
+        <LocalAICard />
       </div>
     </div>
   );

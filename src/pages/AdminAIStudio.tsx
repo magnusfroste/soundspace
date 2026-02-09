@@ -5,9 +5,6 @@ import {
   StudioPromptPanel,
   OutputPreview,
   GenerationHistory,
-  LocalAISettings,
-  MubertSettings,
-  MusicgenSettings,
 } from "@/components/admin/studio";
 
 export default function AdminAIStudio() {
@@ -27,34 +24,17 @@ export default function AdminAIStudio() {
     isSaving,
   } = useAIStudio();
 
-  // Render settings button based on active provider
-  const renderProviderSettings = () => {
-    switch (activeProviderId) {
-      case "local":
-        return <LocalAISettings />;
-      case "mubert":
-        return <MubertSettings />;
-      case "musicgen":
-        return <MusicgenSettings />;
-      default:
-        return null;
-    }
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-primary" />
-            AI Music Studio
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Generate original music tracks using AI providers
-          </p>
-        </div>
-        {renderProviderSettings()}
+      <div>
+        <h1 className="text-2xl font-semibold flex items-center gap-2">
+          <Sparkles className="h-6 w-6 text-primary" />
+          AI Music Studio
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Generate original music tracks using AI providers
+        </p>
       </div>
 
       {/* Provider Tabs */}
