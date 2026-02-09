@@ -121,18 +121,34 @@ export default function AdminSettings() {
 
   // Save premium features mutation
   const savePremiumMutation = useMutation({
-    mutationFn: async (newFeatures: PremiumFeatures) => {
-      // Upsert the premium_features setting
+    mutationFn: async (updates: Partial<PremiumFeatures>) => {
+      // First read current value to merge with updates
+      const { data: current } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "premium_features")
+        .maybeSingle();
+
+      const currentValue = (current?.value as unknown as PremiumFeatures) || {
+        announcements_enabled: false,
+        custom_playlists_enabled: false,
+      };
+
+      const newValue = { ...currentValue, ...updates };
+
+      // Upsert the merged value
       const { error } = await supabase
         .from("site_settings")
         .upsert({ 
           key: "premium_features", 
-          value: JSON.parse(JSON.stringify(newFeatures)) 
+          value: JSON.parse(JSON.stringify(newValue)) 
         }, { onConflict: "key" });
 
       if (error) throw error;
+      return newValue;
     },
-    onSuccess: () => {
+    onSuccess: (newValue) => {
+      setPremiumFeatures(newValue);
       queryClient.invalidateQueries({ queryKey: ["site-settings"] });
       toast.success("Premium features updated");
     },
@@ -147,15 +163,11 @@ export default function AdminSettings() {
   };
 
   const handleToggleAnnouncements = (enabled: boolean) => {
-    const newFeatures = { ...premiumFeatures, announcements_enabled: enabled };
-    setPremiumFeatures(newFeatures);
-    savePremiumMutation.mutate(newFeatures);
+    savePremiumMutation.mutate({ announcements_enabled: enabled });
   };
 
   const handleToggleCustomPlaylists = (enabled: boolean) => {
-    const newFeatures = { ...premiumFeatures, custom_playlists_enabled: enabled };
-    setPremiumFeatures(newFeatures);
-    savePremiumMutation.mutate(newFeatures);
+    savePremiumMutation.mutate({ custom_playlists_enabled: enabled });
   };
 
   const selectedPlaylist = playlists?.find((p) => p.id === landingSettings.playlist_id);
