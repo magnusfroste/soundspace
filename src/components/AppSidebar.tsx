@@ -17,6 +17,8 @@ import {
   SidebarMenuButton,
   SidebarHeader,
   SidebarFooter,
+  SidebarRail,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
@@ -68,16 +70,19 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r border-border">
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <Music2 className="h-4 w-4 text-primary-foreground" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+              <Music2 className="h-4 w-4 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-sm font-bold tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                SomHonesto
+              </h1>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Honest Sound</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-base font-bold tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              SomHonesto
-            </h1>
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Honest Sound</p>
-          </div>
+          <SidebarTrigger className="h-7 w-7" />
         </div>
       </SidebarHeader>
 
@@ -139,6 +144,8 @@ export function AppSidebar() {
           </Button>
         </div>
       </SidebarFooter>
+      
+      <SidebarRail />
     </Sidebar>
   );
 }
