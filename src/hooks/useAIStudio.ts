@@ -84,10 +84,29 @@ export function useAIStudio() {
     },
   });
 
+  // Helper to get actual audio duration from blob
+  const getAudioDuration = async (blob: Blob): Promise<number> => {
+    try {
+      const arrayBuffer = await blob.arrayBuffer();
+      const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const duration = Math.round(audioBuffer.duration);
+      audioContext.close();
+      return duration;
+    } catch (error) {
+      console.error("Failed to decode audio duration:", error);
+      return 0;
+    }
+  };
+
   // Generate music mutation
   const generateMutation = useMutation({
     mutationFn: async (options: GenerateOptions) => {
       const result = await activeProvider.generate(options);
+      
+      // Get actual duration from the audio blob
+      const actualDuration = await getAudioDuration(result.audioBlob);
+      console.log(`Requested duration: ${options.duration}s, Actual duration: ${actualDuration}s`);
       
       // Upload the blob to storage
       const fileName = `ai-gen/${crypto.randomUUID()}.mp3`;
@@ -103,7 +122,7 @@ export function useAIStudio() {
       // Get public URL
       const { data: urlData } = supabase.storage.from("songs").getPublicUrl(fileName);
 
-      // Save to database
+      // Save to database with ACTUAL duration, not requested duration
       const { data: dbRecord, error: insertError } = await supabase
         .from("ai_generations")
         .insert({
@@ -112,7 +131,7 @@ export function useAIStudio() {
           prompt: options.prompt,
           genre: options.genre || null,
           mood: options.mood || null,
-          duration: options.duration,
+          duration: actualDuration || options.duration, // Use actual, fallback to requested
           audio_url: urlData.publicUrl,
           saved_to_library: false,
         })
@@ -125,6 +144,7 @@ export function useAIStudio() {
         ...result,
         audioUrl: urlData.publicUrl,
         dbRecord: dbRecord as DBGeneration,
+        actualDuration,
       };
     },
     onSuccess: (result) => {
