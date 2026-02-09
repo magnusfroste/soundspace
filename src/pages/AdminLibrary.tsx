@@ -128,12 +128,12 @@ export default function AdminLibrary() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">Genre</Label>
-                    <Select value={genre || ""} onValueChange={(v) => setGenre(v || null)}>
+                    <Select value={genre || "all"} onValueChange={(v) => setGenre(v === "all" ? null : v)}>
                       <SelectTrigger>
                         <SelectValue placeholder="All genres" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All genres</SelectItem>
+                        <SelectItem value="all">All genres</SelectItem>
                         {genres.map((g) => (
                           <SelectItem key={g} value={g}>
                             {g}
@@ -145,12 +145,12 @@ export default function AdminLibrary() {
 
                   <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">Mood</Label>
-                    <Select value={mood || ""} onValueChange={(v) => setMood(v || null)}>
+                    <Select value={mood || "all"} onValueChange={(v) => setMood(v === "all" ? null : v)}>
                       <SelectTrigger>
                         <SelectValue placeholder="All moods" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All moods</SelectItem>
+                        <SelectItem value="all">All moods</SelectItem>
                         {moods.map((m) => (
                           <SelectItem key={m} value={m}>
                             {m}
