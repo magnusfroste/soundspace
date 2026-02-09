@@ -178,11 +178,6 @@ export default function AdminSettings() {
                             </div>
                           )}
                           <span>{playlist.title}</span>
-                          {playlist.category && (
-                            <span className="text-xs text-muted-foreground">
-                              ({playlist.category})
-                            </span>
-                          )}
                         </div>
                       </SelectItem>
                     ))}

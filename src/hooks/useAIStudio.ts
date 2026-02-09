@@ -14,7 +14,6 @@ import { useAuth } from "@/contexts/AuthContext";
 interface Playlist {
   id: string;
   title: string;
-  category: string | null;
 }
 
 interface DBGeneration {
@@ -78,7 +77,7 @@ export function useAIStudio() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("playlists")
-        .select("id, title, category")
+        .select("id, title")
         .order("title");
       if (error) throw error;
       return data as Playlist[];

@@ -64,11 +64,6 @@ export function PlaylistDropZone({ playlist }: PlaylistDropZoneProps) {
                   </div>
                 </div>
               </div>
-              {playlist.category && (
-                <Badge variant="secondary" className="text-[10px] flex-shrink-0">
-                  {playlist.category}
-                </Badge>
-              )}
             </div>
           </CardHeader>
         </CollapsibleTrigger>
