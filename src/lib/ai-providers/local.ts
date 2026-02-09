@@ -1,10 +1,29 @@
 import { HardDrive } from "lucide-react";
 import type { AIProvider, GenerateOptions, GenerationResult, ProviderConfig, ProviderStatus } from "./types";
 
-let localConfig: ProviderConfig = {
-  endpointUrl: "http://localhost:11434",
-  model: "",
-};
+const STORAGE_KEY = "somhonesto_local_ai_config";
+
+function loadConfig(): ProviderConfig {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return {
+    endpointUrl: "http://localhost:11434",
+    model: "",
+    apiKey: "",
+  };
+}
+
+function saveConfig(config: ProviderConfig) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+}
+
+let localConfig: ProviderConfig = loadConfig();
 
 export const localAIProvider: AIProvider = {
   id: "local",
@@ -18,8 +37,55 @@ export const localAIProvider: AIProvider = {
       throw new Error("Local AI endpoint not configured");
     }
 
-    // Stub implementation - actual inference would happen here
-    throw new Error("Local AI generation not yet implemented. Configure your local endpoint in settings.");
+    if (!localConfig.model) {
+      throw new Error("Local AI model not configured");
+    }
+
+    // Construct headers with optional API key
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    
+    if (localConfig.apiKey) {
+      headers["Authorization"] = `Bearer ${localConfig.apiKey}`;
+    }
+
+    // Call the local endpoint
+    const response = await fetch(`${localConfig.endpointUrl}/api/generate`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: localConfig.model,
+        prompt: `Generate ${options.duration} seconds of ${options.genre || "ambient"} music with a ${options.mood || "relaxed"} mood. ${options.prompt}`,
+        stream: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Local AI error: ${error}`);
+    }
+
+    const data = await response.json();
+    
+    // Handle audio response - this depends on the model's output format
+    if (data.audio_url) {
+      const audioResponse = await fetch(data.audio_url);
+      const audioBlob = await audioResponse.blob();
+      return {
+        audioBlob,
+        audioUrl: URL.createObjectURL(audioBlob),
+        metadata: {
+          provider: "local",
+          prompt: options.prompt,
+          duration: options.duration,
+          genre: options.genre,
+          mood: options.mood,
+        },
+      };
+    }
+
+    throw new Error("Local AI did not return audio. Make sure your model supports audio generation.");
   },
 
   async checkStatus(): Promise<ProviderStatus> {
@@ -28,8 +94,14 @@ export const localAIProvider: AIProvider = {
     }
 
     try {
+      const headers: Record<string, string> = {};
+      if (localConfig.apiKey) {
+        headers["Authorization"] = `Bearer ${localConfig.apiKey}`;
+      }
+
       const response = await fetch(`${localConfig.endpointUrl}/api/tags`, {
         method: "GET",
+        headers,
         signal: AbortSignal.timeout(5000),
       });
       
@@ -44,6 +116,7 @@ export const localAIProvider: AIProvider = {
 
   configure(config: ProviderConfig) {
     localConfig = { ...localConfig, ...config };
+    saveConfig(localConfig);
   },
 };
 
@@ -53,4 +126,5 @@ export function getLocalConfig(): ProviderConfig {
 
 export function setLocalConfig(config: Partial<ProviderConfig>) {
   localConfig = { ...localConfig, ...config };
+  saveConfig(localConfig);
 }
