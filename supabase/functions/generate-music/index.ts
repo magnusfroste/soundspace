@@ -21,17 +21,21 @@ serve(async (req) => {
       );
     }
 
-    // Validate and clamp duration (min 5s, max 120s, default 30s)
-    const MIN_DURATION = 5;
-    const MAX_DURATION = 120;
-    const DEFAULT_DURATION = 30;
+    // Validate and clamp duration (min 3s, max 600s / 10 min)
+    // ElevenLabs Music API uses music_length_ms (3000-600000ms)
+    const MIN_DURATION_SEC = 3;
+    const MAX_DURATION_SEC = 600;
+    const DEFAULT_DURATION_SEC = 180; // 3 minutes default
     
-    let validDuration = duration ? Number(duration) : DEFAULT_DURATION;
-    if (isNaN(validDuration) || validDuration < MIN_DURATION) {
-      validDuration = MIN_DURATION;
-    } else if (validDuration > MAX_DURATION) {
-      validDuration = MAX_DURATION;
+    let validDurationSec = duration ? Number(duration) : DEFAULT_DURATION_SEC;
+    if (isNaN(validDurationSec) || validDurationSec < MIN_DURATION_SEC) {
+      validDurationSec = MIN_DURATION_SEC;
+    } else if (validDurationSec > MAX_DURATION_SEC) {
+      validDurationSec = MAX_DURATION_SEC;
     }
+
+    // Convert to milliseconds for ElevenLabs API
+    const musicLengthMs = Math.round(validDurationSec * 1000);
 
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
     if (!ELEVENLABS_API_KEY) {
@@ -42,9 +46,9 @@ serve(async (req) => {
       );
     }
 
-    console.log("Generating music with prompt:", prompt, "duration:", validDuration);
+    console.log(`Generating music with prompt: "${prompt}", duration: ${validDurationSec}s (${musicLengthMs}ms)`);
 
-    // Call ElevenLabs Music API
+    // Call ElevenLabs Music API with music_length_ms parameter
     const response = await fetch("https://api.elevenlabs.io/v1/music", {
       method: "POST",
       headers: {
@@ -53,7 +57,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         prompt,
-        duration_seconds: validDuration,
+        music_length_ms: musicLengthMs,
       }),
     });
 
@@ -83,7 +87,7 @@ serve(async (req) => {
     // Return the audio directly as binary
     const audioBuffer = await response.arrayBuffer();
     
-    console.log("Music generated successfully, size:", audioBuffer.byteLength);
+    console.log(`Music generated successfully, size: ${audioBuffer.byteLength} bytes`);
 
     return new Response(audioBuffer, {
       headers: {
