@@ -157,16 +157,25 @@ export function filterSongs(
   search: string,
   genre: string | null,
   mood: string | null,
-  notInPlaylist: boolean
+  notInPlaylist: boolean,
+  promptSearch: string = ""
 ): SongWithPlaylists[] {
   return songs.filter((song) => {
-    // Search filter
+    // Search filter (title, artist)
     if (search) {
       const searchLower = search.toLowerCase();
       const matchesSearch =
         song.title.toLowerCase().includes(searchLower) ||
         song.artist.toLowerCase().includes(searchLower);
       if (!matchesSearch) return false;
+    }
+
+    // Prompt search filter
+    if (promptSearch) {
+      const promptLower = promptSearch.toLowerCase();
+      if (!song.prompt || !song.prompt.toLowerCase().includes(promptLower)) {
+        return false;
+      }
     }
 
     // Genre filter
@@ -180,6 +189,11 @@ export function filterSongs(
 
     return true;
   });
+}
+
+// Check if any songs have prompts (for showing/hiding prompt filter)
+export function hasPromptData(songs: SongWithPlaylists[]): boolean {
+  return songs.some((s) => s.prompt && s.prompt.trim().length > 0);
 }
 
 // Get unique genres from songs

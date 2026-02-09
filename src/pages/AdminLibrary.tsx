@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Search, Filter, X, Library } from "lucide-react";
+import { Search, Filter, X, Library, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,10 +31,12 @@ import {
   filterSongs,
   getUniqueGenres,
   getUniqueMoods,
+  hasPromptData,
 } from "@/hooks/useSongLibrary";
 
 export default function AdminLibrary() {
   const [search, setSearch] = useState("");
+  const [promptSearch, setPromptSearch] = useState("");
   const [genre, setGenre] = useState<string | null>(null);
   const [mood, setMood] = useState<string | null>(null);
   const [notInPlaylist, setNotInPlaylist] = useState(false);
@@ -42,10 +44,13 @@ export default function AdminLibrary() {
   const { data: songs = [], isLoading: songsLoading } = useSongsLibrary();
   const { data: playlists = [], isLoading: playlistsLoading } = usePlaylistsWithCounts();
 
+  // Check if we have any songs with prompt data
+  const showPromptFilter = useMemo(() => hasPromptData(songs), [songs]);
+
   // Filter songs
   const filteredSongs = useMemo(
-    () => filterSongs(songs, search, genre, mood, notInPlaylist),
-    [songs, search, genre, mood, notInPlaylist]
+    () => filterSongs(songs, search, genre, mood, notInPlaylist, promptSearch),
+    [songs, search, genre, mood, notInPlaylist, promptSearch]
   );
 
   // Get filter options
@@ -62,12 +67,13 @@ export default function AdminLibrary() {
   }, [playlists]);
 
   // Count active filters
-  const activeFilters = [genre, mood, notInPlaylist].filter(Boolean).length;
+  const activeFilters = [genre, mood, notInPlaylist, promptSearch].filter(Boolean).length;
 
   const clearFilters = () => {
     setGenre(null);
     setMood(null);
     setNotInPlaylist(false);
+    setPromptSearch("");
   };
 
   return (
@@ -118,7 +124,7 @@ export default function AdminLibrary() {
                   )}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-64" align="end">
+              <PopoverContent className="w-72" align="end">
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">Genre</Label>
@@ -153,6 +159,21 @@ export default function AdminLibrary() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {showPromptFilter && (
+                    <div className="space-y-2">
+                      <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Sparkles className="h-3 w-3" />
+                        AI Prompt
+                      </Label>
+                      <Input
+                        placeholder="Search in prompts..."
+                        value={promptSearch}
+                        onChange={(e) => setPromptSearch(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  )}
 
                   <div className="flex items-center gap-2">
                     <Checkbox
