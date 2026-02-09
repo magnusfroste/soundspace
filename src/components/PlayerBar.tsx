@@ -1,6 +1,7 @@
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Music } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Music, Shuffle, Repeat, Repeat1 } from "lucide-react";
 import { usePlayer } from "@/contexts/PlayerContext";
 import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
 
 function formatTime(seconds: number) {
   if (!seconds || isNaN(seconds)) return "0:00";
@@ -12,15 +13,23 @@ function formatTime(seconds: number) {
 export function PlayerBar() {
   const {
     currentSong, isPlaying, currentTime, duration, volume,
+    shuffle, repeatMode,
     togglePlay, nextTrack, prevTrack, seek, setVolume,
+    setShuffle, setRepeatMode,
   } = usePlayer();
+
+  const cycleRepeatMode = () => {
+    if (repeatMode === "off") setRepeatMode("all");
+    else if (repeatMode === "all") setRepeatMode("one");
+    else setRepeatMode("off");
+  };
 
   if (!currentSong) {
     return (
       <div className="h-20 border-t border-border bg-player flex items-center justify-center">
         <div className="flex items-center gap-2 text-muted-foreground">
           <Music className="h-5 w-5" />
-          <span className="text-sm">Selecione uma música para começar</span>
+          <span className="text-sm">Select a song to start</span>
         </div>
       </div>
     );
@@ -45,7 +54,19 @@ export function PlayerBar() {
 
       {/* Controls */}
       <div className="flex-1 flex flex-col items-center gap-1 max-w-[600px] mx-auto">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Shuffle Button */}
+          <button
+            onClick={() => setShuffle(!shuffle)}
+            className={cn(
+              "transition-colors p-1",
+              shuffle ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            )}
+            title={shuffle ? "Shuffle on" : "Shuffle off"}
+          >
+            <Shuffle className="h-4 w-4" />
+          </button>
+
           <button onClick={prevTrack} className="text-muted-foreground hover:text-foreground transition-colors">
             <SkipBack className="h-5 w-5" />
           </button>
@@ -61,6 +82,25 @@ export function PlayerBar() {
           </button>
           <button onClick={nextTrack} className="text-muted-foreground hover:text-foreground transition-colors">
             <SkipForward className="h-5 w-5" />
+          </button>
+
+          {/* Repeat Button */}
+          <button
+            onClick={cycleRepeatMode}
+            className={cn(
+              "transition-colors p-1",
+              repeatMode !== "off" ? "text-primary" : "text-muted-foreground hover:text-foreground"
+            )}
+            title={
+              repeatMode === "off" ? "Repeat off" :
+              repeatMode === "all" ? "Repeat all" : "Repeat one"
+            }
+          >
+            {repeatMode === "one" ? (
+              <Repeat1 className="h-4 w-4" />
+            ) : (
+              <Repeat className="h-4 w-4" />
+            )}
           </button>
         </div>
         <div className="flex items-center gap-2 w-full">

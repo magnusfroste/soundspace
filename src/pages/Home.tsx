@@ -8,6 +8,7 @@ import { Music, Play, ListMusic, Sparkles, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import type { Tables } from "@/integrations/supabase/types";
 
 interface Profile {
   onboarding_completed: boolean | null;
@@ -58,7 +59,7 @@ export default function HomePage() {
     enabled: !!profile?.suggested_playlist_ids?.length,
   });
 
-  // Auto-play first suggested playlist after onboarding
+  // Auto-play all suggested playlists after onboarding
   useEffect(() => {
     const autoPlay = async () => {
       // Only auto-play once per session and if no music is playing
@@ -73,24 +74,27 @@ export default function HomePage() {
       sessionStorage.removeItem("just_onboarded");
       hasAutoPlayedRef.current = true;
 
-      const firstPlaylist = suggestedPlaylists[0];
+      // Fetch songs from ALL suggested playlists
+      const allSongs: Tables<"songs">[] = [];
       
-      // Fetch songs from the first playlist
-      const { data: playlistSongs } = await supabase
-        .from("playlist_songs")
-        .select("song:songs(*)")
-        .eq("playlist_id", firstPlaylist.id)
-        .order("position");
+      for (const playlist of suggestedPlaylists) {
+        const { data: playlistSongsData } = await supabase
+          .from("playlist_songs")
+          .select("song:songs(*)")
+          .eq("playlist_id", playlist.id)
+          .order("position");
 
-      if (!playlistSongs || playlistSongs.length === 0) return;
+        if (playlistSongsData) {
+          const songs = playlistSongsData
+            .map(ps => ps.song)
+            .filter((s): s is NonNullable<typeof s> => s !== null);
+          allSongs.push(...songs);
+        }
+      }
 
-      const songs = playlistSongs
-        .map(ps => ps.song)
-        .filter((s): s is NonNullable<typeof s> => s !== null);
-
-      if (songs.length > 0) {
-        console.log("Auto-playing first playlist:", firstPlaylist.title);
-        playQueue(songs, 0, firstPlaylist.id);
+      if (allSongs.length > 0) {
+        console.log("Auto-playing all suggested playlists:", allSongs.length, "songs");
+        playQueue(allSongs, 0, "suggested");
       }
     };
 
