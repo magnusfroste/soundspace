@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,13 +13,13 @@ interface Profile {
   onboarding_completed: boolean | null;
   suggested_playlist_ids: string[] | null;
   business_type: string | null;
-  business_subtype: string | null;
 }
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { playQueue } = usePlayer();
+  const { playQueue, currentSong } = usePlayer();
+  const hasAutoPlayedRef = useRef(false);
 
   // Fetch profile to check onboarding status
   const { data: profile, isLoading: profileLoading } = useQuery({
@@ -27,7 +27,7 @@ export default function HomePage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("onboarding_completed, suggested_playlist_ids, business_type, business_subtype")
+        .select("onboarding_completed, suggested_playlist_ids, business_type")
         .eq("user_id", user!.id)
         .maybeSingle();
       if (error) throw error;
@@ -58,6 +58,45 @@ export default function HomePage() {
     enabled: !!profile?.suggested_playlist_ids?.length,
   });
 
+  // Auto-play first suggested playlist after onboarding
+  useEffect(() => {
+    const autoPlay = async () => {
+      // Only auto-play once per session and if no music is playing
+      if (hasAutoPlayedRef.current || currentSong) return;
+      if (!suggestedPlaylists || suggestedPlaylists.length === 0) return;
+
+      // Check if we just came from onboarding
+      const justOnboarded = sessionStorage.getItem("just_onboarded");
+      if (!justOnboarded) return;
+
+      // Clear the flag
+      sessionStorage.removeItem("just_onboarded");
+      hasAutoPlayedRef.current = true;
+
+      const firstPlaylist = suggestedPlaylists[0];
+      
+      // Fetch songs from the first playlist
+      const { data: playlistSongs } = await supabase
+        .from("playlist_songs")
+        .select("song:songs(*)")
+        .eq("playlist_id", firstPlaylist.id)
+        .order("position");
+
+      if (!playlistSongs || playlistSongs.length === 0) return;
+
+      const songs = playlistSongs
+        .map(ps => ps.song)
+        .filter((s): s is NonNullable<typeof s> => s !== null);
+
+      if (songs.length > 0) {
+        console.log("Auto-playing first playlist:", firstPlaylist.title);
+        playQueue(songs, 0, firstPlaylist.id);
+      }
+    };
+
+    autoPlay();
+  }, [suggestedPlaylists, currentSong, playQueue]);
+
   // Fetch all playlists for "Explore more"
   const { data: allPlaylists } = useQuery({
     queryKey: ["playlists"],
@@ -75,7 +114,7 @@ export default function HomePage() {
   );
 
   const hasSuggestedPlaylists = suggestedPlaylists && suggestedPlaylists.length > 0;
-  const businessLabel = profile?.business_subtype?.replace(/_/g, " ") || profile?.business_type;
+  const energyLabel = profile?.business_type;
 
   if (profileLoading) {
     return (
@@ -96,9 +135,9 @@ export default function HomePage() {
       <div>
         <h1 className="text-3xl font-bold">Welcome to SomHonesto</h1>
         <p className="text-muted-foreground mt-2">
-          {hasSuggestedPlaylists
-            ? `Curated playlists for your ${businessLabel}`
-            : "High-quality ambient music for your business."}
+          {hasSuggestedPlaylists && energyLabel
+            ? `${energyLabel.charAt(0).toUpperCase() + energyLabel.slice(1)} playlists for your space`
+            : "High-quality ambient music for your space."}
         </p>
       </div>
 
