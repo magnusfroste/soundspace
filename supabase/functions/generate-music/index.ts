@@ -21,6 +21,18 @@ serve(async (req) => {
       );
     }
 
+    // Validate and clamp duration (min 5s, max 120s, default 30s)
+    const MIN_DURATION = 5;
+    const MAX_DURATION = 120;
+    const DEFAULT_DURATION = 30;
+    
+    let validDuration = duration ? Number(duration) : DEFAULT_DURATION;
+    if (isNaN(validDuration) || validDuration < MIN_DURATION) {
+      validDuration = MIN_DURATION;
+    } else if (validDuration > MAX_DURATION) {
+      validDuration = MAX_DURATION;
+    }
+
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");
     if (!ELEVENLABS_API_KEY) {
       console.error("ELEVENLABS_API_KEY is not configured");
@@ -30,7 +42,7 @@ serve(async (req) => {
       );
     }
 
-    console.log("Generating music with prompt:", prompt, "duration:", duration || 30);
+    console.log("Generating music with prompt:", prompt, "duration:", validDuration);
 
     // Call ElevenLabs Music API
     const response = await fetch("https://api.elevenlabs.io/v1/music", {
@@ -41,7 +53,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         prompt,
-        duration_seconds: duration || 30,
+        duration_seconds: validDuration,
       }),
     });
 
