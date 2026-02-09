@@ -26,7 +26,7 @@ export function StudioPromptPanel({
   onGenerate,
 }: StudioPromptPanelProps) {
   const [prompt, setPrompt] = useState("");
-  const [duration, setDuration] = useState(30);
+  const [duration, setDuration] = useState(180); // 3 minutes default
   const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
 
@@ -104,16 +104,24 @@ export function StudioPromptPanel({
       <div className="space-y-3">
         <div className="flex justify-between">
           <Label>Duration</Label>
-          <span className="text-sm text-muted-foreground">{duration} seconds</span>
+          <span className="text-sm text-muted-foreground">
+            {duration >= 60 
+              ? `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')} min` 
+              : `${duration} sec`}
+          </span>
         </div>
         <Slider
           value={[duration]}
           onValueChange={([val]) => setDuration(val)}
-          min={15}
-          max={60}
-          step={5}
+          min={30}
+          max={600}
+          step={30}
           disabled={isGenerating}
         />
+        <div className="flex justify-between text-xs text-muted-foreground">
+          <span>30 sec</span>
+          <span>10 min</span>
+        </div>
       </div>
 
       <Button
