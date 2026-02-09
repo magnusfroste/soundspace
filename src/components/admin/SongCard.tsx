@@ -1,7 +1,12 @@
-import { GripVertical, Play, Pause, Music2 } from "lucide-react";
+import { GripVertical, Play, Pause, Music2, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { usePlayer } from "@/contexts/PlayerContext";
 import type { SongWithPlaylists } from "@/hooks/useSongLibrary";
 import { cn } from "@/lib/utils";
@@ -140,6 +145,22 @@ export function SongCard({ song, playlistNames }: SongCardProps) {
             In: {inPlaylist}
             {additionalPlaylists > 0 && ` +${additionalPlaylists}`}
           </p>
+        )}
+
+        {/* AI Prompt indicator */}
+        {song.prompt && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground cursor-help">
+                <Sparkles className="h-3 w-3 text-primary" />
+                <span className="truncate">AI Generated</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs">
+              <p className="text-xs font-medium mb-1">AI Prompt:</p>
+              <p className="text-xs text-muted-foreground">{song.prompt}</p>
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
     </Card>
