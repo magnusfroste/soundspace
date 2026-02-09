@@ -1,17 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+// Simplified atmospheres that complement energy choice
 const ATMOSPHERES = [
-  { value: "calm", label: "Calm", emoji: "🌿" },
-  { value: "energetic", label: "Energetic", emoji: "⚡" },
-  { value: "luxurious", label: "Luxurious", emoji: "✨" },
   { value: "modern", label: "Modern", emoji: "🎯" },
-  { value: "traditional", label: "Traditional", emoji: "🏛️" },
-  { value: "casual", label: "Casual", emoji: "☕" },
-  { value: "upbeat", label: "Upbeat", emoji: "🎉" },
-  { value: "romantic", label: "Romantic", emoji: "💕" },
-  { value: "hip", label: "Hip", emoji: "🔥" },
   { value: "cozy", label: "Cozy", emoji: "🛋️" },
+  { value: "sophisticated", label: "Sophisticated", emoji: "✨" },
+  { value: "casual", label: "Casual", emoji: "☕" },
+  { value: "vibrant", label: "Vibrant", emoji: "🎉" },
+  { value: "minimal", label: "Minimal", emoji: "◻️" },
 ] as const;
 
 interface AtmosphereStepProps {
@@ -30,26 +27,24 @@ export function AtmosphereStep({
   const toggleAtmosphere = (value: string) => {
     if (atmospheres.includes(value)) {
       onAtmospheresChange(atmospheres.filter((a) => a !== value));
-    } else if (atmospheres.length < 3) {
+    } else if (atmospheres.length < 2) {
       onAtmospheresChange([...atmospheres, value]);
     }
   };
 
-  const canContinue = atmospheres.length >= 1;
-
   return (
     <div className="space-y-8">
       <div className="text-center space-y-2">
-        <h2 className="text-2xl font-semibold">What's the vibe?</h2>
+        <h2 className="text-2xl font-semibold">Refine the style</h2>
         <p className="text-muted-foreground">
-          Pick 1-3 words that describe your atmosphere
+          Pick up to 2 words that describe your space (optional)
         </p>
       </div>
 
       <div className="flex flex-wrap justify-center gap-3 max-w-lg mx-auto">
         {ATMOSPHERES.map((atm) => {
           const isSelected = atmospheres.includes(atm.value);
-          const isDisabled = !isSelected && atmospheres.length >= 3;
+          const isDisabled = !isSelected && atmospheres.length >= 2;
 
           return (
             <button
@@ -74,20 +69,17 @@ export function AtmosphereStep({
         })}
       </div>
 
-      <p className="text-center text-sm text-muted-foreground">
-        {atmospheres.length}/3 selected
-      </p>
+      {atmospheres.length > 0 && (
+        <p className="text-center text-sm text-muted-foreground">
+          {atmospheres.length}/2 selected
+        </p>
+      )}
 
       <div className="flex justify-center gap-4 pt-4">
         <Button variant="outline" size="lg" onClick={onBack}>
           Back
         </Button>
-        <Button
-          size="lg"
-          onClick={onNext}
-          disabled={!canContinue}
-          className="min-w-[200px]"
-        >
+        <Button size="lg" onClick={onNext} className="min-w-[200px]">
           Continue
         </Button>
       </div>
