@@ -59,11 +59,13 @@ export function AppSidebar() {
   });
 
   const announcementsEnabled = (premiumSettings?.value as { announcements_enabled?: boolean })?.announcements_enabled ?? false;
+  const customPlaylistsEnabled = (premiumSettings?.value as { custom_playlists_enabled?: boolean })?.custom_playlists_enabled ?? false;
 
   // Build business nav based on feature flags
   const businessNav = [
     ...baseBusinessNav.slice(0, 3), // Home, Playlists, Schedule
     ...(announcementsEnabled ? [{ title: "Announcements", url: "/announcements", icon: Mic, premium: true }] : []),
+    ...(customPlaylistsEnabled ? [{ title: "My Playlists", url: "/my-playlists", icon: Crown, premium: true }] : []),
     ...baseBusinessNav.slice(3), // Now Playing
   ] as Array<{ title: string; url: string; icon: typeof Home; premium?: boolean }>;
 
@@ -124,7 +126,7 @@ export function AppSidebar() {
                         <span>{item.title}</span>
                       </span>
                       {item.premium && (
-                        <Crown className="h-3 w-3 text-yellow-500" />
+                        <Crown className="h-3 w-3 text-amber-500" />
                       )}
                     </NavLink>
                   </SidebarMenuButton>

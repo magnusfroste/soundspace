@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.elevenlabs-status]
 verify_jwt = false
+
+[functions.ai-fill-playlist]
+verify_jwt = false
