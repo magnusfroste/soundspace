@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 
 const businessNav = [
-  { title: "Home", url: "/", icon: Home },
+  { title: "Home", url: "/app", icon: Home },
   { title: "Playlists", url: "/playlists", icon: ListMusic },
   { title: "Schedule", url: "/schedule", icon: CalendarDays },
   { title: "Now Playing", url: "/now-playing", icon: Radio },
