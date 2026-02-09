@@ -62,7 +62,7 @@ export default function AdminDashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("playlists")
-        .select("id, title, category, cover_image_url, playlist_songs(count)")
+        .select("id, title, cover_image_url, playlist_songs(count)")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -71,7 +71,6 @@ export default function AdminDashboard() {
         ?.map((pl) => ({
           id: pl.id,
           title: pl.title,
-          category: pl.category,
           cover: pl.cover_image_url,
           songCount: pl.playlist_songs?.[0]?.count ?? 0,
         }))

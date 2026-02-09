@@ -54,7 +54,6 @@ export default function PlaylistsPage() {
               </div>
               <h3 className="font-semibold truncate">{pl.title}</h3>
               <p className="text-xs text-muted-foreground truncate mt-1">
-                {pl.category && <span className="inline-block px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] mr-2">{pl.category}</span>}
                 {pl.description || ""}
               </p>
             </Link>

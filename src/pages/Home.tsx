@@ -129,7 +129,7 @@ export default function HomePage() {
                   </div>
                 </div>
                 <h3 className="font-semibold truncate">{pl.title}</h3>
-                <p className="text-xs text-muted-foreground truncate mt-1">{pl.description || pl.category || "Playlist"}</p>
+                <p className="text-xs text-muted-foreground truncate mt-1">{pl.description || "Playlist"}</p>
               </Link>
             ))}
           </div>
@@ -168,7 +168,7 @@ export default function HomePage() {
                   </div>
                 </div>
                 <h3 className="font-semibold truncate">{pl.title}</h3>
-                <p className="text-xs text-muted-foreground truncate mt-1">{pl.description || pl.category || "Playlist"}</p>
+                <p className="text-xs text-muted-foreground truncate mt-1">{pl.description || "Playlist"}</p>
               </Link>
             ))}
           </div>

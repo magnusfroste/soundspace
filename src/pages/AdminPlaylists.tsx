@@ -11,9 +11,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import type { Tables } from "@/integrations/supabase/types";
 
-type Playlist = Tables<"playlists"> & { playlist_songs: { count: number }[] };
+type Playlist = Omit<Tables<"playlists">, "category"> & { playlist_songs: { count: number }[] };
 
-const CATEGORIES = ["Ambient", "Electronic", "Corporate", "Jazz", "Pop", "Folk", "Classical", "Rock", "Hip-Hop", "R&B"];
 const COVER_STYLES = [
   { value: "abstract-waves", label: "Abstract Waves" },
   { value: "geometric-modern", label: "Geometric Modern" },
@@ -126,11 +125,6 @@ export default function AdminPlaylists() {
               </div>
               <h3 className="font-semibold truncate">{pl.title}</h3>
               <p className="text-xs text-muted-foreground truncate mt-1">
-                {pl.category && (
-                  <span className="inline-block px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] mr-2">
-                    {pl.category}
-                  </span>
-                )}
                 {pl.playlist_songs?.[0]?.count ?? 0} songs
               </p>
             </div>
@@ -156,7 +150,6 @@ interface PlaylistDialogProps {
 function PlaylistDialog({ open, onOpenChange, mode, playlist }: PlaylistDialogProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
   const [coverStyle, setCoverStyle] = useState("abstract-waves");
   const [generatedCover, setGeneratedCover] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -168,12 +161,10 @@ function PlaylistDialog({ open, onOpenChange, mode, playlist }: PlaylistDialogPr
     if (mode === "edit" && playlist) {
       setTitle(playlist.title);
       setDescription(playlist.description || "");
-      setCategory(playlist.category || "");
       setGeneratedCover(playlist.cover_image_url || null);
     } else {
       setTitle("");
       setDescription("");
-      setCategory("");
       setGeneratedCover(null);
     }
     setCoverStyle("abstract-waves");
@@ -222,7 +213,6 @@ function PlaylistDialog({ open, onOpenChange, mode, playlist }: PlaylistDialogPr
       const { error } = await supabase.from("playlists").insert({
         title,
         description: description || null,
-        category: category || null,
         cover_image_url: coverUrl || null,
       });
 
@@ -249,7 +239,6 @@ function PlaylistDialog({ open, onOpenChange, mode, playlist }: PlaylistDialogPr
         .update({
           title,
           description: description || null,
-          category: category || null,
           cover_image_url: coverUrl || null,
         })
         .eq("id", playlist.id);
@@ -284,7 +273,7 @@ function PlaylistDialog({ open, onOpenChange, mode, playlist }: PlaylistDialogPr
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
           body: JSON.stringify({
-            prompt: `${title} - ${category || "music"} playlist`,
+            prompt: `${title} playlist`,
             style: coverStyle,
           }),
         }
@@ -348,21 +337,6 @@ function PlaylistDialog({ open, onOpenChange, mode, playlist }: PlaylistDialogPr
               placeholder="Optional description..."
               rows={2}
             />
-          </div>
-          <div>
-            <Label>Category</Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {CATEGORIES.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           {/* AI Cover Generation */}

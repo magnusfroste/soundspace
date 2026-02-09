@@ -16,7 +16,6 @@ import type { GenerationHistoryItem } from "@/lib/ai-providers";
 interface Playlist {
   id: string;
   title: string;
-  category: string | null;
 }
 
 interface OutputPreviewProps {
@@ -142,11 +141,6 @@ export function OutputPreview({
                 {playlists.map((playlist) => (
                   <SelectItem key={playlist.id} value={playlist.id}>
                     {playlist.title}
-                    {playlist.category && (
-                      <span className="text-muted-foreground ml-2">
-                        ({playlist.category})
-                      </span>
-                    )}
                   </SelectItem>
                 ))}
               </SelectContent>

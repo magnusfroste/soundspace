@@ -6,7 +6,13 @@ import { toast } from "sonner";
 export type Song = Tables<"songs">;
 export type Playlist = Tables<"playlists">;
 
-export interface PlaylistWithCount extends Playlist {
+export interface PlaylistWithCount {
+  id: string;
+  title: string;
+  description: string | null;
+  cover_image_url: string | null;
+  created_at: string;
+  updated_at: string;
   songCount: number;
 }
 

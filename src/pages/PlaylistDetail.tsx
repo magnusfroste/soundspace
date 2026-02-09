@@ -82,9 +82,6 @@ export default function PlaylistDetail() {
               <Play className="h-4 w-4" />
               Tocar tudo
             </Button>
-            {playlist.category && (
-              <span className="px-3 py-1 rounded-full bg-accent/20 text-accent text-xs">{playlist.category}</span>
-            )}
           </div>
         </div>
       </div>
