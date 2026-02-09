@@ -79,6 +79,8 @@ export function MatchingStep({
     try {
       const playlistIds = matchedPlaylists.map((p) => p.id);
       await onComplete(playlistIds);
+      // Set flag for auto-play on /app
+      sessionStorage.setItem("just_onboarded", "true");
       navigate("/app");
     } catch (err) {
       console.error("Error completing onboarding:", err);
