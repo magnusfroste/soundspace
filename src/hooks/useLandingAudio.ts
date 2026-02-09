@@ -16,6 +16,7 @@ export function useLandingAudio() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [isEnabled, setIsEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const songIndexRef = useRef(0);
@@ -127,13 +128,24 @@ export function useLandingAudio() {
     }
   }, [isPlaying, songs]);
 
+  // Toggle mute
+  const toggleMute = useCallback(() => {
+    if (!audioRef.current) return;
+    
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    audioRef.current.muted = newMuted;
+  }, [isMuted]);
+
   return {
     isPlaying,
     isEnabled,
     isLoading,
     currentSong,
     hasTriggered,
+    isMuted,
     triggerPlay,
     togglePlay,
+    toggleMute,
   };
 }

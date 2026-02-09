@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Pause, Music, Volume2 } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX } from "lucide-react";
 import { useLandingAudio } from "@/hooks/useLandingAudio";
 import { useEffect, useRef } from "react";
 
@@ -10,8 +10,10 @@ export function AmbientPlayer() {
     isLoading,
     currentSong, 
     hasTriggered,
+    isMuted,
     triggerPlay, 
-    togglePlay 
+    togglePlay,
+    toggleMute,
   } = useLandingAudio();
 
   const hasScrolledRef = useRef(false);
@@ -74,8 +76,21 @@ export function AmbientPlayer() {
               )}
             </div>
 
+            {/* Mute button */}
+            <button
+              onClick={toggleMute}
+              className="h-8 w-8 rounded-full bg-muted/50 flex items-center justify-center hover:bg-muted transition-colors"
+              aria-label={isMuted ? "Unmute" : "Mute"}
+            >
+              {isMuted ? (
+                <VolumeX className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Volume2 className="h-4 w-4 text-foreground" />
+              )}
+            </button>
+
             {/* Music icon with animation */}
-            {isPlaying && (
+            {isPlaying && !isMuted && (
               <div className="flex items-center gap-0.5 h-4">
                 {[0, 1, 2].map((i) => (
                   <motion.div
