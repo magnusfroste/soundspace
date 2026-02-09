@@ -10,7 +10,6 @@ interface MatchedPlaylist {
   id: string;
   title: string;
   description: string | null;
-  category: string | null;
   cover_image_url: string | null;
   reasoning: string;
 }
