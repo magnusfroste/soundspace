@@ -1,13 +1,32 @@
 import { useState } from "react";
+import { Navigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Mic, Volume2, Trash2, Edit2, Check, X, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
 import { useAnnouncements } from "@/hooks/useAnnouncements";
 import { AudioRecorder } from "@/components/announcements/AudioRecorder";
 import { toast } from "sonner";
 
 export default function AnnouncementsPage() {
+  // Check if feature is enabled
+  const { data: premiumSettings, isLoading: settingsLoading } = useQuery({
+    queryKey: ["site-settings", "premium_features"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("site_settings")
+        .select("*")
+        .eq("key", "premium_features")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const announcementsEnabled = (premiumSettings?.value as { announcements_enabled?: boolean })?.announcements_enabled ?? false;
+
   const {
     announcements,
     isLoading,
@@ -92,12 +111,17 @@ export default function AnnouncementsPage() {
     }
   };
 
-  if (isLoading) {
+  if (settingsLoading || isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="animate-pulse text-muted-foreground">Loading announcements...</div>
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
       </div>
     );
+  }
+
+  // Redirect if feature is disabled
+  if (!announcementsEnabled) {
+    return <Navigate to="/app" replace />;
   }
 
   return (

@@ -1,9 +1,11 @@
 import { useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import {
   Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Sidebar,
   SidebarContent,
@@ -19,11 +21,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 
-const businessNav = [
+const baseBusinessNav = [
   { title: "Home", url: "/app", icon: Home },
   { title: "Playlists", url: "/playlists", icon: ListMusic },
   { title: "Schedule", url: "/schedule", icon: CalendarDays },
-  { title: "Announcements", url: "/announcements", icon: Mic },
   { title: "Now Playing", url: "/now-playing", icon: Radio },
 ];
 
@@ -41,7 +42,28 @@ export function AppSidebar() {
   const location = useLocation();
   const isAdmin = role === "admin";
 
-  const navItems = isAdmin ? [...adminNav, ...businessNav] : businessNav;
+  // Fetch premium features setting
+  const { data: premiumSettings } = useQuery({
+    queryKey: ["site-settings", "premium_features"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("site_settings")
+        .select("*")
+        .eq("key", "premium_features")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const announcementsEnabled = (premiumSettings?.value as { announcements_enabled?: boolean })?.announcements_enabled ?? false;
+
+  // Build business nav based on feature flags
+  const businessNav = [
+    ...baseBusinessNav.slice(0, 3), // Home, Playlists, Schedule
+    ...(announcementsEnabled ? [{ title: "Announcements", url: "/announcements", icon: Mic }] : []),
+    ...baseBusinessNav.slice(3), // Now Playing
+  ];
 
   return (
     <Sidebar className="border-r border-border">
