@@ -119,4 +119,3 @@ Current playlists have `category` and `description`. The AI can match based on:
 - Onboarding is 3-4 quick steps (under 60 seconds)
 - Skip option available on intro screen for power users
 - Can always access full library after onboarding
-
