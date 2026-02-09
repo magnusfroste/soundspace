@@ -1,31 +1,57 @@
+# Voice Announcements Feature (Premium)
 
-# Rename Playlists to Simple Energy-Based Names
+A premium feature that allows businesses to record voice announcements and schedule them to play randomly during music blocks.
 
-A quick update to make playlist names intuitive for scheduling. Three existing playlists will be renamed to reflect their energy level rather than context.
+## Architecture
 
-## Changes
+### Database Schema
 
-| Current Name | New Name | Category |
-|--------------|----------|----------|
-| Relaxed Ambience | **Calm** | Ambient |
-| Energetic Beats | **Energy** | Electronic |
-| Professional Settings | **Focus** | Corporate |
+**announcements** - Stores recorded voice clips
+- `id` (UUID, PK)
+- `profile_id` (UUID, FK → profiles.id)
+- `title` (TEXT)
+- `file_url` (TEXT) - URL to audio in storage bucket
+- `duration` (INTEGER) - Duration in seconds
+- `created_at`, `updated_at` (TIMESTAMP)
 
-## Implementation
+**schedule_entry_announcements** - Links announcements to schedule blocks
+- `id` (UUID, PK)
+- `schedule_entry_id` (UUID, FK → schedule_entries.id)
+- `announcement_id` (UUID, FK → announcements.id)
+- Unique constraint on (schedule_entry_id, announcement_id)
 
-A single SQL update statement will rename all three playlists using their existing IDs:
+### Storage
 
-```sql
-UPDATE playlists SET title = 'Calm' WHERE id = '71b49421-9aa8-4c44-b3b3-0c69c650dd93';
-UPDATE playlists SET title = 'Energy' WHERE id = '8e74cc79-db7a-4f65-91b3-5c3f68b00c64';
-UPDATE playlists SET title = 'Focus' WHERE id = 'cea36987-29d3-4ea1-a3a2-5334871cc059';
-```
+- **Bucket**: `announcements` (public)
+- **Path format**: `{profile_id}/{timestamp}-{filename}.webm`
 
-## Result
+### Settings
 
-After renaming, the admin playlists page will show:
-- **Calm** (Ambient)
-- **Energy** (Electronic)
-- **Focus** (Corporate)
+- Toggle in Admin Settings (`premium_features.announcements_enabled`)
+- Stored in `site_settings` table with key `premium_features`
 
-The descriptions remain unchanged to provide additional context when needed.
+## User Flow
+
+1. **Admin enables feature** in Site Settings → Premium Features
+2. **Business user records announcements** via Announcements page (browser microphone)
+3. **User edits a schedule block** and selects which announcements to include
+4. **During playback**, announcements play randomly between songs
+
+## Components
+
+- `src/pages/Announcements.tsx` - Main page for recording/managing announcements
+- `src/components/announcements/AudioRecorder.tsx` - Recording UI component
+- `src/components/schedule/ScheduleDialog.tsx` - Updated to include announcement selection
+
+## Hooks
+
+- `useAnnouncements()` - CRUD operations for announcements
+- `useAudioRecorder()` - Browser MediaRecorder integration
+- `useScheduleAnnouncements()` - Link/unlink announcements to schedule entries
+
+## Playback Integration (TODO)
+
+The playback engine should:
+1. Fetch linked announcements for the current schedule entry
+2. Randomly insert announcements between songs
+3. Track which announcements have played to ensure variety

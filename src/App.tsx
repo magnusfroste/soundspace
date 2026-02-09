@@ -14,6 +14,7 @@ import PlaylistsPage from "@/pages/Playlists";
 import PlaylistDetail from "@/pages/PlaylistDetail";
 import NowPlaying from "@/pages/NowPlaying";
 import SchedulePage from "@/pages/Schedule";
+import AnnouncementsPage from "@/pages/Announcements";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminAIStudio from "@/pages/AdminAIStudio";
 import AdminLibrary from "@/pages/AdminLibrary";
@@ -78,6 +79,7 @@ const App = () => (
               <Route path="/playlists/:id" element={<PlaylistDetail />} />
               <Route path="/schedule" element={<SchedulePage />} />
               <Route path="/now-playing" element={<NowPlaying />} />
+              <Route path="/announcements" element={<AnnouncementsPage />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/studio" element={<AdminAIStudio />} />
               <Route path="/admin/library" element={<AdminLibrary />} />

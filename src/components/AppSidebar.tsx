@@ -1,6 +1,6 @@
 import { useLocation } from "react-router-dom";
 import {
-  Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings,
+  Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,6 +23,7 @@ const businessNav = [
   { title: "Home", url: "/app", icon: Home },
   { title: "Playlists", url: "/playlists", icon: ListMusic },
   { title: "Schedule", url: "/schedule", icon: CalendarDays },
+  { title: "Announcements", url: "/announcements", icon: Mic },
   { title: "Now Playing", url: "/now-playing", icon: Radio },
 ];
 
