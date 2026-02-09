@@ -83,7 +83,7 @@ export function GenreStep({
             "font-medium",
             letAISuggest ? "text-primary" : "text-foreground"
           )}>
-            Let SomHonesto suggest based on my business
+            Let SomHonesto suggest based on my vibe
           </span>
         </button>
 
