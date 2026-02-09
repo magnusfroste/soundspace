@@ -6,11 +6,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-interface BusinessProfile {
-  businessType: string;
-  businessSubtype: string;
+interface MatchRequest {
   atmospheres: string[];
-  preferredGenres: string[];
+  preferredGenres?: string[];
 }
 
 interface Playlist {
@@ -21,13 +19,71 @@ interface Playlist {
   cover_image_url: string | null;
 }
 
-interface PlaylistWithSongs extends Playlist {
-  genres: string[];
-  moods: string[];
-}
-
 interface MatchedPlaylist extends Playlist {
   reasoning: string;
+}
+
+// Energy level mapping for playlists
+const ENERGY_MAP: Record<string, string[]> = {
+  calm: ["relaxed", "mellow", "peaceful", "zen", "quiet", "soothing"],
+  focus: ["focused", "productive", "background", "ambient", "work", "study"],
+  energy: ["energetic", "upbeat", "lively", "dynamic", "vibrant", "fun"],
+};
+
+// Match atmosphere to energy level
+function getEnergyForAtmosphere(atmosphere: string): string | null {
+  const lower = atmosphere.toLowerCase();
+  
+  // Direct matches to energy levels
+  if (lower.includes("calm") || lower.includes("relaxed") || lower.includes("peaceful") || lower.includes("zen")) {
+    return "calm";
+  }
+  if (lower.includes("focused") || lower.includes("professional") || lower.includes("productive") || lower.includes("work")) {
+    return "focus";
+  }
+  if (lower.includes("energetic") || lower.includes("upbeat") || lower.includes("lively") || lower.includes("dynamic") || lower.includes("vibrant")) {
+    return "energy";
+  }
+  
+  // Additional mappings
+  if (lower.includes("cozy") || lower.includes("intimate") || lower.includes("mellow")) {
+    return "calm";
+  }
+  if (lower.includes("modern") || lower.includes("sophisticated") || lower.includes("elegant")) {
+    return "focus";
+  }
+  if (lower.includes("fun") || lower.includes("party") || lower.includes("social")) {
+    return "energy";
+  }
+  
+  return null;
+}
+
+// Score a playlist based on energy match
+function scorePlaylist(playlist: Playlist, targetEnergies: string[]): number {
+  const title = playlist.title.toLowerCase();
+  let score = 0;
+  
+  for (const energy of targetEnergies) {
+    // Direct title match (highest score)
+    if (title === energy) {
+      score += 100;
+    }
+    // Title contains energy word
+    else if (title.includes(energy)) {
+      score += 50;
+    }
+    // Check category match
+    else if (playlist.category) {
+      const category = playlist.category.toLowerCase();
+      const energyKeywords = ENERGY_MAP[energy] || [];
+      if (energyKeywords.some(kw => category.includes(kw))) {
+        score += 25;
+      }
+    }
+  }
+  
+  return score;
 }
 
 Deno.serve(async (req) => {
@@ -47,15 +103,10 @@ Deno.serve(async (req) => {
     }
 
     // Parse request body
-    const body: BusinessProfile = await req.json();
-    const { businessType, businessSubtype, atmospheres, preferredGenres } = body;
+    const body: MatchRequest = await req.json();
+    const { atmospheres, preferredGenres } = body;
 
-    console.log("Matching playlists for:", {
-      businessType,
-      businessSubtype,
-      atmospheres,
-      preferredGenres,
-    });
+    console.log("Matching playlists for atmospheres:", atmospheres);
 
     // Create Supabase client
     const supabase = createClient(
@@ -66,7 +117,7 @@ Deno.serve(async (req) => {
       }
     );
 
-    // Fetch all playlists with their songs' genre/mood data
+    // Fetch all playlists
     const { data: playlists, error: playlistError } = await supabase
       .from("playlists")
       .select("id, title, description, category, cover_image_url");
@@ -82,146 +133,62 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch song metadata for each playlist
-    const playlistsWithSongs: PlaylistWithSongs[] = await Promise.all(
-      playlists.map(async (playlist) => {
-        const { data: playlistSongs } = await supabase
-          .from("playlist_songs")
-          .select("song_id")
-          .eq("playlist_id", playlist.id);
-
-        if (!playlistSongs || playlistSongs.length === 0) {
-          return { ...playlist, genres: [], moods: [] };
-        }
-
-        const songIds = playlistSongs.map((ps) => ps.song_id);
-        const { data: songs } = await supabase
-          .from("songs")
-          .select("genre, mood")
-          .in("id", songIds);
-
-        const genres = songs
-          ?.map((s) => s.genre)
-          .filter((g): g is string => !!g) || [];
-        const moods = songs
-          ?.map((s) => s.mood)
-          .filter((m): m is string => !!m) || [];
-
-        return {
-          ...playlist,
-          genres: [...new Set(genres)],
-          moods: [...new Set(moods)],
-        };
-      })
-    );
-
-    // Build the AI prompt
-    const businessDescription = buildBusinessDescription(
-      businessType,
-      businessSubtype,
-      atmospheres,
-      preferredGenres
-    );
-
-    const playlistDescriptions = playlistsWithSongs.map((p, i) => {
-      return `${i + 1}. "${p.title}" (Category: ${p.category || "N/A"})
-   Description: ${p.description || "No description"}
-   Genres in playlist: ${p.genres.join(", ") || "Unknown"}
-   Moods in playlist: ${p.moods.join(", ") || "Unknown"}`;
-    }).join("\n\n");
-
-    const prompt = `You are a music curation expert for business environments.
-
-A business owner has provided the following profile:
-${businessDescription}
-
-Here are the available playlists:
-
-${playlistDescriptions}
-
-Based on the business profile, select the TOP 2-3 playlists that would be the best fit. Consider:
-- The business type and subtype (what music suits this environment?)
-- The desired atmospheres (calm, energetic, luxurious, etc.)
-- Genre preferences (if specified)
-- How well each playlist's content matches these criteria
-
-Respond ONLY with valid JSON in this exact format:
-{
-  "matches": [
-    {
-      "playlist_index": 1,
-      "reasoning": "Short explanation why this fits (1-2 sentences, under 30 words)"
-    }
-  ]
-}
-
-Select 2-3 playlists maximum. Use playlist_index (1-based) to reference them.`;
-
-    // Call Lovable AI Gateway
-    const aiResponse = await fetch(
-      "https://ai.gateway.lovable.dev/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY")}`,
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          temperature: 0.3,
-        }),
+    // Map atmospheres to energy levels
+    const targetEnergies = new Set<string>();
+    for (const atmosphere of atmospheres) {
+      const energy = getEnergyForAtmosphere(atmosphere);
+      if (energy) {
+        targetEnergies.add(energy);
       }
-    );
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error("AI Gateway error:", errorText);
-      throw new Error("Failed to get AI recommendations");
     }
 
-    const aiData = await aiResponse.json();
-    const aiContent = aiData.choices?.[0]?.message?.content;
+    // If no clear energy mapping, default to focus (safe background music)
+    if (targetEnergies.size === 0) {
+      targetEnergies.add("focus");
+    }
 
-    console.log("AI response:", aiContent);
+    console.log("Target energies:", Array.from(targetEnergies));
 
-    // Parse AI response
-    let aiMatches: { playlist_index: number; reasoning: string }[] = [];
-    try {
-      // Extract JSON from response (handle markdown code blocks)
-      const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        aiMatches = parsed.matches || [];
+    // Score all playlists
+    const scoredPlaylists = playlists.map(playlist => ({
+      playlist,
+      score: scorePlaylist(playlist, Array.from(targetEnergies)),
+    }));
+
+    // Sort by score and take top matches
+    scoredPlaylists.sort((a, b) => b.score - a.score);
+    
+    // Take playlists with score > 0, or fallback to first 2
+    let topPlaylists = scoredPlaylists.filter(p => p.score > 0).slice(0, 3);
+    
+    if (topPlaylists.length === 0) {
+      topPlaylists = scoredPlaylists.slice(0, 2);
+    }
+
+    // Build matched playlists with reasoning
+    const matchedPlaylists: MatchedPlaylist[] = topPlaylists.map(({ playlist }) => {
+      const title = playlist.title.toLowerCase();
+      let reasoning = "";
+      
+      if (title === "calm") {
+        reasoning = "Perfect for creating a relaxed, peaceful atmosphere.";
+      } else if (title === "focus") {
+        reasoning = "Ideal background music that won't distract your customers.";
+      } else if (title === "energy") {
+        reasoning = "Great for adding energy and vibrancy to your space.";
+      } else {
+        reasoning = "Matches your preferred atmosphere and style.";
       }
-    } catch (parseError) {
-      console.error("Error parsing AI response:", parseError);
-      // Fallback: return first 2 playlists with generic reasoning
-      aiMatches = playlists.slice(0, 2).map((_, i) => ({
-        playlist_index: i + 1,
-        reasoning: "Recommended based on your business profile.",
-      }));
-    }
-
-    // Build final matched playlists
-    const matchedPlaylists: MatchedPlaylist[] = aiMatches
-      .filter((m) => m.playlist_index > 0 && m.playlist_index <= playlists.length)
-      .map((m) => {
-        const playlist = playlists[m.playlist_index - 1];
-        return {
-          id: playlist.id,
-          title: playlist.title,
-          description: playlist.description,
-          category: playlist.category,
-          cover_image_url: playlist.cover_image_url,
-          reasoning: m.reasoning,
-        };
-      });
+      
+      return {
+        id: playlist.id,
+        title: playlist.title,
+        description: playlist.description,
+        category: playlist.category,
+        cover_image_url: playlist.cover_image_url,
+        reasoning,
+      };
+    });
 
     console.log("Matched playlists:", matchedPlaylists.length);
 
@@ -239,25 +206,3 @@ Select 2-3 playlists maximum. Use playlist_index (1-based) to reference them.`;
     );
   }
 });
-
-function buildBusinessDescription(
-  businessType: string,
-  businessSubtype: string,
-  atmospheres: string[],
-  preferredGenres: string[]
-): string {
-  const typeLabel = businessSubtype
-    ? `${businessSubtype.replace(/_/g, " ")} (${businessType})`
-    : businessType;
-
-  let description = `Business Type: ${typeLabel}\n`;
-  description += `Desired Atmosphere: ${atmospheres.join(", ")}\n`;
-
-  if (preferredGenres.length > 0) {
-    description += `Preferred Genres: ${preferredGenres.join(", ")}`;
-  } else {
-    description += `Preferred Genres: No specific preference (suggest based on business type and atmosphere)`;
-  }
-
-  return description;
-}
