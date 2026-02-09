@@ -1,7 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic,
+  Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic, Crown,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -61,9 +61,9 @@ export function AppSidebar() {
   // Build business nav based on feature flags
   const businessNav = [
     ...baseBusinessNav.slice(0, 3), // Home, Playlists, Schedule
-    ...(announcementsEnabled ? [{ title: "Announcements", url: "/announcements", icon: Mic }] : []),
+    ...(announcementsEnabled ? [{ title: "Announcements", url: "/announcements", icon: Mic, premium: true }] : []),
     ...baseBusinessNav.slice(3), // Now Playing
-  ];
+  ] as Array<{ title: string; url: string; icon: typeof Home; premium?: boolean }>;
 
   return (
     <Sidebar className="border-r border-border">
@@ -113,9 +113,14 @@ export function AppSidebar() {
               {businessNav.map((item) => (
                 <SidebarMenuItem key={item.url}>
                   <SidebarMenuButton asChild isActive={location.pathname === item.url}>
-                    <NavLink to={item.url} end>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
+                    <NavLink to={item.url} end className="flex items-center justify-between w-full">
+                      <span className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </span>
+                      {item.premium && (
+                        <Crown className="h-3 w-3 text-yellow-500" />
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
