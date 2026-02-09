@@ -5,6 +5,8 @@ import { connectAudioElement } from "@/hooks/useAudioAnalyser";
 
 type Song = Tables<"songs">;
 
+type RepeatMode = "off" | "one" | "all";
+
 interface PlayerContextType {
   currentSong: Song | null;
   queue: Song[];
@@ -12,6 +14,8 @@ interface PlayerContextType {
   currentTime: number;
   duration: number;
   volume: number;
+  shuffle: boolean;
+  repeatMode: RepeatMode;
   scheduleMode: boolean;
   currentPlaylistId: string | null;
   playSong: (song: Song) => void;
@@ -21,6 +25,8 @@ interface PlayerContextType {
   prevTrack: () => void;
   seek: (time: number) => void;
   setVolume: (vol: number) => void;
+  setShuffle: (enabled: boolean) => void;
+  setRepeatMode: (mode: RepeatMode) => void;
   setScheduleMode: (enabled: boolean) => void;
 }
 
@@ -41,6 +47,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.8);
+  const [shuffle, setShuffleState] = useState(false);
+  const [repeatMode, setRepeatModeState] = useState<RepeatMode>("all");
   const [scheduleMode, setScheduleModeState] = useState(false);
   const [currentPlaylistId, setCurrentPlaylistId] = useState<string | null>(null);
   
@@ -48,6 +56,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const playStartTimeRef = useRef<number | null>(null);
   const currentSongIdRef = useRef<string | null>(null);
   const playLogIdRef = useRef<string | null>(null);
+  
+  // Track played indices for shuffle mode
+  const playedIndicesRef = useRef<Set<number>>(new Set());
 
   // Log play to database
   const logPlay = useCallback(async (songId: string) => {
@@ -126,21 +137,69 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Get next track index based on shuffle/repeat mode
+  const getNextIndex = useCallback((currentIdx: number, queueLen: number): number | null => {
+    if (shuffle) {
+      // In shuffle mode, pick a random unplayed track
+      const unplayed = Array.from({ length: queueLen }, (_, i) => i)
+        .filter(i => i !== currentIdx && !playedIndicesRef.current.has(i));
+      
+      if (unplayed.length > 0) {
+        return unplayed[Math.floor(Math.random() * unplayed.length)];
+      }
+      
+      // All played - reset if repeat all
+      if (repeatMode === "all") {
+        playedIndicesRef.current.clear();
+        const available = Array.from({ length: queueLen }, (_, i) => i)
+          .filter(i => i !== currentIdx);
+        return available.length > 0 
+          ? available[Math.floor(Math.random() * available.length)] 
+          : 0;
+      }
+      return null;
+    }
+    
+    // Sequential mode
+    const nextIdx = currentIdx + 1;
+    if (nextIdx < queueLen) {
+      return nextIdx;
+    }
+    
+    // End of queue
+    if (repeatMode === "all") {
+      return 0; // Loop back to start
+    }
+    return null;
+  }, [shuffle, repeatMode]);
+
   const handleEnded = useCallback(() => {
     // Update duration for completed song
     updatePlayDuration();
     
-    // Auto-advance to next track
-    setQueueIndex((prev) => {
-      const nextIdx = prev + 1;
-      if (nextIdx < queue.length) {
-        loadAndPlay(queue[nextIdx]);
-        return nextIdx;
+    // Handle repeat one
+    if (repeatMode === "one") {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
       }
+      return;
+    }
+    
+    // Mark current as played
+    playedIndicesRef.current.add(queueIndex);
+    
+    // Get next track
+    const nextIdx = getNextIndex(queueIndex, queue.length);
+    
+    if (nextIdx !== null) {
+      setQueueIndex(nextIdx);
+      loadAndPlay(queue[nextIdx]);
+    } else {
       setIsPlaying(false);
-      return prev;
-    });
-  }, [queue, updatePlayDuration]);
+    }
+  }, [queue, queueIndex, repeatMode, updatePlayDuration, getNextIndex]);
 
   // Update ended handler when queue changes
   useEffect(() => {
@@ -188,10 +247,30 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("scheduleMode", enabled ? "true" : "false");
   }, []);
 
-  // Load schedule mode from localStorage
+  const setShuffle = useCallback((enabled: boolean) => {
+    setShuffleState(enabled);
+    localStorage.setItem("shuffle", enabled ? "true" : "false");
+    // Reset played indices when toggling shuffle
+    playedIndicesRef.current.clear();
+  }, []);
+
+  const setRepeatMode = useCallback((mode: RepeatMode) => {
+    setRepeatModeState(mode);
+    localStorage.setItem("repeatMode", mode);
+  }, []);
+
+  // Load settings from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("scheduleMode");
-    if (saved === "true") setScheduleModeState(true);
+    const savedSchedule = localStorage.getItem("scheduleMode");
+    if (savedSchedule === "true") setScheduleModeState(true);
+    
+    const savedShuffle = localStorage.getItem("shuffle");
+    if (savedShuffle === "true") setShuffleState(true);
+    
+    const savedRepeat = localStorage.getItem("repeatMode") as RepeatMode | null;
+    if (savedRepeat && ["off", "one", "all"].includes(savedRepeat)) {
+      setRepeatModeState(savedRepeat);
+    }
   }, []);
 
   // Schedule auto-play engine
@@ -276,12 +355,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const nextTrack = useCallback(() => {
     updatePlayDuration();
-    const nextIdx = queueIndex + 1;
-    if (nextIdx < queue.length) {
+    playedIndicesRef.current.add(queueIndex);
+    
+    const nextIdx = getNextIndex(queueIndex, queue.length);
+    if (nextIdx !== null) {
       setQueueIndex(nextIdx);
       loadAndPlay(queue[nextIdx]);
     }
-  }, [queueIndex, queue, updatePlayDuration]);
+  }, [queueIndex, queue, updatePlayDuration, getNextIndex]);
 
   const prevTrack = useCallback(() => {
     const audio = audioRef.current;
@@ -310,9 +391,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     <PlayerContext.Provider
       value={{
         currentSong, queue, isPlaying, currentTime, duration, volume,
-        scheduleMode, currentPlaylistId,
+        shuffle, repeatMode, scheduleMode, currentPlaylistId,
         playSong, playQueue, togglePlay, nextTrack, prevTrack, seek, setVolume,
-        setScheduleMode,
+        setShuffle, setRepeatMode, setScheduleMode,
       }}
     >
       {children}
