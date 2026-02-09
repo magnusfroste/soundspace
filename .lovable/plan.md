@@ -1,121 +1,31 @@
 
+# Rename Playlists to Simple Energy-Based Names
 
-# Business Onboarding Flow
+A quick update to make playlist names intuitive for scheduling. Three existing playlists will be renamed to reflect their energy level rather than context.
 
-A guided onboarding experience that uses AI to match businesses with relevant playlists from your curated library, followed by easy scheduling.
+## Changes
 
-## Overview
+| Current Name | New Name | Category |
+|--------------|----------|----------|
+| Relaxed Ambience | **Calm** | Ambient |
+| Energetic Beats | **Energy** | Electronic |
+| Professional Settings | **Focus** | Corporate |
 
-The onboarding collects business context (type, sub-type, atmosphere, preferred genres) and uses AI to suggest 2-3 matching playlists from your existing library. After matching, users land on a "Quick Start" view showing their suggested playlists prominently, with an option to explore the full library.
+## Implementation
 
-```text
-+------------------+    +------------------+    +------------------+
-|  Business Type   | -> |   Atmosphere     | -> |   Genre Prefs    |
-|  (Bar, Cafe...)  |    |  (Calm, Hip...)  |    |  (Jazz, Pop...)  |
-+------------------+    +------------------+    +------------------+
-         |                      |                       |
-         +----------------------+-----------------------+
-                               |
-                        +------v------+
-                        |  AI Match   |
-                        | (Edge Func) |
-                        +------+------+
-                               |
-                   +-----------v-----------+
-                   |  2-3 Suggested Playlists  |
-                   |  "Perfect for your pub"  |
-                   +-----------+---------------+
-                               |
-                        +------v------+
-                        | Quick Start |
-                        |   Schedule  |
-                        +-------------+
+A single SQL update statement will rename all three playlists using their existing IDs:
+
+```sql
+UPDATE playlists SET title = 'Calm' WHERE id = '71b49421-9aa8-4c44-b3b3-0c69c650dd93';
+UPDATE playlists SET title = 'Energy' WHERE id = '8e74cc79-db7a-4f65-91b3-5c3f68b00c64';
+UPDATE playlists SET title = 'Focus' WHERE id = 'cea36987-29d3-4ea1-a3a2-5334871cc059';
 ```
 
-## User Flow
+## Result
 
-### Step 1: Business Type
-- Dropdown with categories: Bar, Cafe, Restaurant, Gym, Hotel, Office, Salon, Spa, Store, Medical, Other
-- When selected, show sub-type chips (e.g., Bar -> Wine bar, Dive bar, Cocktail bar, Pub, etc.)
+After renaming, the admin playlists page will show:
+- **Calm** (Ambient)
+- **Energy** (Electronic)
+- **Focus** (Corporate)
 
-### Step 2: Atmosphere (Pick 1-3)
-- Chip selection: Calm, Energetic, Luxurious, Modern, Traditional, Casual, Upbeat, Romantic, Hip, Cozy
-- Multi-select up to 3
-
-### Step 3: Genre Preferences (Optional)
-- Option A: "Let SomHonesto suggest" (AI picks based on business type + atmosphere)
-- Option B: Manual selection chips (Jazz, Pop, Electronic, Ambient, Classical, etc.)
-
-### Step 4: AI Matching
-- Loading screen: "Finding the perfect playlists for your [business type]..."
-- Edge function calls AI to match preferences against playlist metadata
-
-### Step 5: Results
-- Display 2-3 matched playlists with reasoning
-- "These are now in your library" message
-- CTA: "Set up your schedule" or "Start playing"
-
-## Data Model Changes
-
-### Profile Table Updates
-Add columns to store onboarding preferences:
-- `business_subtype` (text): e.g., "wine_bar", "cocktail_bar"
-- `atmospheres` (text[]): array of selected atmosphere tags
-- `preferred_genres` (text[]): array of genre preferences
-- `onboarding_completed` (boolean): flag to skip onboarding on return
-- `suggested_playlist_ids` (uuid[]): AI-suggested playlists for this profile
-
-## Components
-
-### New Files
-1. **`src/pages/Onboarding.tsx`** - Multi-step wizard container
-2. **`src/components/onboarding/BusinessTypeStep.tsx`** - Business category + sub-type
-3. **`src/components/onboarding/AtmosphereStep.tsx`** - Atmosphere chip selection
-4. **`src/components/onboarding/GenreStep.tsx`** - Genre preferences
-5. **`src/components/onboarding/MatchingStep.tsx`** - Loading + results display
-6. **`src/hooks/useOnboarding.ts`** - State management + profile saving
-
-### Edge Function
-**`supabase/functions/match-business-playlists/index.ts`**
-- Input: business_type, business_subtype, atmospheres, genres, available playlists
-- Uses Lovable AI to score and rank playlists
-- Returns top 2-3 matches with reasoning
-
-## Post-Onboarding Experience
-
-### Modified Home Page (`/app`)
-- **For new users (suggested playlists exist)**: Show "Your Playlists" section prominently with 2-3 matched playlists + "Explore more playlists" link below
-- **For existing users**: Current behavior (all playlists visible)
-
-### Playlists Page (`/playlists`)
-- Show "Recommended for you" badge on AI-matched playlists
-- All playlists remain accessible for full exploration
-
-## Routing Logic
-
-```text
-User logs in -> Check profile.onboarding_completed
-   |
-   +-- false --> /onboarding (multi-step wizard)
-   |
-   +-- true --> /app (normal home with suggestions highlighted)
-```
-
-## Technical Details
-
-### AI Matching Prompt Strategy
-The edge function will:
-1. Build a profile description from business type + sub-type + atmospheres
-2. Describe each playlist (title, category, description, song stats)
-3. Ask AI to rank and explain top matches in English
-
-### Playlist Metadata Enhancement
-Current playlists have `category` and `description`. The AI can match based on:
-- Category keywords (Ambient, Electronic, Corporate)
-- Description text
-- Song mood/genre distributions (calculated from playlist_songs -> songs)
-
-### Progressive Disclosure
-- Onboarding is 3-4 quick steps (under 60 seconds)
-- Skip option available on intro screen for power users
-- Can always access full library after onboarding
+The descriptions remain unchanged to provide additional context when needed.
