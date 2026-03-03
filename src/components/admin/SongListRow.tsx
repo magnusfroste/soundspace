@@ -34,6 +34,9 @@ import {
 import { usePlayer } from "@/contexts/PlayerContext";
 import type { SongWithPlaylists, PlaylistWithCount } from "@/hooks/useSongLibrary";
 import { useAddSongToPlaylist, useUpdateSong, useDeleteSong } from "@/hooks/useSongLibrary";
+import { supabase } from "@/integrations/supabase/client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface SongListRowProps {
