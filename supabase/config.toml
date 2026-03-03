@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.ai-fill-playlist]
 verify_jwt = false
+
+[functions.import-udio]
+verify_jwt = false

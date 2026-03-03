@@ -21,6 +21,7 @@ import AdminLibrary from "@/pages/AdminLibrary";
 import AdminPlaylists from "@/pages/AdminPlaylists";
 import AdminIntegrations from "@/pages/AdminIntegrations";
 import AdminSettings from "@/pages/AdminSettings";
+import AdminPlugins from "@/pages/AdminPlugins";
 import MyPlaylists from "@/pages/MyPlaylists";
 import MyPlaylistDetail from "@/pages/MyPlaylistDetail";
 import NotFound from "@/pages/NotFound";
@@ -90,6 +91,7 @@ const App = () => (
               <Route path="/admin/playlists" element={<AdminPlaylists />} />
               <Route path="/admin/integrations" element={<AdminIntegrations />} />
               <Route path="/admin/settings" element={<AdminSettings />} />
+              <Route path="/admin/plugins" element={<AdminPlugins />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
