@@ -21,6 +21,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut } from "lucide-react";
 
 const baseBusinessNav = [
@@ -45,6 +46,20 @@ export function AppSidebar() {
   const { role, signOut, user } = useAuth();
   const location = useLocation();
   const isAdmin = role === "admin";
+
+  // Fetch user profile for avatar & display name
+  const { data: profile } = useQuery({
+    queryKey: ["sidebar-profile", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("display_name, avatar_url")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      return data;
+    },
+  });
 
   // Fetch premium features setting
   const { data: premiumSettings } = useQuery({
@@ -141,29 +156,26 @@ export function AppSidebar() {
 
       <SidebarFooter className="p-3 group-data-[collapsible=icon]:p-2">
         <div className="glass rounded-lg p-3 group-data-[collapsible=icon]:p-2 space-y-2">
-          <p className="text-xs text-muted-foreground truncate group-data-[collapsible=icon]:hidden">{user?.email}</p>
-          <div className="flex flex-col gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
-              asChild
-            >
-              <NavLink to="/profile">
-                <User className="h-4 w-4 group-data-[collapsible=icon]:mr-0 mr-2" />
-                <span className="group-data-[collapsible=icon]:hidden">Profile</span>
-              </NavLink>
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="w-full justify-start text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0" 
-              onClick={signOut}
-            >
-              <LogOut className="h-4 w-4 group-data-[collapsible=icon]:mr-0 mr-2" />
-              <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
-            </Button>
-          </div>
+          <NavLink to="/profile" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center hover:opacity-80 transition-opacity">
+            <Avatar className="h-7 w-7 shrink-0">
+              {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={profile?.display_name ?? "User"} />}
+              <AvatarFallback className="text-[10px] bg-muted">
+                {profile?.display_name ? profile.display_name.slice(0, 2).toUpperCase() : "?"}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-medium truncate group-data-[collapsible=icon]:hidden">
+              {profile?.display_name || "Profile"}
+            </span>
+          </NavLink>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="w-full justify-start text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0" 
+            onClick={signOut}
+          >
+            <LogOut className="h-4 w-4 group-data-[collapsible=icon]:mr-0 mr-2" />
+            <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
+          </Button>
         </div>
       </SidebarFooter>
       
