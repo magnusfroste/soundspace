@@ -13,6 +13,7 @@ export interface GenerateOptions {
 export interface GenerationResult {
   audioBlob: Blob;
   audioUrl: string;
+  lyrics?: string;
   metadata: {
     provider: string;
     prompt: string;
