@@ -1,5 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Upload, Music2, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useUploadSong } from "@/hooks/useSongLibrary";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const ACCEPTED = ".mp3,.wav";
 const MAX_SIZE_MB = 20;
@@ -23,6 +26,24 @@ export function UploadSongDialog() {
   const [artist, setArtist] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadMutation = useUploadSong();
+  const { user } = useAuth();
+
+  // Fetch profile business_name for default artist
+  const { data: profile } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("business_name")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const defaultArtist = profile?.business_name || "";
 
   const reset = () => {
     setFile(null);
@@ -53,7 +74,7 @@ export function UploadSongDialog() {
     if (!file || !title.trim()) return;
 
     uploadMutation.mutate(
-      { file, title: title.trim(), artist: artist.trim() || "Unknown Artist" },
+      { file, title: title.trim(), artist: (artist.trim() || defaultArtist || "Unknown Artist") },
       {
         onSuccess: () => {
           reset();
