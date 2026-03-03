@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { Search, Filter, X, Library, Sparkles } from "lucide-react";
+import { UploadSongDialog } from "@/components/admin/UploadSongDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -77,6 +78,7 @@ export default function AdminLibrary() {
           </div>
 
           <div className="flex items-center gap-2">
+            <UploadSongDialog />
             {/* Search */}
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
