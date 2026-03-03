@@ -200,6 +200,7 @@ export default function AdminLibrary() {
               <div className="w-24 hidden md:block">Genre</div>
               <div className="w-20 hidden lg:block">Mood</div>
               <div className="w-48 hidden xl:block">AI Prompt</div>
+              <div className="w-8 hidden xl:block text-center">Lyr</div>
               <div className="w-12 text-right">Time</div>
               <div className="w-32 hidden lg:block">Playlists</div>
               <div className="w-8" />
