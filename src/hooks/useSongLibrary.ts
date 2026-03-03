@@ -96,6 +96,28 @@ export function usePlaylistsWithCounts() {
   });
 }
 
+// Update song metadata
+export function useUpdateSong() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: { id: string; title?: string; artist?: string; genre?: string | null; mood?: string | null }) => {
+      const { error } = await supabase
+        .from("songs")
+        .update(updates)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-songs-library"] });
+      toast.success("Song updated");
+    },
+    onError: () => {
+      toast.error("Failed to update song");
+    },
+  });
+}
+
 // Add song to playlist
 export function useAddSongToPlaylist() {
   const queryClient = useQueryClient();
