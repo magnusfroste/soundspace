@@ -27,7 +27,8 @@ export function StudioPromptPanel({
   onGenerate,
 }: StudioPromptPanelProps) {
   const [prompt, setPrompt] = useState("");
-  const [duration, setDuration] = useState(180); // 3 minutes default
+  const [duration, setDuration] = useState(180);
+  const [lyrics, setLyrics] = useState("");
   const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
 
@@ -39,6 +40,7 @@ export function StudioPromptPanel({
       duration,
       genre: selectedGenre || undefined,
       mood: selectedMood || undefined,
+      lyrics: lyrics.trim() || undefined,
     });
   };
 
