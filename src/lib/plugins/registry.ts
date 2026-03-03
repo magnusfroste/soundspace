@@ -18,6 +18,14 @@ export const pluginRegistry: Plugin[] = [
     category: "import",
     version: "1.0.0",
   },
+  {
+    id: "suno-importer",
+    name: "Suno Importer",
+    description: "Import songs from Suno share links. Paste a link to download and catalog the track automatically.",
+    icon: "Download",
+    category: "import",
+    version: "1.0.0",
+  },
 ];
 
 export function getPlugin(id: string): Plugin | undefined {

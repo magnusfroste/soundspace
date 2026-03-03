@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Puzzle, Download, Upload, Zap, BarChart3 } from "lucide-react";
 import { toast } from "sonner";
 import { UdioImporterPlugin } from "@/components/plugins/UdioImporterPlugin";
+import { SunoImporterPlugin } from "@/components/plugins/SunoImporterPlugin";
 
 const categoryIcons: Record<string, typeof Download> = {
   import: Download,
@@ -145,6 +146,9 @@ export default function AdminPlugins() {
 
                   {isActive && plugin.id === "udio-importer" && (
                     <UdioImporterPlugin />
+                  )}
+                  {isActive && plugin.id === "suno-importer" && (
+                    <SunoImporterPlugin />
                   )}
                 </CardContent>
               )}
