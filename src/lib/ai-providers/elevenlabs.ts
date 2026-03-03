@@ -22,7 +22,11 @@ export const elevenlabsProvider: AIProvider = {
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ prompt: fullPrompt, duration: options.duration }),
+        body: JSON.stringify({
+          prompt: fullPrompt,
+          duration: options.duration,
+          lyrics: options.lyrics || undefined,
+        }),
       }
     );
 
@@ -31,12 +35,22 @@ export const elevenlabsProvider: AIProvider = {
       throw new Error(error.error || "Failed to generate music");
     }
 
-    const audioBlob = await response.blob();
+    // New: response is JSON with { audio (base64), lyrics, compositionPlan }
+    const data = await response.json();
+
+    // Decode base64 audio to blob
+    const binaryStr = atob(data.audio);
+    const bytes = new Uint8Array(binaryStr.length);
+    for (let i = 0; i < binaryStr.length; i++) {
+      bytes[i] = binaryStr.charCodeAt(i);
+    }
+    const audioBlob = new Blob([bytes], { type: "audio/mpeg" });
     const audioUrl = URL.createObjectURL(audioBlob);
 
     return {
       audioBlob,
       audioUrl,
+      lyrics: data.lyrics || undefined,
       metadata: {
         provider: "elevenlabs",
         prompt: options.prompt,
@@ -48,7 +62,6 @@ export const elevenlabsProvider: AIProvider = {
   },
 
   async checkStatus(): Promise<ProviderStatus> {
-    // Could add a health check endpoint here
     return "ready";
   },
 };
