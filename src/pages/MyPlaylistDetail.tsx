@@ -75,10 +75,10 @@ export default function MyPlaylistDetail() {
 
     const songsToPlay = songs
       .filter((s) => s.song)
-      .map((s) => s.song!);
+      .map((s) => ({ ...s.song!, lyrics: s.song!.lyrics ?? null }));
 
     if (songsToPlay.length > 0) {
-      playQueue(songsToPlay, 0);
+      playQueue(songsToPlay as any, 0);
     }
   };
 
@@ -90,7 +90,7 @@ export default function MyPlaylistDetail() {
       .map((s) => s.song!) || [];
 
     const startIndex = songsToPlay.findIndex((s) => s.id === song.id);
-    playQueue(songsToPlay, startIndex >= 0 ? startIndex : 0);
+    playQueue(songsToPlay as any, startIndex >= 0 ? startIndex : 0);
   };
 
   const handleDeletePlaylist = async () => {
