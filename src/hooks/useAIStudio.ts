@@ -53,6 +53,21 @@ export function useAIStudio() {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Fetch profile to get business_name for artist attribution
+  const { data: profile } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("business_name")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const activeProvider = getProviderById(activeProviderId) || allProviders[0];
 
   // Fetch generation history from database
@@ -174,17 +189,19 @@ export function useAIStudio() {
       const songTitle = title.trim() || `AI Generated - ${new Date().toLocaleDateString()}`;
 
       // Insert into songs table with prompt metadata
+      // Use profile business_name as artist attribution
+      const artistName = profile?.business_name || "AI Studio";
       const { data: songData, error: insertError } = await supabase
         .from("songs")
         .insert({
           title: songTitle,
-          artist: "SomHonesto AI",
+          artist: artistName,
           file_url: item.audioUrl,
           duration: item.duration,
           genre: item.genre || null,
           mood: item.mood || null,
           origin_source: `ai_${item.provider}`,
-          prompt: item.prompt, // Store the original AI prompt for future matching
+          prompt: item.prompt,
         })
         .select("id")
         .single();
