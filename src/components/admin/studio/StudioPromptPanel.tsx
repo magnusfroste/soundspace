@@ -116,7 +116,8 @@ export function StudioPromptPanel({
         />
       </div>
 
-
+      <div className="space-y-3">
+        <div className="flex justify-between">
           <Label>Duration</Label>
           <span className="text-sm text-muted-foreground">
             {duration >= 60 
