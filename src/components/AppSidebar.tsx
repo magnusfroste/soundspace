@@ -1,7 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic, Crown, Puzzle, Users,
+  Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic, Crown, Puzzle, Users, User,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -140,17 +140,30 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="p-3 group-data-[collapsible=icon]:p-2">
-        <div className="glass rounded-lg p-3 group-data-[collapsible=icon]:p-2">
-          <p className="text-xs text-muted-foreground truncate mb-2 group-data-[collapsible=icon]:hidden">{user?.email}</p>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="w-full justify-start text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0" 
-            onClick={signOut}
-          >
-            <LogOut className="h-4 w-4 group-data-[collapsible=icon]:mr-0 mr-2" />
-            <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
-          </Button>
+        <div className="glass rounded-lg p-3 group-data-[collapsible=icon]:p-2 space-y-2">
+          <p className="text-xs text-muted-foreground truncate group-data-[collapsible=icon]:hidden">{user?.email}</p>
+          <div className="flex flex-col gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+              asChild
+            >
+              <NavLink to="/profile">
+                <User className="h-4 w-4 group-data-[collapsible=icon]:mr-0 mr-2" />
+                <span className="group-data-[collapsible=icon]:hidden">Profile</span>
+              </NavLink>
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full justify-start text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0" 
+              onClick={signOut}
+            >
+              <LogOut className="h-4 w-4 group-data-[collapsible=icon]:mr-0 mr-2" />
+              <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
+            </Button>
+          </div>
         </div>
       </SidebarFooter>
       

@@ -26,6 +26,7 @@ import AdminUsers from "@/pages/AdminUsers";
 import MyPlaylists from "@/pages/MyPlaylists";
 import MyPlaylistDetail from "@/pages/MyPlaylistDetail";
 import NotFound from "@/pages/NotFound";
+import ProfilePage from "@/pages/ProfilePage";
 
 const queryClient = new QueryClient();
 
@@ -94,6 +95,7 @@ const App = () => (
               <Route path="/admin/settings" element={<AdminSettings />} />
               <Route path="/admin/plugins" element={<AdminPlugins />} />
               <Route path="/admin/users" element={<AdminUsers />} />
+              <Route path="/profile" element={<ProfilePage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
