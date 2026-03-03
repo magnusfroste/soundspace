@@ -146,7 +146,8 @@ export function useAIStudio() {
           prompt: options.prompt,
           genre: options.genre || null,
           mood: options.mood || null,
-          duration: actualDuration || options.duration, // Use actual, fallback to requested
+          lyrics: options.lyrics || null,
+          duration: actualDuration || options.duration,
           audio_url: urlData.publicUrl,
           saved_to_library: false,
         })
