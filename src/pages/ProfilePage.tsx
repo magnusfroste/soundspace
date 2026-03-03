@@ -41,6 +41,7 @@ export default function ProfilePage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["sidebar-profile"] });
       toast.success("Profile updated");
     },
     onError: (err: Error) => toast.error(err.message),
