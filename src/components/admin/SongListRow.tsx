@@ -283,9 +283,28 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
             </PopoverContent>
           </Popover>
         ) : (
-          <span className="text-muted-foreground/30">
-            <Type className="h-3.5 w-3.5" />
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="text-muted-foreground/40 hover:text-primary transition-colors disabled:opacity-50"
+                title="Extract lyrics"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  extractLyrics.mutate();
+                }}
+                disabled={extractLyrics.isPending}
+              >
+                {extractLyrics.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Type className="h-3.5 w-3.5" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p className="text-xs">Extract lyrics (STT)</p>
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
 
