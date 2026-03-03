@@ -7,6 +7,7 @@ export interface GenerateOptions {
   duration: number;
   genre?: string;
   mood?: string;
+  lyrics?: string;
 }
 
 export interface GenerationResult {

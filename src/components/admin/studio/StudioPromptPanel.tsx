@@ -17,6 +17,7 @@ interface StudioPromptPanelProps {
     duration: number;
     genre?: string;
     mood?: string;
+    lyrics?: string;
   }) => void;
 }
 
