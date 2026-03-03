@@ -262,10 +262,12 @@ export type Database = {
       profiles: {
         Row: {
           atmospheres: string[] | null
+          avatar_url: string | null
           business_name: string | null
           business_subtype: string | null
           business_type: string | null
           created_at: string
+          display_name: string | null
           id: string
           location: string | null
           onboarding_completed: boolean | null
@@ -276,10 +278,12 @@ export type Database = {
         }
         Insert: {
           atmospheres?: string[] | null
+          avatar_url?: string | null
           business_name?: string | null
           business_subtype?: string | null
           business_type?: string | null
           created_at?: string
+          display_name?: string | null
           id?: string
           location?: string | null
           onboarding_completed?: boolean | null
@@ -290,10 +294,12 @@ export type Database = {
         }
         Update: {
           atmospheres?: string[] | null
+          avatar_url?: string | null
           business_name?: string | null
           business_subtype?: string | null
           business_type?: string | null
           created_at?: string
+          display_name?: string | null
           id?: string
           location?: string | null
           onboarding_completed?: boolean | null
