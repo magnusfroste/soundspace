@@ -200,6 +200,74 @@ export function useDeleteSong() {
   });
 }
 
+// Upload a song file (MP3/WAV) to storage and create a catalog entry
+export function useUploadSong() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      file,
+      title,
+      artist,
+    }: {
+      file: File;
+      title: string;
+      artist: string;
+    }) => {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "mp3";
+      const fileName = `upload-${crypto.randomUUID()}.${ext}`;
+      const contentType = ext === "wav" ? "audio/wav" : "audio/mpeg";
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from("songs")
+        .upload(fileName, file, { contentType, upsert: false });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from("songs")
+        .getPublicUrl(fileName);
+
+      // Try to get duration from the file
+      const duration = await getAudioDuration(file);
+
+      // Insert song record
+      const { error: insertError } = await supabase.from("songs").insert({
+        title,
+        artist,
+        file_url: urlData.publicUrl,
+        duration,
+        origin_source: "manual_upload",
+      });
+
+      if (insertError) throw insertError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-songs-library"] });
+      toast.success("Song uploaded successfully");
+    },
+    onError: () => {
+      toast.error("Failed to upload song");
+    },
+  });
+}
+
+function getAudioDuration(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const audio = new Audio();
+    audio.addEventListener("loadedmetadata", () => {
+      resolve(Math.round(audio.duration));
+      URL.revokeObjectURL(audio.src);
+    });
+    audio.addEventListener("error", () => {
+      resolve(0);
+      URL.revokeObjectURL(audio.src);
+    });
+    audio.src = URL.createObjectURL(file);
+  });
+}
+
 // Filter helpers
 export function filterSongs(
   songs: SongWithPlaylists[],
