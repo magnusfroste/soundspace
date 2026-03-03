@@ -29,6 +29,32 @@ interface OutputPreviewProps {
   }) => void;
 }
 
+function LyricsPanel({ lyrics }: { lyrics: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const lines = lyrics.split("\n");
+  const isLong = lines.length > 6;
+  const displayText = expanded ? lyrics : lines.slice(0, 6).join("\n");
+
+  return (
+    <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+      <button
+        className="flex items-center gap-2 text-sm font-medium w-full text-left"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <Type className="h-3.5 w-3.5 text-primary" />
+        Lyrics
+        {isLong && (
+          expanded ? <ChevronUp className="h-3.5 w-3.5 ml-auto" /> : <ChevronDown className="h-3.5 w-3.5 ml-auto" />
+        )}
+      </button>
+      <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-sans leading-relaxed">
+        {displayText}
+        {!expanded && isLong && "…"}
+      </pre>
+    </div>
+  );
+}
+
 export function OutputPreview({
   item,
   playlists,
