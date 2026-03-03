@@ -38,6 +38,7 @@ function mapDBToHistoryItem(db: DBGeneration): GenerationHistoryItem {
     prompt: db.prompt,
     genre: db.genre || undefined,
     mood: db.mood || undefined,
+    lyrics: db.lyrics || undefined,
     duration: db.duration,
     audioUrl: db.audio_url || "",
     savedToLibrary: db.saved_to_library,
@@ -202,6 +203,7 @@ export function useAIStudio() {
           duration: item.duration,
           genre: item.genre || null,
           mood: item.mood || null,
+          lyrics: item.lyrics || null,
           origin_source: `ai_${item.provider}`,
           prompt: item.prompt,
         })
