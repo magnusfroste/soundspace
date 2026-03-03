@@ -104,8 +104,19 @@ export function StudioPromptPanel({
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="flex justify-between">
+      <div className="space-y-2">
+        <Label htmlFor="lyrics">Lyrics (optional)</Label>
+        <Textarea
+          id="lyrics"
+          placeholder="Paste or type song lyrics here..."
+          value={lyrics}
+          onChange={(e) => setLyrics(e.target.value)}
+          disabled={isGenerating}
+          className="min-h-[80px] resize-none text-sm"
+        />
+      </div>
+
+
           <Label>Duration</Label>
           <span className="text-sm text-muted-foreground">
             {duration >= 60 
