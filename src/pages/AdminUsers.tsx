@@ -1,7 +1,8 @@
-import { Users, Shield, Building2 } from "lucide-react";
+import { Users, Shield, Building2, User } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -15,6 +16,8 @@ import { useAuth } from "@/contexts/AuthContext";
 interface UserRow {
   id: string;
   user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
   business_name: string | null;
   business_type: string | null;
   location: string | null;
@@ -33,7 +36,7 @@ export default function AdminUsers() {
       const [{ data: profiles, error: pErr }, { data: roles, error: rErr }] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id, user_id, business_name, business_type, location, onboarding_completed, created_at")
+          .select("id, user_id, display_name, avatar_url, business_name, business_type, location, onboarding_completed, created_at")
           .order("created_at", { ascending: false }),
         supabase.from("user_roles").select("user_id, role"),
       ]);
@@ -80,8 +83,8 @@ export default function AdminUsers() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left">
+                <th className="px-4 py-3 font-medium text-muted-foreground">User</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Business</th>
-                <th className="px-4 py-3 font-medium text-muted-foreground">Type</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Location</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Role</th>
                 <th className="px-4 py-3 font-medium text-muted-foreground">Onboarding</th>
@@ -104,17 +107,32 @@ export default function AdminUsers() {
               ) : (
                 users.map((u) => {
                   const isSelf = u.user_id === currentUser?.id;
+                  const initials = u.display_name
+                    ? u.display_name.slice(0, 2).toUpperCase()
+                    : "?";
                   return (
                     <tr key={u.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            {u.avatar_url && <AvatarImage src={u.avatar_url} alt={u.display_name ?? "User"} />}
+                            <AvatarFallback className="text-xs bg-muted">
+                              {initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium truncate max-w-[160px]">
+                            {u.display_name || <span className="text-muted-foreground italic">No name</span>}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="font-medium truncate max-w-[200px]">
+                          <span className="truncate max-w-[160px] text-muted-foreground">
                             {u.business_name || "—"}
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{u.business_type || "—"}</td>
                       <td className="px-4 py-3 text-muted-foreground">{u.location || "—"}</td>
                       <td className="px-4 py-3">
                         {isSelf ? (
