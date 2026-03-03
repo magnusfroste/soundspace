@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Music2, Sparkles, Plus, Trash2, Type } from "lucide-react";
+import { Play, Pause, Music2, Sparkles, Plus, Trash2, Type, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,9 @@ import {
 import { usePlayer } from "@/contexts/PlayerContext";
 import type { SongWithPlaylists, PlaylistWithCount } from "@/hooks/useSongLibrary";
 import { useAddSongToPlaylist, useUpdateSong, useDeleteSong } from "@/hooks/useSongLibrary";
+import { supabase } from "@/integrations/supabase/client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface SongListRowProps {
@@ -147,7 +150,30 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
   const { currentSong, isPlaying, playSong, togglePlay } = usePlayer();
   const addToPlaylist = useAddSongToPlaylist();
   const deleteSong = useDeleteSong();
+  const queryClient = useQueryClient();
   const isCurrentSong = currentSong?.id === song.id;
+
+  const extractLyrics = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("transcribe-lyrics", {
+        body: { song_id: song.id, audio_url: song.file_url },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.success) throw new Error(data?.error || "Transcription failed");
+      return data.lyrics as string;
+    },
+    onSuccess: (lyrics) => {
+      queryClient.invalidateQueries({ queryKey: ["songs"] });
+      if (lyrics) {
+        toast.success("Lyrics extracted!");
+      } else {
+        toast.info("No vocals detected — instrumental track");
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
 
   const handlePlayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -257,9 +283,28 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
             </PopoverContent>
           </Popover>
         ) : (
-          <span className="text-muted-foreground/30">
-            <Type className="h-3.5 w-3.5" />
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="text-muted-foreground/40 hover:text-primary transition-colors disabled:opacity-50"
+                title="Extract lyrics"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  extractLyrics.mutate();
+                }}
+                disabled={extractLyrics.isPending}
+              >
+                {extractLyrics.isPending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Type className="h-3.5 w-3.5" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p className="text-xs">Extract lyrics (STT)</p>
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
 
