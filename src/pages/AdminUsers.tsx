@@ -1,7 +1,16 @@
 import { Users, Shield, Building2 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface UserRow {
   id: string;
@@ -11,27 +20,25 @@ interface UserRow {
   location: string | null;
   onboarding_completed: boolean | null;
   created_at: string;
-  role: string;
-  email: string | null;
+  role: "admin" | "business";
 }
 
 export default function AdminUsers() {
+  const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
+
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: async () => {
-      // Fetch profiles (admin RLS allows reading all)
-      const { data: profiles, error: pErr } = await supabase
-        .from("profiles")
-        .select("id, user_id, business_name, business_type, location, onboarding_completed, created_at")
-        .order("created_at", { ascending: false });
+      const [{ data: profiles, error: pErr }, { data: roles, error: rErr }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, user_id, business_name, business_type, location, onboarding_completed, created_at")
+          .order("created_at", { ascending: false }),
+        supabase.from("user_roles").select("user_id, role"),
+      ]);
 
       if (pErr) throw pErr;
-
-      // Fetch all roles
-      const { data: roles, error: rErr } = await supabase
-        .from("user_roles")
-        .select("user_id, role");
-
       if (rErr) throw rErr;
 
       const roleMap = new Map<string, string>();
@@ -39,9 +46,25 @@ export default function AdminUsers() {
 
       return (profiles ?? []).map((p) => ({
         ...p,
-        role: roleMap.get(p.user_id) ?? "business",
-        email: null as string | null, // email not accessible from client
+        role: (roleMap.get(p.user_id) ?? "business") as "admin" | "business",
       })) as UserRow[];
+    },
+  });
+
+  const changeRole = useMutation({
+    mutationFn: async ({ userId, newRole }: { userId: string; newRole: "admin" | "business" }) => {
+      const { error } = await supabase
+        .from("user_roles")
+        .update({ role: newRole })
+        .eq("user_id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] });
+      toast.success("Role updated");
+    },
+    onError: (err: Error) => {
+      toast.error(`Failed to update role: ${err.message}`);
     },
   });
 
@@ -79,43 +102,56 @@ export default function AdminUsers() {
                   </td>
                 </tr>
               ) : (
-                users.map((u) => (
-                  <tr key={u.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <span className="font-medium truncate max-w-[200px]">
-                          {u.business_name || "—"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {u.business_type || "—"}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {u.location || "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge
-                        variant={u.role === "admin" ? "default" : "secondary"}
-                        className="gap-1"
-                      >
-                        {u.role === "admin" && <Shield className="h-3 w-3" />}
-                        {u.role}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-block h-2 w-2 rounded-full ${
-                          u.onboarding_completed ? "bg-emerald-500" : "bg-amber-500"
-                        }`}
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">
-                      {new Date(u.created_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))
+                users.map((u) => {
+                  const isSelf = u.user_id === currentUser?.id;
+                  return (
+                    <tr key={u.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="font-medium truncate max-w-[200px]">
+                            {u.business_name || "—"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{u.business_type || "—"}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{u.location || "—"}</td>
+                      <td className="px-4 py-3">
+                        {isSelf ? (
+                          <Badge variant="default" className="gap-1">
+                            <Shield className="h-3 w-3" />
+                            {u.role} (you)
+                          </Badge>
+                        ) : (
+                          <Select
+                            value={u.role}
+                            onValueChange={(val) =>
+                              changeRole.mutate({ userId: u.user_id, newRole: val as "admin" | "business" })
+                            }
+                          >
+                            <SelectTrigger className="w-[120px] h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="business">business</SelectItem>
+                              <SelectItem value="admin">admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-block h-2 w-2 rounded-full ${
+                            u.onboarding_completed ? "bg-emerald-500" : "bg-amber-500"
+                          }`}
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">
+                        {new Date(u.created_at).toLocaleDateString()}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
