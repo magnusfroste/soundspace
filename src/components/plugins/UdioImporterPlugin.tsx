@@ -1,10 +1,13 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, Loader2, Music2, CheckCircle2, ExternalLink } from "lucide-react";
+import { Download, Loader2, Music2, CheckCircle2, History, ChevronDown, ChevronUp } from "lucide-react";
 import { useUdioImporter } from "@/hooks/useUdioImporter";
+import { supabase } from "@/integrations/supabase/client";
+import { formatDistanceToNow } from "date-fns";
 
 function isValidUdioUrl(url: string): boolean {
   return /^https?:\/\/(www\.)?udio\.com\/songs\/[\w-]+/.test(url.trim());
@@ -12,7 +15,22 @@ function isValidUdioUrl(url: string): boolean {
 
 export function UdioImporterPlugin() {
   const [url, setUrl] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
   const { importSong, isImporting, results } = useUdioImporter();
+
+  const { data: history = [] } = useQuery({
+    queryKey: ["udio-import-history"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("songs")
+        .select("id, title, artist, duration, genre, mood, created_at")
+        .eq("origin_source", "udio_import")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const handleImport = (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,11 +89,11 @@ export function UdioImporterPlugin() {
         </CardContent>
       </Card>
 
-      {/* Results */}
+      {/* Session results */}
       {results.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Recently Imported</CardTitle>
+            <CardTitle className="text-base">Just Imported</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -93,17 +111,52 @@ export function UdioImporterPlugin() {
                       {result.artist} · {Math.floor(result.duration / 60)}:{String(result.duration % 60).padStart(2, "0")}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="gap-1">
-                      <CheckCircle2 className="h-3 w-3" />
-                      Added
-                    </Badge>
-                  </div>
+                  <Badge variant="secondary" className="gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Added
+                  </Badge>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Import history */}
+      {history.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
+          >
+            <History className="h-4 w-4" />
+            <span>Import history ({history.length})</span>
+            {showHistory ? <ChevronUp className="h-3.5 w-3.5 ml-auto" /> : <ChevronDown className="h-3.5 w-3.5 ml-auto" />}
+          </button>
+
+          {showHistory && (
+            <div className="mt-3 space-y-1.5">
+              {history.map((song) => (
+                <div
+                  key={song.id}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-muted/30 transition-colors"
+                >
+                  <Music2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{song.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {song.artist}
+                      {song.genre && ` · ${song.genre}`}
+                    </p>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                    {formatDistanceToNow(new Date(song.created_at), { addSuffix: true })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
