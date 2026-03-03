@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,7 +46,18 @@ export default function AuthPage() {
           }
           return;
         }
-        navigate("/");
+        // Check role to route appropriately
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          navigate(roleData?.role === "admin" ? "/admin" : "/app");
+        } else {
+          navigate("/app");
+        }
       } else {
         const { error } = await signUp(email, password);
         if (error) {
