@@ -1,6 +1,8 @@
-import { Play, Pause, Music2, Sparkles, Plus } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Play, Pause, Music2, Sparkles, Plus, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Tooltip,
   TooltipContent,
@@ -14,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { usePlayer } from "@/contexts/PlayerContext";
 import type { SongWithPlaylists, PlaylistWithCount } from "@/hooks/useSongLibrary";
-import { useAddSongToPlaylist } from "@/hooks/useSongLibrary";
+import { useAddSongToPlaylist, useUpdateSong } from "@/hooks/useSongLibrary";
 import { cn } from "@/lib/utils";
 
 interface SongListRowProps {
@@ -27,6 +29,101 @@ function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+/** Inline editable text cell */
+function EditableCell({
+  value,
+  field,
+  songId,
+  placeholder = "—",
+  className,
+  asBadge,
+  badgeVariant = "secondary",
+}: {
+  value: string | null;
+  field: "title" | "artist" | "genre" | "mood";
+  songId: string;
+  placeholder?: string;
+  className?: string;
+  asBadge?: boolean;
+  badgeVariant?: "secondary" | "outline";
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? "");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const updateSong = useUpdateSong();
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  const save = () => {
+    const trimmed = draft.trim();
+    // title and artist are required
+    if ((field === "title" || field === "artist") && !trimmed) {
+      setDraft(value ?? "");
+      setEditing(false);
+      return;
+    }
+    const newValue = trimmed || null;
+    if (newValue !== value) {
+      updateSong.mutate({ id: songId, [field]: newValue });
+    }
+    setEditing(false);
+  };
+
+  const cancel = () => {
+    setDraft(value ?? "");
+    setEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") save();
+    if (e.key === "Escape") cancel();
+  };
+
+  if (editing) {
+    return (
+      <div className={cn("flex items-center gap-1", className)} onClick={(e) => e.stopPropagation()}>
+        <Input
+          ref={inputRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={save}
+          className="h-6 text-xs px-1.5 py-0 min-w-0"
+        />
+      </div>
+    );
+  }
+
+  const display = value || placeholder;
+  const isEmpty = !value;
+
+  return (
+    <div
+      className={cn("cursor-text group/cell rounded px-1 -mx-1 hover:bg-accent/50 transition-colors", className)}
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+      title="Click to edit"
+    >
+      {asBadge && !isEmpty ? (
+        <Badge variant={badgeVariant} className="text-[10px] cursor-text">
+          {display}
+        </Badge>
+      ) : (
+        <span className={cn("text-xs truncate block", isEmpty && "text-muted-foreground italic")}>
+          {display}
+        </span>
+      )}
+    </div>
+  );
 }
 
 export function SongListRow({ song, playlistNames, playlists }: SongListRowProps) {
@@ -47,7 +144,6 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
     .map((id) => playlistNames[id])
     .filter(Boolean);
 
-  // Playlists the song is NOT in yet
   const availablePlaylists = playlists.filter(
     (p) => !song.playlistIds.includes(p.id)
   );
@@ -88,31 +184,23 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
         )}
       </div>
 
-      {/* Title & Artist */}
+      {/* Title & Artist — editable */}
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm truncate">{song.title}</p>
-        <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+        <EditableCell value={song.title} field="title" songId={song.id} className="font-medium text-sm" />
+        <EditableCell value={song.artist} field="artist" songId={song.id} className="text-muted-foreground" placeholder="Unknown" />
       </div>
 
-      {/* Genre */}
+      {/* Genre — editable */}
       <div className="w-24 flex-shrink-0 hidden md:block">
-        {song.genre ? (
-          <Badge variant="secondary" className="text-[10px]">{song.genre}</Badge>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        )}
+        <EditableCell value={song.genre} field="genre" songId={song.id} asBadge badgeVariant="secondary" />
       </div>
 
-      {/* Mood */}
+      {/* Mood — editable */}
       <div className="w-20 flex-shrink-0 hidden lg:block">
-        {song.mood ? (
-          <Badge variant="outline" className="text-[10px]">{song.mood}</Badge>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        )}
+        <EditableCell value={song.mood} field="mood" songId={song.id} asBadge badgeVariant="outline" />
       </div>
 
-      {/* Prompt */}
+      {/* Prompt (read-only) */}
       <div className="w-48 flex-shrink-0 hidden xl:block">
         {song.prompt ? (
           <Tooltip>
