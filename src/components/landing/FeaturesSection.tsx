@@ -11,33 +11,33 @@ import {
 const features = [
   {
     icon: Sparkles,
-    title: "IA Musical",
-    description: "Playlists criadas por inteligência artificial que entendem o mood do seu negócio.",
+    title: "AI Music Curation",
+    description: "Playlists created by AI that understands the mood of your business.",
   },
   {
     icon: Calendar,
-    title: "Programação Inteligente",
-    description: "Agende diferentes playlists para cada momento do dia automaticamente.",
+    title: "Smart Scheduling",
+    description: "Schedule different playlists for each moment of the day automatically.",
   },
   {
     icon: Music2,
-    title: "Biblioteca Curada",
-    description: "Milhares de faixas licenciadas, perfeitas para ambientes comerciais.",
+    title: "Curated Library",
+    description: "Thousands of licensed tracks, perfect for commercial environments.",
   },
   {
     icon: Shield,
-    title: "100% Licenciado",
-    description: "Sem preocupações com direitos autorais. Tudo regularizado.",
+    title: "100% Licensed",
+    description: "No copyright worries. Everything fully cleared and legal.",
   },
   {
     icon: Zap,
-    title: "Fácil de Usar",
-    description: "Configure em minutos. Sem equipamentos complexos ou instalações.",
+    title: "Easy to Use",
+    description: "Set up in minutes. No complex equipment or installations needed.",
   },
   {
     icon: BarChart3,
     title: "Analytics",
-    description: "Entenda quais músicas funcionam melhor para seu público.",
+    description: "Understand which music works best for your audience.",
   },
 ];
 
@@ -74,11 +74,7 @@ export function FeaturesSection() {
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
-          transition={{ 
-            type: "spring",
-            stiffness: 100,
-            damping: 20,
-          }}
+          transition={{ type: "spring", stiffness: 100, damping: 20 }}
         >
           <motion.h2 
             className="text-4xl md:text-5xl font-bold mb-4"
@@ -87,7 +83,7 @@ export function FeaturesSection() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ delay: 0.1 }}
           >
-            Tudo que você precisa
+            Everything you need
           </motion.h2>
           <motion.p 
             className="text-lg text-muted-foreground max-w-2xl mx-auto"
@@ -96,7 +92,7 @@ export function FeaturesSection() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ delay: 0.2 }}
           >
-            Uma plataforma completa para gerenciar a música do seu estabelecimento
+            A complete platform to manage the music in your venue
           </motion.p>
         </motion.div>
 
@@ -112,10 +108,7 @@ export function FeaturesSection() {
               key={i}
               variants={itemVariants}
               className="group p-6 rounded-2xl glass glass-hover cursor-default"
-              whileHover={{ 
-                y: -8, 
-                transition: { type: "spring", stiffness: 300 } 
-              }}
+              whileHover={{ y: -8, transition: { type: "spring", stiffness: 300 } }}
             >
               <motion.div 
                 className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors"

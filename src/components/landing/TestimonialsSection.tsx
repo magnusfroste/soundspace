@@ -3,24 +3,24 @@ import { Star } from "lucide-react";
 
 const testimonials = [
   {
-    name: "Maria Santos",
-    role: "Proprietária, Café Aroma",
-    location: "São Paulo, SP",
-    quote: "A mudança na atmosfera do café foi instantânea. Nossos clientes adoram e voltam mais vezes.",
+    name: "Sarah Mitchell",
+    role: "Owner, Aroma Café",
+    location: "Brooklyn, NY",
+    quote: "The change in atmosphere was instant. Our customers love it and keep coming back.",
     rating: 5,
   },
   {
-    name: "Carlos Mendes",
-    role: "Gerente, Restaurante Sabor",
-    location: "Rio de Janeiro, RJ",
-    quote: "A programação automática é incrível. Cada horário tem a trilha perfeita, sem eu precisar fazer nada.",
+    name: "James Chen",
+    role: "Manager, Savour Restaurant",
+    location: "San Francisco, CA",
+    quote: "The automatic scheduling is incredible. Every time slot has the perfect soundtrack without me lifting a finger.",
     rating: 5,
   },
   {
-    name: "Ana Oliveira",
-    role: "CEO, Rede Fitness Plus",
-    location: "Belo Horizonte, MG",
-    quote: "Usamos em 15 academias. A consistência da marca através da música fez toda diferença.",
+    name: "Emily Rodriguez",
+    role: "CEO, FitLife Studios",
+    location: "Austin, TX",
+    quote: "We use it across 15 gyms. Brand consistency through music has made all the difference.",
     rating: 5,
   },
 ];
@@ -36,11 +36,7 @@ export function TestimonialsSection() {
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
-          transition={{ 
-            type: "spring",
-            stiffness: 100,
-            damping: 20,
-          }}
+          transition={{ type: "spring", stiffness: 100, damping: 20 }}
         >
           <motion.h2 
             className="text-4xl md:text-5xl font-bold mb-4"
@@ -49,7 +45,7 @@ export function TestimonialsSection() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ delay: 0.1 }}
           >
-            Amado por empresas
+            Loved by businesses
           </motion.h2>
           <motion.p 
             className="text-lg text-muted-foreground max-w-2xl mx-auto"
@@ -58,7 +54,7 @@ export function TestimonialsSection() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ delay: 0.2 }}
           >
-            Milhares de estabelecimentos já transformaram sua experiência musical
+            Thousands of venues have already transformed their music experience
           </motion.p>
         </motion.div>
 
@@ -70,18 +66,9 @@ export function TestimonialsSection() {
               initial={{ opacity: 0, y: 50, scale: 0.9 }}
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
               viewport={{ once: true, margin: "-50px" }}
-              transition={{ 
-                delay: i * 0.15,
-                type: "spring",
-                stiffness: 100,
-                damping: 15,
-              }}
-              whileHover={{ 
-                y: -8,
-                transition: { type: "spring", stiffness: 300 }
-              }}
+              transition={{ delay: i * 0.15, type: "spring", stiffness: 100, damping: 15 }}
+              whileHover={{ y: -8, transition: { type: "spring", stiffness: 300 } }}
             >
-              {/* Stars */}
               <motion.div 
                 className="flex gap-1 mb-4"
                 initial={{ opacity: 0, x: -20 }}
@@ -102,12 +89,10 @@ export function TestimonialsSection() {
                 ))}
               </motion.div>
 
-              {/* Quote */}
               <p className="text-foreground mb-6 leading-relaxed">
                 "{testimonial.quote}"
               </p>
 
-              {/* Author */}
               <div className="flex items-center gap-3">
                 <motion.div 
                   className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold"

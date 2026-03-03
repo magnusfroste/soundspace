@@ -8,15 +8,11 @@ export function CTASection() {
 
   return (
     <section className="py-24 relative overflow-hidden">
-      {/* Background effects */}
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-t from-primary/20 via-transparent to-transparent" />
         <motion.div 
           className="absolute -bottom-32 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-primary/20 blur-[120px]"
-          animate={{ 
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
-          }}
+          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
           transition={{ duration: 5, repeat: Infinity }}
         />
       </div>
@@ -27,22 +23,14 @@ export function CTASection() {
           initial={{ opacity: 0, y: 60 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
-          transition={{ 
-            type: "spring",
-            stiffness: 100,
-            damping: 20,
-          }}
+          transition={{ type: "spring", stiffness: 100, damping: 20 }}
         >
           <motion.div 
             className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/20 mb-8"
             initial={{ opacity: 0, scale: 0, rotate: -180 }}
             whileInView={{ opacity: 1, scale: 1, rotate: 0 }}
             viewport={{ once: true }}
-            transition={{ 
-              delay: 0.2,
-              type: "spring",
-              stiffness: 200,
-            }}
+            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
             animate={{ rotate: [0, 5, -5, 0] }}
           >
             <Music className="h-8 w-8 text-primary" />
@@ -55,7 +43,7 @@ export function CTASection() {
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
           >
-            Pronto para transformar
+            Ready to transform
             <br />
             <motion.span 
               className="text-gradient"
@@ -64,7 +52,7 @@ export function CTASection() {
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
             >
-              seu ambiente?
+              your space?
             </motion.span>
           </motion.h2>
 
@@ -75,8 +63,8 @@ export function CTASection() {
             viewport={{ once: true }}
             transition={{ delay: 0.3 }}
           >
-            Comece gratuitamente hoje e descubra como a música certa 
-            pode elevar a experiência dos seus clientes.
+            Start for free today and discover how the right music 
+            can elevate your customer experience.
           </motion.p>
 
           <motion.div
@@ -86,16 +74,13 @@ export function CTASection() {
             viewport={{ once: true }}
             transition={{ delay: 0.4, type: "spring" }}
           >
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.98 }}
-            >
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }}>
               <Button 
                 size="lg" 
                 className="h-14 px-8 text-lg rounded-full bg-primary hover:bg-primary/90 group"
                 onClick={() => navigate("/auth")}
               >
-                Criar conta grátis
+                Create Free Account
                 <ArrowRight className="h-5 w-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </motion.div>
@@ -106,7 +91,7 @@ export function CTASection() {
               viewport={{ once: true }}
               transition={{ delay: 0.5 }}
             >
-              Sem cartão de crédito • Cancele quando quiser
+              No credit card required • Cancel anytime
             </motion.span>
           </motion.div>
         </motion.div>

@@ -17,45 +17,41 @@ export function Navbar() {
     >
       <div className="container mx-auto px-6">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Music2 className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="font-bold text-lg">SomHonesto</span>
+            <span className="font-bold text-lg">SoundSpace</span>
           </div>
 
-          {/* Desktop links */}
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Recursos
+              Features
             </a>
             <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Preços
+              Pricing
             </a>
             <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Sobre
+              About
             </a>
           </div>
 
-          {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
             <Button 
               variant="ghost" 
               className="text-sm"
               onClick={() => navigate("/auth")}
             >
-              Entrar
+              Sign In
             </Button>
             <Button 
               className="rounded-full bg-primary hover:bg-primary/90"
               onClick={() => navigate("/auth")}
             >
-              Começar grátis
+              Get Started Free
             </Button>
           </div>
 
-          {/* Mobile menu button */}
           <button 
             className="md:hidden p-2"
             onClick={() => setIsOpen(!isOpen)}
@@ -64,7 +60,6 @@ export function Navbar() {
           </button>
         </div>
 
-        {/* Mobile menu */}
         {isOpen && (
           <motion.div 
             className="md:hidden py-4 border-t border-border/50"
@@ -73,19 +68,19 @@ export function Navbar() {
           >
             <div className="flex flex-col gap-4">
               <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                Recursos
+                Features
               </a>
               <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                Preços
+                Pricing
               </a>
               <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                Sobre
+                About
               </a>
               <Button 
                 className="w-full rounded-full bg-primary hover:bg-primary/90 mt-2"
                 onClick={() => navigate("/auth")}
               >
-                Começar grátis
+                Get Started Free
               </Button>
             </div>
           </motion.div>
