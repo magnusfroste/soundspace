@@ -150,7 +150,30 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
   const { currentSong, isPlaying, playSong, togglePlay } = usePlayer();
   const addToPlaylist = useAddSongToPlaylist();
   const deleteSong = useDeleteSong();
+  const queryClient = useQueryClient();
   const isCurrentSong = currentSong?.id === song.id;
+
+  const extractLyrics = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("transcribe-lyrics", {
+        body: { song_id: song.id, audio_url: song.file_url },
+      });
+      if (error) throw new Error(error.message);
+      if (!data?.success) throw new Error(data?.error || "Transcription failed");
+      return data.lyrics as string;
+    },
+    onSuccess: (lyrics) => {
+      queryClient.invalidateQueries({ queryKey: ["songs"] });
+      if (lyrics) {
+        toast.success("Lyrics extracted!");
+      } else {
+        toast.info("No vocals detected — instrumental track");
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
 
   const handlePlayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
