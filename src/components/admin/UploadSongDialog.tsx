@@ -159,7 +159,7 @@ export function UploadSongDialog() {
               id="song-artist"
               value={artist}
               onChange={(e) => setArtist(e.target.value)}
-              placeholder="Artist name (optional)"
+              placeholder={defaultArtist || "Artist name (optional)"}
             />
           </div>
 
