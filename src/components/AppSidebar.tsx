@@ -1,7 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic, Crown, Puzzle,
+  Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic, Crown, Puzzle, Users,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
