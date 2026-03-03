@@ -111,7 +111,11 @@ export function OutputPreview({
         controls
       />
 
-      {!item.savedToLibrary && (
+      {item.lyrics && (
+        <LyricsPanel lyrics={item.lyrics} />
+      )}
+
+
         <div className="border-t pt-4 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="songTitle">Song Title</Label>
