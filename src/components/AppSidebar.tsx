@@ -37,6 +37,7 @@ const adminNav = [
   { title: "Manage Playlists", url: "/admin/playlists", icon: ListMusic },
   { title: "Integrations", url: "/admin/integrations", icon: Plug },
   { title: "Plugins", url: "/admin/plugins", icon: Puzzle },
+  { title: "Users", url: "/admin/users", icon: Users },
   { title: "Site Settings", url: "/admin/settings", icon: Settings },
 ];
 
