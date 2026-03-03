@@ -139,6 +139,9 @@ export function useAIStudio() {
       // Get public URL
       const { data: urlData } = supabase.storage.from("songs").getPublicUrl(fileName);
 
+      // Prefer lyrics returned by ElevenLabs (post-generation), fallback to user-provided
+      const finalLyrics = result.lyrics || options.lyrics || null;
+
       // Save to database with ACTUAL duration, not requested duration
       const { data: dbRecord, error: insertError } = await supabase
         .from("ai_generations")
@@ -148,7 +151,7 @@ export function useAIStudio() {
           prompt: options.prompt,
           genre: options.genre || null,
           mood: options.mood || null,
-          lyrics: options.lyrics || null,
+          lyrics: finalLyrics,
           duration: actualDuration || options.duration,
           audio_url: urlData.publicUrl,
           saved_to_library: false,
