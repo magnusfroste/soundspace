@@ -1,7 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic, Crown, Puzzle,
+  Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic, Crown, Puzzle, Users,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -37,6 +37,7 @@ const adminNav = [
   { title: "Manage Playlists", url: "/admin/playlists", icon: ListMusic },
   { title: "Integrations", url: "/admin/integrations", icon: Plug },
   { title: "Plugins", url: "/admin/plugins", icon: Puzzle },
+  { title: "Users", url: "/admin/users", icon: Users },
   { title: "Site Settings", url: "/admin/settings", icon: Settings },
 ];
 
