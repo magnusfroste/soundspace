@@ -246,13 +246,13 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
                 <Type className="h-3.5 w-3.5" />
               </button>
             </PopoverTrigger>
-            <PopoverContent side="left" className="w-80 p-0">
-              <div className="px-4 py-3 border-b border-border">
+            <PopoverContent side="left" className="w-80 p-0 max-h-[350px] flex flex-col">
+              <div className="px-4 py-3 border-b border-border flex-shrink-0">
                 <p className="text-sm font-medium">{song.title}</p>
                 <p className="text-xs text-muted-foreground">{song.artist}</p>
               </div>
-              <ScrollArea className="max-h-64">
-                <p className="text-xs whitespace-pre-wrap px-4 py-3 leading-relaxed">{song.lyrics}</p>
+              <ScrollArea className="flex-1 min-h-0">
+                <pre className="text-xs whitespace-pre-wrap font-sans px-4 py-3 leading-relaxed">{song.lyrics}</pre>
               </ScrollArea>
             </PopoverContent>
           </Popover>
