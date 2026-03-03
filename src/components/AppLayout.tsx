@@ -10,15 +10,17 @@ export function AppLayout() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+        <div className="min-h-screen flex w-full">
         {/* Desktop sidebar - hidden on mobile */}
         {!isMobile && <AppSidebar />}
         
-        <div className="flex-1 flex flex-col min-h-screen">
+        <div className="flex-1 flex flex-col h-screen overflow-hidden">
           <main className="flex-1 overflow-auto p-4 md:p-6 pb-36 md:pb-6">
             <Outlet />
           </main>
-          <PlayerBar />
+          <div className="flex-shrink-0">
+            <PlayerBar />
+          </div>
         </div>
         
         {/* Mobile bottom navigation */}
