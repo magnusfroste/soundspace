@@ -7,6 +7,7 @@ export interface GenerateOptions {
   duration: number;
   genre?: string;
   mood?: string;
+  lyrics?: string;
 }
 
 export interface GenerationResult {
@@ -45,6 +46,7 @@ export interface GenerationHistoryItem {
   prompt: string;
   genre?: string;
   mood?: string;
+  lyrics?: string;
   duration: number;
   audioUrl: string;
   audioBlob?: Blob;

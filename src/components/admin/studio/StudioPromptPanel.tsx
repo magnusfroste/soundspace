@@ -17,6 +17,7 @@ interface StudioPromptPanelProps {
     duration: number;
     genre?: string;
     mood?: string;
+    lyrics?: string;
   }) => void;
 }
 
@@ -26,7 +27,8 @@ export function StudioPromptPanel({
   onGenerate,
 }: StudioPromptPanelProps) {
   const [prompt, setPrompt] = useState("");
-  const [duration, setDuration] = useState(180); // 3 minutes default
+  const [duration, setDuration] = useState(180);
+  const [lyrics, setLyrics] = useState("");
   const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
 
@@ -38,6 +40,7 @@ export function StudioPromptPanel({
       duration,
       genre: selectedGenre || undefined,
       mood: selectedMood || undefined,
+      lyrics: lyrics.trim() || undefined,
     });
   };
 
@@ -99,6 +102,18 @@ export function StudioPromptPanel({
             </Badge>
           ))}
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="lyrics">Lyrics (optional)</Label>
+        <Textarea
+          id="lyrics"
+          placeholder="Paste or type song lyrics here..."
+          value={lyrics}
+          onChange={(e) => setLyrics(e.target.value)}
+          disabled={isGenerating}
+          className="min-h-[80px] resize-none text-sm"
+        />
       </div>
 
       <div className="space-y-3">

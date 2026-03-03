@@ -23,6 +23,7 @@ interface DBGeneration {
   prompt: string;
   genre: string | null;
   mood: string | null;
+  lyrics: string | null;
   duration: number;
   audio_url: string | null;
   saved_to_library: boolean;
@@ -37,6 +38,7 @@ function mapDBToHistoryItem(db: DBGeneration): GenerationHistoryItem {
     prompt: db.prompt,
     genre: db.genre || undefined,
     mood: db.mood || undefined,
+    lyrics: db.lyrics || undefined,
     duration: db.duration,
     audioUrl: db.audio_url || "",
     savedToLibrary: db.saved_to_library,
@@ -146,7 +148,8 @@ export function useAIStudio() {
           prompt: options.prompt,
           genre: options.genre || null,
           mood: options.mood || null,
-          duration: actualDuration || options.duration, // Use actual, fallback to requested
+          lyrics: options.lyrics || null,
+          duration: actualDuration || options.duration,
           audio_url: urlData.publicUrl,
           saved_to_library: false,
         })
@@ -200,6 +203,7 @@ export function useAIStudio() {
           duration: item.duration,
           genre: item.genre || null,
           mood: item.mood || null,
+          lyrics: item.lyrics || null,
           origin_source: `ai_${item.provider}`,
           prompt: item.prompt,
         })
