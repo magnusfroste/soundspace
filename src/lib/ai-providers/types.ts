@@ -46,6 +46,7 @@ export interface GenerationHistoryItem {
   prompt: string;
   genre?: string;
   mood?: string;
+  lyrics?: string;
   duration: number;
   audioUrl: string;
   audioBlob?: Blob;

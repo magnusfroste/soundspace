@@ -23,6 +23,7 @@ interface DBGeneration {
   prompt: string;
   genre: string | null;
   mood: string | null;
+  lyrics: string | null;
   duration: number;
   audio_url: string | null;
   saved_to_library: boolean;
