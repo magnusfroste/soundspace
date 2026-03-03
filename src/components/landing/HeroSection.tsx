@@ -9,10 +9,8 @@ export function HeroSection() {
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Animated audio visualizer background */}
       <AudioVisualizerBackground />
 
-      {/* Content */}
       <div className="relative z-10 container mx-auto px-6 text-center pt-16">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -26,7 +24,7 @@ export function HeroSection() {
             transition={{ delay: 0.2 }}
           >
             <Headphones className="h-4 w-4 text-primary" />
-            <span className="text-sm text-muted-foreground">Música ambiente para seu negócio</span>
+            <span className="text-sm text-muted-foreground">Ambient music for your business</span>
           </motion.div>
 
           <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold mb-6 tracking-tight">
@@ -36,7 +34,7 @@ export function HeroSection() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
             >
-              A trilha sonora
+              The perfect
             </motion.span>
             <motion.span 
               className="block text-gradient"
@@ -44,7 +42,7 @@ export function HeroSection() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.4 }}
             >
-              perfeita para
+              soundtrack for
             </motion.span>
             <motion.span 
               className="block text-foreground"
@@ -52,7 +50,7 @@ export function HeroSection() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.5 }}
             >
-              seu espaço
+              your space
             </motion.span>
           </h1>
 
@@ -62,9 +60,9 @@ export function HeroSection() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}
           >
-            Transforme a experiência dos seus clientes com playlists curadas por IA, 
-            programação inteligente e música de alta qualidade. 
-            Sem anúncios. Sem interrupções.
+            Transform your customer experience with AI-curated playlists, 
+            smart scheduling, and high-quality music. 
+            No ads. No interruptions.
           </motion.p>
 
           <motion.div 
@@ -79,7 +77,7 @@ export function HeroSection() {
               onClick={() => navigate("/auth")}
             >
               <Play className="h-5 w-5 mr-2 group-hover:scale-110 transition-transform" />
-              Começar grátis
+              Get Started Free
             </Button>
             <Button 
               size="lg" 
@@ -87,12 +85,11 @@ export function HeroSection() {
               className="h-14 px-8 text-lg rounded-full border-border/50 hover:bg-card/50 backdrop-blur-sm"
               onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
             >
-              Saiba mais
+              Learn More
             </Button>
           </motion.div>
         </motion.div>
 
-        {/* Stats */}
         <motion.div 
           className="mt-20 grid grid-cols-3 gap-8 max-w-3xl mx-auto"
           initial={{ opacity: 0, y: 30 }}
@@ -100,9 +97,9 @@ export function HeroSection() {
           transition={{ delay: 0.9 }}
         >
           {[
-            { value: "50K+", label: "Faixas musicais" },
-            { value: "2.5K+", label: "Estabelecimentos" },
-            { value: "24/7", label: "Suporte ativo" },
+            { value: "50K+", label: "Music tracks" },
+            { value: "2.5K+", label: "Businesses" },
+            { value: "24/7", label: "Active support" },
           ].map((stat, i) => (
             <motion.div 
               key={i} 
@@ -116,7 +113,6 @@ export function HeroSection() {
           ))}
         </motion.div>
 
-        {/* Scroll indicator */}
         <motion.div 
           className="absolute bottom-8 left-1/2 -translate-x-1/2"
           initial={{ opacity: 0 }}

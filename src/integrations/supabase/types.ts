@@ -21,6 +21,7 @@ export type Database = {
           duration: number
           genre: string | null
           id: string
+          lyrics: string | null
           mood: string | null
           prompt: string
           provider: string
@@ -34,6 +35,7 @@ export type Database = {
           duration: number
           genre?: string | null
           id?: string
+          lyrics?: string | null
           mood?: string | null
           prompt: string
           provider: string
@@ -47,6 +49,7 @@ export type Database = {
           duration?: number
           genre?: string | null
           id?: string
+          lyrics?: string | null
           mood?: string | null
           prompt?: string
           provider?: string
@@ -425,6 +428,7 @@ export type Database = {
           file_url: string
           genre: string | null
           id: string
+          lyrics: string | null
           mood: string | null
           origin_source: string | null
           prompt: string | null
@@ -439,6 +443,7 @@ export type Database = {
           file_url: string
           genre?: string | null
           id?: string
+          lyrics?: string | null
           mood?: string | null
           origin_source?: string | null
           prompt?: string | null
@@ -453,6 +458,7 @@ export type Database = {
           file_url?: string
           genre?: string | null
           id?: string
+          lyrics?: string | null
           mood?: string | null
           origin_source?: string | null
           prompt?: string | null

@@ -1,29 +1,29 @@
 import { motion } from "framer-motion";
 import { Play, Pause } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState } from "react";
 
 const playlists = [
   {
-    title: "Café da Manhã",
-    description: "Jazz suave e bossa nova",
+    title: "Morning Coffee",
+    description: "Smooth jazz and bossa nova",
     gradient: "from-amber-500/20 to-orange-600/20",
     accentColor: "text-amber-400",
   },
   {
-    title: "Hora do Almoço",
-    description: "Pop contemporâneo relaxante",
+    title: "Lunch Hour",
+    description: "Relaxed contemporary pop",
     gradient: "from-blue-500/20 to-cyan-600/20",
     accentColor: "text-blue-400",
   },
   {
     title: "Happy Hour",
-    description: "Eletrônico e house melódico",
+    description: "Electronic and melodic house",
     gradient: "from-purple-500/20 to-pink-600/20",
     accentColor: "text-purple-400",
   },
   {
-    title: "Jantar Romântico",
-    description: "Clássicos acústicos e MPB",
+    title: "Romantic Dinner",
+    description: "Acoustic classics and soul",
     gradient: "from-rose-500/20 to-red-600/20",
     accentColor: "text-rose-400",
   },
@@ -40,11 +40,7 @@ export function ShowcaseSection() {
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
-          transition={{ 
-            type: "spring",
-            stiffness: 100,
-            damping: 20,
-          }}
+          transition={{ type: "spring", stiffness: 100, damping: 20 }}
         >
           <motion.h2 
             className="text-4xl md:text-5xl font-bold mb-4"
@@ -53,7 +49,7 @@ export function ShowcaseSection() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ delay: 0.1 }}
           >
-            Playlists para cada momento
+            Playlists for every moment
           </motion.h2>
           <motion.p 
             className="text-lg text-muted-foreground max-w-2xl mx-auto"
@@ -62,7 +58,7 @@ export function ShowcaseSection() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ delay: 0.2 }}
           >
-            Programação inteligente que se adapta ao ritmo do seu negócio
+            Smart scheduling that adapts to the rhythm of your business
           </motion.p>
         </motion.div>
 
@@ -76,20 +72,13 @@ export function ShowcaseSection() {
               initial={{ opacity: 0, y: 60, rotateX: 10 }}
               whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
               viewport={{ once: true, margin: "-50px" }}
-              transition={{ 
-                delay: i * 0.1,
-                type: "spring",
-                stiffness: 100,
-                damping: 15,
-              }}
+              transition={{ delay: i * 0.1, type: "spring", stiffness: 100, damping: 15 }}
               whileHover={{ y: -10 }}
               onClick={() => setActiveIndex(activeIndex === i ? null : i)}
             >
-              {/* Background gradient */}
               <div className={`absolute inset-0 bg-gradient-to-br ${playlist.gradient}`} />
               <div className="absolute inset-0 bg-card/40 backdrop-blur-sm" />
 
-              {/* Content */}
               <div className="relative p-6 h-64 flex flex-col justify-between">
                 <div>
                   <h3 className={`text-xl font-bold mb-1 ${playlist.accentColor}`}>
@@ -100,7 +89,6 @@ export function ShowcaseSection() {
                   </p>
                 </div>
 
-                {/* Equalizer animation */}
                 <div className="flex items-end gap-1 h-16">
                   {[...Array(12)].map((_, j) => (
                     <motion.div
@@ -120,7 +108,6 @@ export function ShowcaseSection() {
                   ))}
                 </div>
 
-                {/* Play button */}
                 <motion.div 
                   className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-primary flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                   whileHover={{ scale: 1.1 }}
