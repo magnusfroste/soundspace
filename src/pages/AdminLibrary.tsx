@@ -201,6 +201,7 @@ export default function AdminLibrary() {
               <div className="w-12 text-right">Time</div>
               <div className="w-32 hidden lg:block">Playlists</div>
               <div className="w-8" />
+              <div className="w-8" />
             </div>
             {filteredSongs.map((song) => (
               <SongListRow

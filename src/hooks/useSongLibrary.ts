@@ -173,6 +173,33 @@ export function useAddSongToPlaylist() {
   });
 }
 
+// Delete song
+export function useDeleteSong() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Remove from playlist_songs first
+      const { error: psError } = await supabase
+        .from("playlist_songs")
+        .delete()
+        .eq("song_id", id);
+      if (psError) throw psError;
+
+      const { error } = await supabase.from("songs").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-songs-library"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-playlists-zones"] });
+      toast.success("Song deleted");
+    },
+    onError: () => {
+      toast.error("Failed to delete song");
+    },
+  });
+}
+
 // Filter helpers
 export function filterSongs(
   songs: SongWithPlaylists[],
