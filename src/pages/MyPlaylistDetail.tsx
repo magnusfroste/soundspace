@@ -75,10 +75,10 @@ export default function MyPlaylistDetail() {
 
     const songsToPlay = songs
       .filter((s) => s.song)
-      .map((s) => ({ ...s.song!, lyrics: s.song!.lyrics ?? null }));
+      .map((s) => s.song! as any);
 
     if (songsToPlay.length > 0) {
-      playQueue(songsToPlay as any, 0);
+      playQueue(songsToPlay, 0);
     }
   };
 
