@@ -237,6 +237,32 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
         )}
       </div>
 
+      {/* Lyrics indicator */}
+      <div className="w-8 flex-shrink-0 hidden xl:flex justify-center">
+        {song.lyrics ? (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="text-primary/70 hover:text-primary transition-colors" title="View lyrics">
+                <Type className="h-3.5 w-3.5" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="left" className="w-80 p-0">
+              <div className="px-4 py-3 border-b border-border">
+                <p className="text-sm font-medium">{song.title}</p>
+                <p className="text-xs text-muted-foreground">{song.artist}</p>
+              </div>
+              <ScrollArea className="max-h-64">
+                <p className="text-xs whitespace-pre-wrap px-4 py-3 leading-relaxed">{song.lyrics}</p>
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+        ) : (
+          <span className="text-muted-foreground/30">
+            <Type className="h-3.5 w-3.5" />
+          </span>
+        )}
+      </div>
+
       {/* Duration */}
       <div className="w-12 text-right text-xs text-muted-foreground flex-shrink-0">
         {formatDuration(song.duration)}
