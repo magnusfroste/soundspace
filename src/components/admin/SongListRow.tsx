@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Music2, Sparkles, Plus, Check, X } from "lucide-react";
+import { Play, Pause, Music2, Sparkles, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -14,9 +14,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { usePlayer } from "@/contexts/PlayerContext";
 import type { SongWithPlaylists, PlaylistWithCount } from "@/hooks/useSongLibrary";
-import { useAddSongToPlaylist, useUpdateSong } from "@/hooks/useSongLibrary";
+import { useAddSongToPlaylist, useUpdateSong, useDeleteSong } from "@/hooks/useSongLibrary";
 import { cn } from "@/lib/utils";
 
 interface SongListRowProps {
@@ -129,6 +140,7 @@ function EditableCell({
 export function SongListRow({ song, playlistNames, playlists }: SongListRowProps) {
   const { currentSong, isPlaying, playSong, togglePlay } = usePlayer();
   const addToPlaylist = useAddSongToPlaylist();
+  const deleteSong = useDeleteSong();
   const isCurrentSong = currentSong?.id === song.id;
 
   const handlePlayClick = (e: React.MouseEvent) => {
@@ -269,6 +281,38 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
+      </div>
+
+      {/* Delete */}
+      <div className="w-8 flex-shrink-0">
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete song</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete <strong>{song.title}</strong> by {song.artist} and remove it from all playlists.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteSong.mutate(song.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   );
