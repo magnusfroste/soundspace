@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Music, Loader2, CheckCircle, XCircle, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
 import {
   Card,
@@ -47,34 +47,26 @@ export function AceStepCard() {
   const isConfigured = Boolean(config.endpointUrl);
 
   const handleTestConnection = async () => {
-    if (!endpointUrl) {
-      toast.error("Please enter an endpoint URL");
-      return;
-    }
-
     setIsTesting(true);
     setConnectionStatus("idle");
 
     try {
-      const headers: Record<string, string> = {};
-      if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
-
-      const response = await fetch(`${endpointUrl.replace(/\/+$/, "")}/health`, {
-        method: "GET",
-        headers,
-        signal: AbortSignal.timeout(5000),
+      const { data, error } = await supabase.functions.invoke("acestep-proxy", {
+        body: { endpoint: "/health", method: "GET" },
       });
 
-      if (response.ok) {
+      if (error) throw error;
+
+      if (data && !data.error) {
         setConnectionStatus("connected");
         toast.success("Connected to ACE-Step");
       } else {
         setConnectionStatus("failed");
-        toast.error("Failed to connect to ACE-Step");
+        toast.error(data?.error || "Failed to connect to ACE-Step");
       }
-    } catch {
+    } catch (err: any) {
       setConnectionStatus("failed");
-      toast.error("Connection failed — is ACE-Step API server running?");
+      toast.error(err?.message || "Connection failed");
     } finally {
       setIsTesting(false);
     }
