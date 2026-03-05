@@ -42,7 +42,6 @@ async function pollResult(
     if (!task) throw new Error("AceStep: task not found");
 
     if (task.status === 1) {
-      // result is a JSON string
       const results = typeof task.result === "string" ? JSON.parse(task.result) : task.result;
       return results;
     }
@@ -51,11 +50,74 @@ async function pollResult(
       throw new Error("AceStep generation failed");
     }
 
-    // status 0 — still running, wait and retry
     await new Promise((r) => setTimeout(r, interval));
   }
 
   throw new Error("AceStep generation timed out");
+}
+
+/** Build the request body/formdata depending on whether audio files are present */
+function buildRequest(
+  options: GenerateOptions,
+  model: string,
+): { body: BodyInit; contentType?: string } {
+  const hasFiles = options.sourceAudioBlob || options.referenceAudioBlob;
+  const taskType = options.taskType || "text2music";
+
+  let prompt = options.prompt;
+  if (options.genre) prompt += `, ${options.genre.toLowerCase()} style`;
+  if (options.mood) prompt += `, ${options.mood.toLowerCase()} mood`;
+
+  if (hasFiles) {
+    const fd = new FormData();
+    fd.append("prompt", prompt);
+    fd.append("lyrics", options.lyrics || "");
+    fd.append("audio_duration", String(options.duration));
+    fd.append("model", model);
+    fd.append("thinking", "true");
+    fd.append("batch_size", "1");
+    fd.append("audio_format", "mp3");
+    fd.append("inference_steps", "8");
+    fd.append("task_type", taskType);
+
+    if (options.sourceAudioBlob) {
+      fd.append("src_audio", options.sourceAudioBlob, "source.mp3");
+    }
+    if (options.referenceAudioBlob) {
+      fd.append("reference_audio", options.referenceAudioBlob, "reference.mp3");
+    }
+
+    if (taskType === "repaint") {
+      fd.append("repainting_start", String(options.repaintStart ?? 0));
+      if (options.repaintEnd != null) {
+        fd.append("repainting_end", String(options.repaintEnd));
+      }
+    }
+
+    if (taskType === "cover" && options.coverStrength != null) {
+      fd.append("audio_cover_strength", String(options.coverStrength));
+    }
+
+    return { body: fd };
+  }
+
+  // JSON request for text2music (no files)
+  const payload: Record<string, unknown> = {
+    prompt,
+    lyrics: options.lyrics || "",
+    audio_duration: options.duration,
+    model,
+    thinking: true,
+    batch_size: 1,
+    audio_format: "mp3",
+    inference_steps: 8,
+    task_type: taskType,
+  };
+
+  return {
+    body: JSON.stringify(payload),
+    contentType: "application/json",
+  };
 }
 
 export const aceStepProvider: AIProvider = {
@@ -72,31 +134,25 @@ export const aceStepProvider: AIProvider = {
 
     const baseUrl = aceStepConfig.endpointUrl.replace(/\/+$/, "");
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+    const headers: Record<string, string> = {};
     if (aceStepConfig.apiKey) {
       headers["Authorization"] = `Bearer ${aceStepConfig.apiKey}`;
     }
 
-    let prompt = options.prompt;
-    if (options.genre) prompt += `, ${options.genre.toLowerCase()} style`;
-    if (options.mood) prompt += `, ${options.mood.toLowerCase()} mood`;
+    const { body, contentType } = buildRequest(
+      options,
+      aceStepConfig.model || "acestep-v15-turbo",
+    );
+
+    if (contentType) {
+      headers["Content-Type"] = contentType;
+    }
 
     // 1. Submit generation task
     const releaseRes = await fetch(`${baseUrl}/release_task`, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        prompt,
-        lyrics: options.lyrics || "",
-        audio_duration: options.duration,
-        model: aceStepConfig.model || "acestep-v15-turbo",
-        thinking: true,
-        batch_size: 1,
-        audio_format: "mp3",
-        inference_steps: 8,
-      }),
+      body,
     });
 
     if (!releaseRes.ok) {
@@ -119,7 +175,12 @@ export const aceStepProvider: AIProvider = {
       ? firstResult.file
       : `${baseUrl}${firstResult.file}`;
 
-    const audioRes = await fetch(audioUrl, { headers });
+    const dlHeaders: Record<string, string> = {};
+    if (aceStepConfig.apiKey) {
+      dlHeaders["Authorization"] = `Bearer ${aceStepConfig.apiKey}`;
+    }
+
+    const audioRes = await fetch(audioUrl, { headers: dlHeaders });
     if (!audioRes.ok) throw new Error("Failed to download ACE-Step audio");
 
     const audioBlob = await audioRes.blob();
