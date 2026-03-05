@@ -56,15 +56,27 @@ Deno.serve(async (req) => {
       }
     }
 
+    const httpMethod = (method || "GET").toUpperCase();
     const fetchOptions: RequestInit = {
-      method: method || "GET",
+      method: httpMethod,
       headers,
-      body: jsonBody ? JSON.stringify(jsonBody) : undefined,
     };
+    // Only attach body for methods that support it
+    if (jsonBody && httpMethod !== "GET" && httpMethod !== "HEAD") {
+      fetchOptions.body = JSON.stringify(jsonBody);
+    }
 
     const res = await fetch(`${baseUrl}${endpoint}`, fetchOptions);
 
     const contentType = res.headers.get("content-type") || "";
+
+    // If upstream returned an error with HTML (e.g. Cloudflare 502), return clean JSON error
+    if (!res.ok && contentType.includes("text/html")) {
+      return new Response(
+        JSON.stringify({ error: `ACE-Step server returned ${res.status}`, detail: "The ACE-Step host is unreachable or returned an error. Please check that your server is running." }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     if (contentType.includes("audio") || contentType.includes("octet-stream")) {
       return new Response(res.body, {
