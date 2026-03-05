@@ -1,5 +1,6 @@
 import { Music } from "lucide-react";
 import type { AIProvider, GenerateOptions, GenerationResult, ProviderConfig, ProviderStatus } from "./types";
+import { supabase } from "@/integrations/supabase/client";
 
 const STORAGE_KEY = "somhonesto_acestep_config";
 
