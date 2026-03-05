@@ -51,6 +51,7 @@ export default function AdminAIStudio() {
           <div className="rounded-lg border bg-card p-6">
             <StudioPromptPanel
               providerName={activeProvider.name}
+              providerId={activeProvider.id}
               isGenerating={isGenerating}
               onGenerate={generate}
             />
