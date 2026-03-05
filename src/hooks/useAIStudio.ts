@@ -71,19 +71,26 @@ export function useAIStudio() {
   });
 
   const activeProvider = getProviderById(activeProviderId) || allProviders[0];
+  const [, setStatusTick] = useState(0);
 
   // Refresh provider statuses on mount
   useEffect(() => {
-    allProviders.forEach(async (provider) => {
-      try {
-        const status = await provider.checkStatus();
-        if (provider.status !== status) {
-          provider.status = status;
+    let cancelled = false;
+    Promise.all(
+      allProviders.map(async (provider) => {
+        try {
+          const status = await provider.checkStatus();
+          if (provider.status !== status) {
+            provider.status = status;
+          }
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
-      }
+      })
+    ).then(() => {
+      if (!cancelled) setStatusTick((t) => t + 1);
     });
+    return () => { cancelled = true; };
   }, []);
 
   // Fetch generation history from database
