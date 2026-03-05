@@ -162,6 +162,14 @@ export const aceStepProvider: AIProvider = {
       payload.audio_cover_strength = options.coverStrength;
     }
 
+    // Include source audio as base64 for cover/repaint/complete
+    if (options.sourceAudioBlob && ["cover", "repaint", "complete"].includes(taskType)) {
+      payload.src_audio_base64 = await blobToBase64(options.sourceAudioBlob);
+    }
+    if (options.referenceAudioBlob) {
+      payload.reference_audio_base64 = await blobToBase64(options.referenceAudioBlob);
+    }
+
     // 1. Submit generation task
     const releaseData = await proxyCall("/release_task", "POST", payload);
     const taskId = releaseData.data?.task_id;
