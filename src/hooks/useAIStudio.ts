@@ -72,6 +72,20 @@ export function useAIStudio() {
 
   const activeProvider = getProviderById(activeProviderId) || allProviders[0];
 
+  // Refresh provider statuses on mount
+  useEffect(() => {
+    allProviders.forEach(async (provider) => {
+      try {
+        const status = await provider.checkStatus();
+        if (provider.status !== status) {
+          provider.status = status;
+        }
+      } catch {
+        // ignore
+      }
+    });
+  }, []);
+
   // Fetch generation history from database
   const { data: history = [] } = useQuery({
     queryKey: ["ai_generations"],
