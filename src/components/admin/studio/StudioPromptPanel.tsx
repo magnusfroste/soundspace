@@ -1,16 +1,31 @@
-import { useState } from "react";
-import { Music, Loader2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { Music, Loader2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { GENRES, MOODS, type Genre, type Mood } from "@/lib/ai-providers";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { GENRES, MOODS, type Genre, type Mood, type AceStepTaskType } from "@/lib/ai-providers";
 import { cn } from "@/lib/utils";
+
+const ACESTEP_MODES: { value: AceStepTaskType; label: string; description: string }[] = [
+  { value: "text2music", label: "Generate", description: "Create music from text" },
+  { value: "cover", label: "Cover", description: "Create a cover from source audio" },
+  { value: "repaint", label: "Repaint", description: "Edit a section of existing audio" },
+  { value: "complete", label: "Extend", description: "Extend/complete existing audio" },
+];
 
 interface StudioPromptPanelProps {
   providerName: string;
+  providerId: string;
   isGenerating: boolean;
   onGenerate: (options: {
     prompt: string;
@@ -18,11 +33,18 @@ interface StudioPromptPanelProps {
     genre?: string;
     mood?: string;
     lyrics?: string;
+    taskType?: AceStepTaskType;
+    sourceAudioBlob?: Blob;
+    referenceAudioBlob?: Blob;
+    repaintStart?: number;
+    repaintEnd?: number;
+    coverStrength?: number;
   }) => void;
 }
 
 export function StudioPromptPanel({
   providerName,
+  providerId,
   isGenerating,
   onGenerate,
 }: StudioPromptPanelProps) {
@@ -32,20 +54,70 @@ export function StudioPromptPanel({
   const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
 
+  // ACE-Step specific state
+  const [taskType, setTaskType] = useState<AceStepTaskType>("text2music");
+  const [sourceAudio, setSourceAudio] = useState<{ file: File; name: string } | null>(null);
+  const [referenceAudio, setReferenceAudio] = useState<{ file: File; name: string } | null>(null);
+  const [repaintStart, setRepaintStart] = useState(0);
+  const [repaintEnd, setRepaintEnd] = useState(30);
+  const [coverStrength, setCoverStrength] = useState(0.7);
+
+  const sourceInputRef = useRef<HTMLInputElement>(null);
+  const refInputRef = useRef<HTMLInputElement>(null);
+
+  const isAceStep = providerId === "acestep";
+  const needsSourceAudio = isAceStep && ["cover", "repaint", "complete"].includes(taskType);
+
   const handleGenerate = () => {
     if (!prompt.trim()) return;
-    
+
     onGenerate({
       prompt: prompt.trim(),
       duration,
       genre: selectedGenre || undefined,
       mood: selectedMood || undefined,
       lyrics: lyrics.trim() || undefined,
+      ...(isAceStep && {
+        taskType,
+        sourceAudioBlob: sourceAudio?.file,
+        referenceAudioBlob: referenceAudio?.file,
+        ...(taskType === "repaint" && { repaintStart, repaintEnd }),
+        ...(taskType === "cover" && { coverStrength }),
+      }),
     });
   };
 
+  const canGenerate =
+    prompt.trim() &&
+    !isGenerating &&
+    (!needsSourceAudio || sourceAudio);
+
   return (
     <div className="space-y-6">
+      {/* ACE-Step Mode Selector */}
+      {isAceStep && (
+        <div className="space-y-2">
+          <Label>Generation Mode</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {ACESTEP_MODES.map((mode) => (
+              <button
+                key={mode.value}
+                onClick={() => setTaskType(mode.value)}
+                className={cn(
+                  "rounded-lg border p-3 text-left transition-all",
+                  taskType === mode.value
+                    ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                    : "border-border hover:border-primary/30 hover:bg-muted/50"
+                )}
+              >
+                <div className="text-sm font-medium">{mode.label}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{mode.description}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="space-y-2">
         <Label htmlFor="prompt">Describe your music</Label>
         <Textarea
@@ -58,6 +130,133 @@ export function StudioPromptPanel({
         />
       </div>
 
+      {/* Source Audio Upload (for cover, repaint, complete) */}
+      {needsSourceAudio && (
+        <div className="space-y-2">
+          <Label>Source Audio {taskType === "repaint" ? "(audio to edit)" : "(audio to process)"}</Label>
+          <input
+            ref={sourceInputRef}
+            type="file"
+            accept="audio/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) setSourceAudio({ file, name: file.name });
+            }}
+          />
+          {sourceAudio ? (
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+              <Music className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm truncate flex-1">{sourceAudio.name}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setSourceAudio(null)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => sourceInputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Source Audio
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Reference Audio (optional, for style guidance) */}
+      {isAceStep && taskType === "text2music" && (
+        <div className="space-y-2">
+          <Label>Reference Audio (optional — style guidance)</Label>
+          <input
+            ref={refInputRef}
+            type="file"
+            accept="audio/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) setReferenceAudio({ file, name: file.name });
+            }}
+          />
+          {referenceAudio ? (
+            <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
+              <Music className="h-4 w-4 text-muted-foreground shrink-0" />
+              <span className="text-sm truncate flex-1">{referenceAudio.name}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setReferenceAudio(null)}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => refInputRef.current?.click()}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Reference Audio
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Repaint time range */}
+      {isAceStep && taskType === "repaint" && (
+        <div className="space-y-3">
+          <Label>Edit Range (seconds)</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <span className="text-xs text-muted-foreground">Start</span>
+              <Input
+                type="number"
+                min={0}
+                value={repaintStart}
+                onChange={(e) => setRepaintStart(Number(e.target.value))}
+              />
+            </div>
+            <div className="space-y-1">
+              <span className="text-xs text-muted-foreground">End</span>
+              <Input
+                type="number"
+                min={0}
+                value={repaintEnd}
+                onChange={(e) => setRepaintEnd(Number(e.target.value))}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cover strength */}
+      {isAceStep && taskType === "cover" && (
+        <div className="space-y-3">
+          <div className="flex justify-between">
+            <Label>Cover Strength</Label>
+            <span className="text-sm text-muted-foreground">{(coverStrength * 100).toFixed(0)}%</span>
+          </div>
+          <Slider
+            value={[coverStrength]}
+            onValueChange={([val]) => setCoverStrength(val)}
+            min={0}
+            max={1}
+            step={0.05}
+          />
+          <p className="text-xs text-muted-foreground">
+            Lower = more like original, Higher = more creative
+          </p>
+        </div>
+      )}
+
       <div className="space-y-3">
         <Label>Genre</Label>
         <div className="flex flex-wrap gap-2">
@@ -67,13 +266,9 @@ export function StudioPromptPanel({
               variant={selectedGenre === genre ? "default" : "outline"}
               className={cn(
                 "cursor-pointer transition-colors",
-                selectedGenre === genre
-                  ? ""
-                  : "hover:bg-primary/10"
+                selectedGenre === genre ? "" : "hover:bg-primary/10"
               )}
-              onClick={() =>
-                setSelectedGenre(selectedGenre === genre ? null : genre)
-              }
+              onClick={() => setSelectedGenre(selectedGenre === genre ? null : genre)}
             >
               {genre}
             </Badge>
@@ -90,13 +285,9 @@ export function StudioPromptPanel({
               variant={selectedMood === mood ? "default" : "outline"}
               className={cn(
                 "cursor-pointer transition-colors",
-                selectedMood === mood
-                  ? ""
-                  : "hover:bg-primary/10"
+                selectedMood === mood ? "" : "hover:bg-primary/10"
               )}
-              onClick={() =>
-                setSelectedMood(selectedMood === mood ? null : mood)
-              }
+              onClick={() => setSelectedMood(selectedMood === mood ? null : mood)}
             >
               {mood}
             </Badge>
@@ -120,8 +311,8 @@ export function StudioPromptPanel({
         <div className="flex justify-between">
           <Label>Duration</Label>
           <span className="text-sm text-muted-foreground">
-            {duration >= 60 
-              ? `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')} min` 
+            {duration >= 60
+              ? `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, "0")} min`
               : `${duration} sec`}
           </span>
         </div>
@@ -141,7 +332,7 @@ export function StudioPromptPanel({
 
       <Button
         onClick={handleGenerate}
-        disabled={isGenerating || !prompt.trim()}
+        disabled={!canGenerate}
         className="w-full"
         size="lg"
       >
@@ -153,7 +344,9 @@ export function StudioPromptPanel({
         ) : (
           <>
             <Music className="h-4 w-4 mr-2" />
-            Generate Music
+            {isAceStep && taskType !== "text2music"
+              ? `${ACESTEP_MODES.find((m) => m.value === taskType)?.label ?? "Generate"} Music`
+              : "Generate Music"}
           </>
         )}
       </Button>
