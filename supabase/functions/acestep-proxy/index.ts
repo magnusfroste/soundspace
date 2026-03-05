@@ -22,9 +22,14 @@ Deno.serve(async (req) => {
   try {
     const { endpoint, method, body } = await req.json();
 
-    // Whitelist allowed endpoints
-    const allowed = ["/health", "/v1/models", "/release_task", "/query_result", "/create_random_sample", "/format_lyrics"];
-    if (!endpoint || !allowed.includes(endpoint)) {
+    // Whitelist allowed endpoints (exact match or prefix match for /v1/audio)
+    const allowedExact = ["/health", "/v1/models", "/release_task", "/query_result", "/create_random_sample", "/format_lyrics"];
+    const allowedPrefixes = ["/v1/audio"];
+    const isAllowed = endpoint && (
+      allowedExact.includes(endpoint) ||
+      allowedPrefixes.some((p: string) => endpoint.startsWith(p))
+    );
+    if (!isAllowed) {
       return new Response(
         JSON.stringify({ error: "Endpoint not allowed" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
