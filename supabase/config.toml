@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.import-udio]
 verify_jwt = false
+
+[functions.acestep-proxy]
+verify_jwt = false
