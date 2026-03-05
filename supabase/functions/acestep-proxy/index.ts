@@ -55,10 +55,23 @@ Deno.serve(async (req) => {
       // Build FormData for file uploads
       const fd = new FormData();
       
+      // Fields that ACE-Step expects as integers
+      const intFields = new Set(["audio_duration", "batch_size", "inference_steps", "repainting_start", "repainting_end"]);
+      const floatFields = new Set(["audio_cover_strength"]);
+      const boolFields = new Set(["thinking"]);
+      
       // Add all non-base64 fields
       for (const [key, value] of Object.entries(body)) {
         if (key === "src_audio_base64" || key === "reference_audio_base64") continue;
-        fd.append(key, String(value));
+        if (intFields.has(key)) {
+          fd.append(key, String(parseInt(String(value), 10)));
+        } else if (floatFields.has(key)) {
+          fd.append(key, String(parseFloat(String(value))));
+        } else if (boolFields.has(key)) {
+          fd.append(key, value ? "true" : "false");
+        } else {
+          fd.append(key, String(value));
+        }
       }
 
       // Add source audio as file
