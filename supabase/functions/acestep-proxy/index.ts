@@ -12,6 +12,14 @@ function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
+/** Write bytes to a temp file, return the path */
+async function writeTempFile(bytes: Uint8Array, name: string): Promise<string> {
+  const dir = await Deno.makeTempDir();
+  const path = `${dir}/${name}`;
+  await Deno.writeFile(path, bytes);
+  return path;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -46,70 +54,88 @@ Deno.serve(async (req) => {
 
     const baseUrl = ACESTEP_URL.replace(/\/+$/, "");
 
-    // Check if body contains base64 audio that needs to be sent as FormData
+    // Check if body contains base64 audio that needs file handling
     const hasBase64Audio = body && (body.src_audio_base64 || body.reference_audio_base64);
 
     let fetchOptions: RequestInit;
+    const tempFiles: string[] = [];
 
     if (hasBase64Audio && endpoint === "/release_task") {
-      // Build FormData for file uploads
+      // Build FormData for file uploads to ACE-Step
       const fd = new FormData();
-      
-      // Fields that ACE-Step expects as integers
+
+      // Write base64 audio to temp files and attach
+      if (body.src_audio_base64) {
+        const bytes = base64ToBytes(body.src_audio_base64);
+        const path = await writeTempFile(bytes, "source.mp3");
+        tempFiles.push(path);
+        const blob = new Blob([bytes], { type: "audio/mpeg" });
+        fd.append("src_audio", blob, "source.mp3");
+      }
+      if (body.reference_audio_base64) {
+        const bytes = base64ToBytes(body.reference_audio_base64);
+        const path = await writeTempFile(bytes, "reference.mp3");
+        tempFiles.push(path);
+        const blob = new Blob([bytes], { type: "audio/mpeg" });
+        fd.append("reference_audio", blob, "reference.mp3");
+      }
+
+      // Add remaining fields — ensure correct types for Python backend
       const intFields = new Set(["audio_duration", "batch_size", "inference_steps", "repainting_start", "repainting_end"]);
       const floatFields = new Set(["audio_cover_strength"]);
-      const boolFields = new Set(["thinking"]);
-      
-      // Add all non-base64 fields
+
       for (const [key, value] of Object.entries(body)) {
         if (key === "src_audio_base64" || key === "reference_audio_base64") continue;
         if (intFields.has(key)) {
-          fd.append(key, String(parseInt(String(value), 10)));
+          fd.append(key, String(Math.round(Number(value))));
         } else if (floatFields.has(key)) {
-          fd.append(key, String(parseFloat(String(value))));
-        } else if (boolFields.has(key)) {
+          fd.append(key, String(Number(value)));
+        } else if (key === "thinking") {
+          // Python expects string "true"/"false" for bool parsing
           fd.append(key, value ? "true" : "false");
         } else {
-          fd.append(key, String(value));
+          fd.append(key, String(value ?? ""));
         }
-      }
-
-      // Add source audio as file
-      if (body.src_audio_base64) {
-        const audioBytes = base64ToBytes(body.src_audio_base64);
-        const audioBlob = new Blob([audioBytes], { type: "audio/mpeg" });
-        fd.append("src_audio", audioBlob, "source.mp3");
-      }
-
-      // Add reference audio as file
-      if (body.reference_audio_base64) {
-        const refBytes = base64ToBytes(body.reference_audio_base64);
-        const refBlob = new Blob([refBytes], { type: "audio/mpeg" });
-        fd.append("reference_audio", refBlob, "reference.mp3");
       }
 
       const headers: Record<string, string> = {};
       if (ACESTEP_KEY) headers["Authorization"] = `Bearer ${ACESTEP_KEY}`;
-      // Don't set Content-Type for FormData — browser sets it with boundary
 
-      fetchOptions = {
-        method: method || "POST",
-        headers,
-        body: fd,
-      };
+      fetchOptions = { method: "POST", headers, body: fd };
     } else {
-      // Standard JSON request
+      // Standard JSON request — ensure numeric types
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (ACESTEP_KEY) headers["Authorization"] = `Bearer ${ACESTEP_KEY}`;
+
+      // Coerce types for release_task JSON requests too
+      let jsonBody = body;
+      if (body && endpoint === "/release_task") {
+        jsonBody = { ...body };
+        const intKeys = ["audio_duration", "batch_size", "inference_steps", "repainting_start", "repainting_end"];
+        for (const k of intKeys) {
+          if (k in jsonBody) jsonBody[k] = Math.round(Number(jsonBody[k]));
+        }
+        if ("audio_cover_strength" in jsonBody) {
+          jsonBody.audio_cover_strength = Number(jsonBody.audio_cover_strength);
+        }
+        if ("thinking" in jsonBody) {
+          jsonBody.thinking = Boolean(jsonBody.thinking);
+        }
+      }
 
       fetchOptions = {
         method: method || "GET",
         headers,
-        body: body ? JSON.stringify(body) : undefined,
+        body: jsonBody ? JSON.stringify(jsonBody) : undefined,
       };
     }
 
     const res = await fetch(`${baseUrl}${endpoint}`, fetchOptions);
+
+    // Clean up temp files
+    for (const f of tempFiles) {
+      try { await Deno.remove(f); } catch { /* ignore */ }
+    }
 
     const contentType = res.headers.get("content-type") || "";
 
@@ -117,10 +143,7 @@ Deno.serve(async (req) => {
     if (contentType.includes("audio") || contentType.includes("octet-stream")) {
       return new Response(res.body, {
         status: res.status,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": contentType,
-        },
+        headers: { ...corsHeaders, "Content-Type": contentType },
       });
     }
 
