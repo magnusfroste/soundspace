@@ -2,12 +2,21 @@ import { LucideIcon } from "lucide-react";
 
 export type ProviderStatus = "ready" | "configuring" | "unavailable" | "coming_soon";
 
+export type AceStepTaskType = "text2music" | "cover" | "repaint" | "lego" | "extract" | "complete";
+
 export interface GenerateOptions {
   prompt: string;
   duration: number;
   genre?: string;
   mood?: string;
   lyrics?: string;
+  /** ACE-Step specific */
+  taskType?: AceStepTaskType;
+  sourceAudioBlob?: Blob;
+  referenceAudioBlob?: Blob;
+  repaintStart?: number;
+  repaintEnd?: number;
+  coverStrength?: number;
 }
 
 export interface GenerationResult {
