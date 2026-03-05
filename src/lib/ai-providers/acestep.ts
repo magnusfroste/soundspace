@@ -20,6 +20,17 @@ function saveConfig(config: ProviderConfig) {
 
 let aceStepConfig: ProviderConfig = loadConfig();
 
+/** Convert a Blob to base64 string */
+async function blobToBase64(blob: Blob): Promise<string> {
+  const buffer = await blob.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
 /** Call ACE-Step via edge function proxy */
 async function proxyCall(endpoint: string, method = "GET", body?: unknown): Promise<any> {
   const { data, error } = await supabase.functions.invoke("acestep-proxy", {
@@ -149,6 +160,14 @@ export const aceStepProvider: AIProvider = {
     }
     if (taskType === "cover" && options.coverStrength != null) {
       payload.audio_cover_strength = options.coverStrength;
+    }
+
+    // Include source audio as base64 for cover/repaint/complete
+    if (options.sourceAudioBlob && ["cover", "repaint", "complete"].includes(taskType)) {
+      payload.src_audio_base64 = await blobToBase64(options.sourceAudioBlob);
+    }
+    if (options.referenceAudioBlob) {
+      payload.reference_audio_base64 = await blobToBase64(options.referenceAudioBlob);
     }
 
     // 1. Submit generation task
