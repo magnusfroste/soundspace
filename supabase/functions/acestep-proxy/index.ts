@@ -31,11 +31,6 @@ const corsHeaders = {
 
     const res = await fetch(`${baseUrl}${endpoint}`, fetchOptions);
 
-    // Clean up temp files
-    for (const f of tempFiles) {
-      try { await Deno.remove(f); } catch { /* ignore */ }
-    }
-
     const contentType = res.headers.get("content-type") || "";
 
     // For audio/binary responses, stream them through
