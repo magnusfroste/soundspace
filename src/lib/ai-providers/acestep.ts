@@ -20,40 +20,34 @@ function saveConfig(config: ProviderConfig) {
 
 let aceStepConfig: ProviderConfig = loadConfig();
 
+/** Call ACE-Step via edge function proxy */
+async function proxyCall(endpoint: string, method = "GET", body?: unknown): Promise<Response> {
+  const { data, error } = await supabase.functions.invoke("acestep-proxy", {
+    body: { endpoint, method, body },
+  });
+  if (error) throw new Error(`ACE-Step proxy error: ${error.message}`);
+  return data;
+}
+
 /** Poll query_result until status is 1 (success) or 2 (failed) */
 async function pollResult(
-  baseUrl: string,
   taskId: string,
-  headers: Record<string, string>,
   maxAttempts = 120,
   interval = 3000,
 ): Promise<any> {
   for (let i = 0; i < maxAttempts; i++) {
-    const res = await fetch(`${baseUrl}/query_result`, {
-      method: "POST",
-      headers: { ...headers, "Content-Type": "application/json" },
-      body: JSON.stringify({ task_id_list: [taskId] }),
-    });
+    const result = await proxyCall("/query_result", "POST", { task_id_list: [taskId] });
 
-    if (!res.ok) throw new Error(`AceStep poll error: ${res.status}`);
-
-    const json = await res.json();
-    const task = json.data?.[0];
-
+    const task = result.data?.[0];
     if (!task) throw new Error("AceStep: task not found");
 
     if (task.status === 1) {
-      const results = typeof task.result === "string" ? JSON.parse(task.result) : task.result;
-      return results;
+      return typeof task.result === "string" ? JSON.parse(task.result) : task.result;
     }
-
-    if (task.status === 2) {
-      throw new Error("AceStep generation failed");
-    }
+    if (task.status === 2) throw new Error("AceStep generation failed");
 
     await new Promise((r) => setTimeout(r, interval));
   }
-
   throw new Error("AceStep generation timed out");
 }
 
