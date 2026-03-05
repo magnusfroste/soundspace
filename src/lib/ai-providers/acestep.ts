@@ -159,18 +159,31 @@ export const aceStepProvider: AIProvider = {
     // 2. Poll for result
     const results = await pollResult(taskId);
 
-    // 3. Get audio URL from result
+    // 3. Get audio via proxy using the /v1/audio endpoint
     const firstResult = results[0];
-    if (!firstResult?.file) throw new Error("ACE-Step returned no audio file");
+    const audioPath = firstResult?.url || firstResult?.file;
+    if (!audioPath) throw new Error("ACE-Step returned no audio file");
 
-    // The file URL comes from the API — download via proxy isn't needed for URLs
-    // For now, create a blob URL from the result if it contains base64 or a direct URL
-    const audioUrl = firstResult.file.startsWith("http")
-      ? firstResult.file
-      : `${(aceStepConfig.endpointUrl || "").replace(/\/+$/, "")}${firstResult.file}`;
+    // Download audio through the proxy to avoid CORS issues
+    const { data: audioData, error: audioError } = await supabase.functions.invoke(
+      "acestep-proxy",
+      {
+        body: { endpoint: audioPath, method: "GET" },
+        // No responseType option — we get the raw response
+      },
+    );
 
-    // Try fetching audio through the proxy for CORS safety
-    const audioBlob = await fetch(audioUrl).then(r => r.blob()).catch(() => new Blob());
+    let audioBlob: Blob;
+    if (audioData instanceof Blob) {
+      audioBlob = audioData;
+    } else if (audioData instanceof ArrayBuffer) {
+      audioBlob = new Blob([audioData], { type: "audio/mpeg" });
+    } else {
+      // Fallback: try fetching directly (won't work cross-origin but worth a shot)
+      audioBlob = await fetch(audioPath).then(r => r.blob()).catch(() => new Blob());
+    }
+
+    if (audioBlob.size === 0) throw new Error("Failed to download audio from ACE-Step");
 
     return {
       audioBlob,
