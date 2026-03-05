@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -71,6 +71,27 @@ export function useAIStudio() {
   });
 
   const activeProvider = getProviderById(activeProviderId) || allProviders[0];
+  const [, setStatusTick] = useState(0);
+
+  // Refresh provider statuses on mount
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(
+      allProviders.map(async (provider) => {
+        try {
+          const status = await provider.checkStatus();
+          if (provider.status !== status) {
+            provider.status = status;
+          }
+        } catch {
+          // ignore
+        }
+      })
+    ).then(() => {
+      if (!cancelled) setStatusTick((t) => t + 1);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // Fetch generation history from database
   const { data: history = [] } = useQuery({
