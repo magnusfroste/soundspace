@@ -346,3 +346,49 @@ export async function formatLyrics(lyrics: string): Promise<string> {
   const result = await proxyCall("/format_lyrics", "POST", { lyrics });
   return result?.formatted_lyrics || result?.lyrics || result || lyrics;
 }
+
+/** Extract audio features (BPM, key, caption, etc.) from an audio file */
+export interface AudioExtractResult {
+  bpm?: number;
+  keyScale?: string;
+  timeSignature?: string;
+  caption?: string;
+  lyrics?: string;
+  vocalLanguage?: string;
+  duration?: number;
+}
+
+export async function extractAudioFeatures(audioBlob: Blob): Promise<AudioExtractResult> {
+  const model = aceStepConfig.model || "acestep-v15-turbo";
+  const base64 = await blobToBase64(audioBlob);
+
+  const payload = {
+    task_type: "extract",
+    src_audio_base64: base64,
+    model,
+    prompt: "",
+    lyrics: "",
+    audio_duration: 0,
+    batch_size: 1,
+    audio_format: "mp3",
+    inference_steps: 8,
+    thinking: true,
+  };
+
+  const releaseData = await proxyCall("/release_task", "POST", payload);
+  const taskId = releaseData?.task_id || releaseData?.data?.task_id;
+  if (!taskId) throw new Error("ACE-Step did not return a task_id for extract");
+
+  const results = await pollResult(taskId);
+  const item = Array.isArray(results) ? results[0] : results;
+
+  return {
+    bpm: item?.bpm ?? undefined,
+    keyScale: item?.keyscale ?? item?.key_scale ?? undefined,
+    timeSignature: item?.timesignature ?? item?.time_signature ?? undefined,
+    caption: item?.caption ?? item?.prompt ?? undefined,
+    lyrics: item?.lyrics ?? undefined,
+    vocalLanguage: item?.vocal_language ?? undefined,
+    duration: item?.duration ?? undefined,
+  };
+}

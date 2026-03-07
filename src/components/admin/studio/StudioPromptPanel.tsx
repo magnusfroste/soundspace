@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { GENRES, MOODS, type Genre, type Mood, type AceStepTaskType } from "@/lib/ai-providers";
 import { enhanceCaption, formatLyrics } from "@/lib/ai-providers";
+import { AudioExtractPanel } from "./AudioExtractPanel";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -94,6 +95,20 @@ export function StudioPromptPanel({
 
   const isAceStep = providerId === "acestep";
   const needsSourceAudio = isAceStep && ["cover", "repaint", "complete"].includes(taskType);
+
+  const handleApplyExtract = (data: {
+    prompt?: string;
+    bpm?: string;
+    keyScale?: string;
+    timeSignature?: string;
+    lyrics?: string;
+  }) => {
+    if (data.prompt) setPrompt(data.prompt);
+    if (data.bpm) setBpm(data.bpm);
+    if (data.keyScale) setKeyScale(data.keyScale);
+    if (data.timeSignature) setTimeSignature(data.timeSignature);
+    if (data.lyrics) setLyrics(data.lyrics);
+  };
 
   const handleEnhancePrompt = async () => {
     if (!prompt.trim()) return;
@@ -175,6 +190,11 @@ export function StudioPromptPanel({
             ))}
           </div>
         </div>
+      )}
+
+      {/* Audio Extract */}
+      {isAceStep && (
+        <AudioExtractPanel onApply={handleApplyExtract} />
       )}
 
       {/* Prompt */}

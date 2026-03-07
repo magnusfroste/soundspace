@@ -4,7 +4,8 @@ export { elevenlabsProvider } from "./elevenlabs";
 export { localAIProvider, getLocalConfig, setLocalConfig } from "./local";
 export { mubertProvider, getMubertConfig, setMubertConfig } from "./mubert";
 export { musicgenProvider, getMusicgenConfig, setMusicgenConfig, MUSICGEN_MODELS } from "./musicgen";
-export { aceStepProvider, getAceStepConfig, setAceStepConfig, enhanceCaption, formatLyrics } from "./acestep";
+export { aceStepProvider, getAceStepConfig, setAceStepConfig, enhanceCaption, formatLyrics, extractAudioFeatures } from "./acestep";
+export type { AudioExtractResult } from "./acestep";
 
 import { elevenlabsProvider } from "./elevenlabs";
 import { localAIProvider } from "./local";
