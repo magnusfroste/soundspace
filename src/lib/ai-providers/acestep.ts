@@ -219,23 +219,28 @@ export const aceStepProvider: AIProvider = {
     const audioPath = firstResult?.url || firstResult?.file;
     if (!audioPath) throw new Error("ACE-Step returned no audio file");
 
-    // Download audio through the proxy to avoid CORS issues
-    const { data: audioData, error: audioError } = await supabase.functions.invoke(
-      "acestep-proxy",
-      {
-        body: { endpoint: audioPath, method: "GET" },
-        // No responseType option — we get the raw response
+    // Download audio through the proxy — use fetch directly for binary data
+    // supabase.functions.invoke doesn't reliably return binary responses as Blob
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const audioResponse = await fetch(`${supabaseUrl}/functions/v1/acestep-proxy`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`,
       },
-    );
+      body: JSON.stringify({ endpoint: audioPath, method: "GET" }),
+    });
 
-    let audioBlob: Blob;
-    if (audioData instanceof Blob) {
-      audioBlob = audioData;
-    } else if (audioData instanceof ArrayBuffer) {
-      audioBlob = new Blob([audioData], { type: "audio/mpeg" });
-    } else {
-      // Fallback: try fetching directly (won't work cross-origin but worth a shot)
-      audioBlob = await fetch(audioPath).then(r => r.blob()).catch(() => new Blob());
+    if (!audioResponse.ok) {
+      throw new Error(`Failed to download audio: ${audioResponse.status}`);
+    }
+
+    let audioBlob = await audioResponse.blob();
+    // If the blob came back as JSON (envelope), it's not audio
+    if (audioBlob.type.includes("json") || audioBlob.size < 1000) {
+      throw new Error("ACE-Step returned invalid audio data");
     }
 
     if (audioBlob.size === 0) throw new Error("Failed to download audio from ACE-Step");
