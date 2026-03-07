@@ -350,6 +350,7 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
                 if (song.mood) params.set("mood", song.mood);
                 if (song.bpm) params.set("bpm", String(song.bpm));
                 if (song.lyrics) params.set("lyrics", song.lyrics);
+                if (song.file_url) params.set("ref_audio", song.file_url);
                 navigate(`/admin/studio?${params.toString()}`);
               }}
             >

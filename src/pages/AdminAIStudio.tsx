@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Sparkles } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { useAIStudio } from "@/hooks/useAIStudio";
 import {
   ProviderTabs,
@@ -9,6 +11,7 @@ import {
 } from "@/components/admin/studio";
 
 export default function AdminAIStudio() {
+  const [searchParams] = useSearchParams();
   const {
     providers,
     activeProvider,
@@ -29,6 +32,13 @@ export default function AdminAIStudio() {
     save,
     isSaving,
   } = useAIStudio();
+
+  // Auto-select ACE-Step when navigating with ref_audio (Generate Similar with audio)
+  useEffect(() => {
+    if (searchParams.get("ref_audio") && activeProviderId !== "acestep") {
+      setActiveProviderId("acestep");
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-6">

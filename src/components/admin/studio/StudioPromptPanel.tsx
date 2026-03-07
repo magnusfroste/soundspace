@@ -102,12 +102,34 @@ export function StudioPromptPanel({
     const m = searchParams.get("mood");
     const b = searchParams.get("bpm");
     const l = searchParams.get("lyrics");
-    if (p || g || m || b || l) {
+    const refAudioUrl = searchParams.get("ref_audio");
+
+    if (p || g || m || b || l || refAudioUrl) {
       if (p) setPrompt(p);
       if (g) setSelectedGenre(g as Genre);
       if (m) setSelectedMood(m as Mood);
       if (b) setBpm(b);
       if (l) setLyrics(l);
+
+      // If a reference audio URL is provided, fetch it and set as source audio in cover mode
+      if (refAudioUrl) {
+        setTaskType("cover");
+        fetch(refAudioUrl)
+          .then((res) => {
+            if (!res.ok) throw new Error("Failed to fetch audio");
+            return res.blob();
+          })
+          .then((blob) => {
+            const fileName = refAudioUrl.split("/").pop() || "source.mp3";
+            const file = new File([blob], fileName, { type: blob.type || "audio/mpeg" });
+            setSourceAudio({ file, name: fileName });
+            toast.success("Source audio loaded — Cover mode enabled");
+          })
+          .catch(() => {
+            toast.error("Could not load source audio for cover mode");
+          });
+      }
+
       // Clear params so they don't persist on refresh
       setSearchParams({}, { replace: true });
     }
