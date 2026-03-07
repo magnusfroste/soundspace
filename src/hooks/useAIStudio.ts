@@ -187,10 +187,21 @@ export function useAIStudio() {
         audioUrl: urlData.publicUrl,
         dbRecord: dbRecord as DBGeneration,
         actualDuration,
+        // Pass through ACE-Step metadata
+        bpm: result.metadata.bpm,
+        keyScale: result.metadata.keyScale,
+        timeSignature: result.metadata.timeSignature,
+        vocalLanguage: result.metadata.vocalLanguage,
       };
     },
     onSuccess: (result) => {
-      const newItem = mapDBToHistoryItem(result.dbRecord);
+      const newItem: GenerationHistoryItem = {
+        ...mapDBToHistoryItem(result.dbRecord),
+        bpm: result.bpm,
+        keyScale: result.keyScale,
+        timeSignature: result.timeSignature,
+        vocalLanguage: result.vocalLanguage,
+      };
       setCurrentGeneration(newItem);
       queryClient.invalidateQueries({ queryKey: ["ai_generations"] });
       toast.success("Music generated successfully!");
