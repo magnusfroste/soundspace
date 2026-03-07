@@ -61,6 +61,7 @@ export default function AdminAgent() {
     setActiveConversationId,
     isGenerating,
     streamingContent,
+    statusMessage,
     sendMessage,
     createConversation,
     deleteConversation,
