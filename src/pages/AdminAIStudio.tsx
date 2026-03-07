@@ -4,6 +4,7 @@ import {
   ProviderTabs,
   StudioPromptPanel,
   OutputPreview,
+  BatchOutputPreview,
   GenerationHistory,
 } from "@/components/admin/studio";
 
@@ -16,6 +17,11 @@ export default function AdminAIStudio() {
     generate,
     isGenerating,
     currentGeneration,
+    batchVariations,
+    selectedVariationIndex,
+    setSelectedVariationIndex,
+    confirmVariation,
+    isConfirmingVariation,
     history,
     playItem,
     deleteFromHistory,
@@ -57,8 +63,22 @@ export default function AdminAIStudio() {
             />
           </div>
 
-          {/* Output Preview */}
-          {currentGeneration && (
+          {/* Batch Output Preview */}
+          {batchVariations && batchVariations.length > 1 && (
+            <BatchOutputPreview
+              variations={batchVariations}
+              selectedIndex={selectedVariationIndex}
+              onSelectVariation={setSelectedVariationIndex}
+              onConfirmSelection={confirmVariation}
+              savedItem={currentGeneration}
+              playlists={playlists}
+              isSaving={isSaving}
+              onSave={save}
+            />
+          )}
+
+          {/* Single Output Preview */}
+          {currentGeneration && !batchVariations && (
             <OutputPreview
               item={currentGeneration}
               playlists={playlists}
