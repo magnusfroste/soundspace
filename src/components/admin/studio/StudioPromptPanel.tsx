@@ -412,6 +412,34 @@ export function StudioPromptPanel({
         />
       </div>
 
+      {/* Batch Size (ACE-Step only) */}
+      {isAceStep && (
+        <div className="space-y-3">
+          <Label>Variations</Label>
+          <div className="flex gap-2">
+            {[1, 2, 3, 4].map((n) => (
+              <button
+                key={n}
+                onClick={() => setBatchSize(n)}
+                className={cn(
+                  "flex-1 rounded-lg border py-2 text-sm font-medium transition-all",
+                  batchSize === n
+                    ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                    : "border-border hover:border-primary/30 hover:bg-muted/50"
+                )}
+              >
+                {n === 1 ? "Single" : `${n}x`}
+              </button>
+            ))}
+          </div>
+          {batchSize > 1 && (
+            <p className="text-xs text-muted-foreground">
+              Generate {batchSize} variations and pick the best one
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Duration */}
       <div className="space-y-3">
         <div className="flex justify-between">
