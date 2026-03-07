@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Music, Loader2, Upload, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { enhanceCaption, formatLyrics } from "@/lib/ai-providers";
 import { AudioExtractPanel } from "./AudioExtractPanel";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useSearchParams } from "react-router-dom";
 
 const ACESTEP_MODES: { value: AceStepTaskType; label: string; description: string }[] = [
   { value: "text2music", label: "Generate", description: "Create music from text" },
@@ -92,6 +93,25 @@ export function StudioPromptPanel({
 
   const sourceInputRef = useRef<HTMLInputElement>(null);
   const refInputRef = useRef<HTMLInputElement>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Pre-fill from URL search params (e.g. from "Generate Similar")
+  useEffect(() => {
+    const p = searchParams.get("prompt");
+    const g = searchParams.get("genre");
+    const m = searchParams.get("mood");
+    const b = searchParams.get("bpm");
+    const l = searchParams.get("lyrics");
+    if (p || g || m || b || l) {
+      if (p) setPrompt(p);
+      if (g) setSelectedGenre(g as Genre);
+      if (m) setSelectedMood(m as Mood);
+      if (b) setBpm(b);
+      if (l) setLyrics(l);
+      // Clear params so they don't persist on refresh
+      setSearchParams({}, { replace: true });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const isAceStep = providerId === "acestep";
   const needsSourceAudio = isAceStep && ["cover", "repaint", "complete"].includes(taskType);

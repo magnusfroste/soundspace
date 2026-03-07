@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Music2, Sparkles, Plus, Trash2, Type, Loader2 } from "lucide-react";
+import { Play, Pause, Music2, Sparkles, Plus, Trash2, Type, Loader2, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { usePlayer } from "@/contexts/PlayerContext";
+import { useNavigate } from "react-router-dom";
 import type { SongWithPlaylists, PlaylistWithCount } from "@/hooks/useSongLibrary";
 import { useAddSongToPlaylist, useUpdateSong, useDeleteSong } from "@/hooks/useSongLibrary";
 import { supabase } from "@/integrations/supabase/client";
@@ -150,6 +151,7 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
   const { currentSong, isPlaying, playSong, togglePlay } = usePlayer();
   const addToPlaylist = useAddSongToPlaylist();
   const deleteSong = useDeleteSong();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isCurrentSong = currentSong?.id === song.id;
 
@@ -330,6 +332,34 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
         ) : (
           <span className="text-xs text-muted-foreground">—</span>
         )}
+      </div>
+
+      {/* Generate Similar */}
+      <div className="w-8 flex-shrink-0">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                const params = new URLSearchParams();
+                if (song.prompt) params.set("prompt", song.prompt);
+                if (song.genre) params.set("genre", song.genre);
+                if (song.mood) params.set("mood", song.mood);
+                if (song.bpm) params.set("bpm", String(song.bpm));
+                if (song.lyrics) params.set("lyrics", song.lyrics);
+                navigate(`/admin/studio?${params.toString()}`);
+              }}
+            >
+              <Wand2 className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p className="text-xs">Generate Similar</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Quick add to playlist */}
