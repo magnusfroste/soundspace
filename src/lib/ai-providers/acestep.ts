@@ -161,6 +161,95 @@ function buildRequest(
   };
 }
 
+/** Download a single audio result from ACE-Step */
+async function downloadAudio(audioPath: string): Promise<Blob> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const audioResponse = await fetch(`${supabaseUrl}/functions/v1/acestep-proxy`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": supabaseKey,
+      "Authorization": `Bearer ${supabaseKey}`,
+    },
+    body: JSON.stringify({ endpoint: audioPath, method: "GET" }),
+  });
+
+  if (!audioResponse.ok) {
+    throw new Error(`Failed to download audio: ${audioResponse.status}`);
+  }
+
+  const audioBlob = await audioResponse.blob();
+  if (audioBlob.type.includes("json") || audioBlob.size < 1000) {
+    throw new Error("ACE-Step returned invalid audio data");
+  }
+  if (audioBlob.size === 0) throw new Error("Failed to download audio from ACE-Step");
+  return audioBlob;
+}
+
+/** Build the common payload for ACE-Step generation */
+function buildPayload(options: GenerateOptions, model: string, batchSize = 1): Record<string, unknown> {
+  const taskType = options.taskType || "text2music";
+  let prompt = options.prompt;
+  if (options.genre) prompt += `, ${options.genre.toLowerCase()} style`;
+  if (options.mood) prompt += `, ${options.mood.toLowerCase()} mood`;
+
+  const payload: Record<string, unknown> = {
+    prompt,
+    lyrics: options.lyrics || "",
+    audio_duration: options.duration,
+    model,
+    thinking: true,
+    batch_size: batchSize,
+    audio_format: "mp3",
+    inference_steps: 8,
+    task_type: taskType,
+  };
+
+  if (options.bpm) payload.bpm = options.bpm;
+  if (options.keyScale) payload.keyscale = options.keyScale;
+  if (options.timeSignature) payload.timesignature = options.timeSignature;
+
+  if (taskType === "repaint") {
+    payload.repainting_start = options.repaintStart ?? 0;
+    if (options.repaintEnd != null) payload.repainting_end = options.repaintEnd;
+  }
+  if (taskType === "cover" && options.coverStrength != null) {
+    payload.audio_cover_strength = options.coverStrength;
+  }
+
+  return payload;
+}
+
+/** Map a single ACE-Step result item to a GenerationResult */
+async function mapResultToGeneration(
+  resultItem: any,
+  options: GenerateOptions,
+): Promise<GenerationResult> {
+  const audioPath = resultItem?.url || resultItem?.file;
+  if (!audioPath) throw new Error("ACE-Step returned no audio file");
+
+  const audioBlob = await downloadAudio(audioPath);
+
+  return {
+    audioBlob,
+    audioUrl: URL.createObjectURL(audioBlob),
+    lyrics: resultItem.lyrics || undefined,
+    qualityScore: resultItem.quality_score ?? resultItem.qualityScore ?? undefined,
+    metadata: {
+      provider: "acestep",
+      prompt: options.prompt,
+      duration: resultItem.duration || options.duration,
+      genre: options.genre,
+      mood: options.mood,
+      bpm: resultItem.bpm,
+      keyScale: resultItem.keyscale,
+      timeSignature: resultItem.timesignature,
+      vocalLanguage: resultItem.vocal_language,
+    },
+  };
+}
+
 export const aceStepProvider: AIProvider = {
   id: "acestep",
   name: "ACE-Step",
@@ -169,40 +258,12 @@ export const aceStepProvider: AIProvider = {
   status: "configuring",
 
   async generate(options: GenerateOptions): Promise<GenerationResult> {
-    // Build JSON payload (proxy doesn't support FormData yet)
     const model = aceStepConfig.model || "acestep-v15-turbo";
-    const taskType = options.taskType || "text2music";
 
-    let prompt = options.prompt;
-    if (options.genre) prompt += `, ${options.genre.toLowerCase()} style`;
-    if (options.mood) prompt += `, ${options.mood.toLowerCase()} mood`;
-
-    const payload: Record<string, unknown> = {
-      prompt,
-      lyrics: options.lyrics || "",
-      audio_duration: options.duration,
-      model,
-      thinking: true,
-      batch_size: 1,
-      audio_format: "mp3",
-      inference_steps: 8,
-      task_type: taskType,
-    };
-
-    // Musical control params
-    if (options.bpm) payload.bpm = options.bpm;
-    if (options.keyScale) payload.keyscale = options.keyScale;
-    if (options.timeSignature) payload.timesignature = options.timeSignature;
-
-    if (taskType === "repaint") {
-      payload.repainting_start = options.repaintStart ?? 0;
-      if (options.repaintEnd != null) payload.repainting_end = options.repaintEnd;
-    }
-    if (taskType === "cover" && options.coverStrength != null) {
-      payload.audio_cover_strength = options.coverStrength;
-    }
+    const payload = buildPayload(options, model, 1);
 
     // Include source audio as base64 for cover/repaint/complete
+    const taskType = options.taskType || "text2music";
     if (options.sourceAudioBlob && ["cover", "repaint", "complete"].includes(taskType)) {
       payload.src_audio_base64 = await blobToBase64(options.sourceAudioBlob);
     }
@@ -210,62 +271,44 @@ export const aceStepProvider: AIProvider = {
       payload.reference_audio_base64 = await blobToBase64(options.referenceAudioBlob);
     }
 
-    // 1. Submit generation task
     const releaseData = await proxyCall("/release_task", "POST", payload);
-    // After envelope unwrap, releaseData is {status, task_id} directly
     const taskId = releaseData?.task_id || releaseData?.data?.task_id;
     if (!taskId) throw new Error("ACE-Step did not return a task_id");
 
-    // 2. Poll for result
     const results = await pollResult(taskId);
+    return mapResultToGeneration(results[0], options);
+  },
 
-    // 3. Get audio via proxy using the /v1/audio endpoint
-    const firstResult = results[0];
-    const audioPath = firstResult?.url || firstResult?.file;
-    if (!audioPath) throw new Error("ACE-Step returned no audio file");
+  async generateBatch(options: GenerateOptions): Promise<GenerationResult[]> {
+    const model = aceStepConfig.model || "acestep-v15-turbo";
+    const batchSize = Math.min(Math.max(options.batchSize || 2, 1), 4);
 
-    // Download audio through the proxy — use fetch directly for binary data
-    // supabase.functions.invoke doesn't reliably return binary responses as Blob
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-    const audioResponse = await fetch(`${supabaseUrl}/functions/v1/acestep-proxy`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": supabaseKey,
-        "Authorization": `Bearer ${supabaseKey}`,
-      },
-      body: JSON.stringify({ endpoint: audioPath, method: "GET" }),
-    });
+    const payload = buildPayload(options, model, batchSize);
 
-    if (!audioResponse.ok) {
-      throw new Error(`Failed to download audio: ${audioResponse.status}`);
+    const taskType = options.taskType || "text2music";
+    if (options.sourceAudioBlob && ["cover", "repaint", "complete"].includes(taskType)) {
+      payload.src_audio_base64 = await blobToBase64(options.sourceAudioBlob);
+    }
+    if (options.referenceAudioBlob) {
+      payload.reference_audio_base64 = await blobToBase64(options.referenceAudioBlob);
     }
 
-    let audioBlob = await audioResponse.blob();
-    // If the blob came back as JSON (envelope), it's not audio
-    if (audioBlob.type.includes("json") || audioBlob.size < 1000) {
-      throw new Error("ACE-Step returned invalid audio data");
-    }
+    const releaseData = await proxyCall("/release_task", "POST", payload);
+    const taskId = releaseData?.task_id || releaseData?.data?.task_id;
+    if (!taskId) throw new Error("ACE-Step did not return a task_id");
 
-    if (audioBlob.size === 0) throw new Error("Failed to download audio from ACE-Step");
+    const results = await pollResult(taskId);
+    const resultArray = Array.isArray(results) ? results : [results];
 
-    return {
-      audioBlob,
-      audioUrl: URL.createObjectURL(audioBlob),
-      lyrics: firstResult.lyrics || undefined,
-      metadata: {
-        provider: "acestep",
-        prompt: options.prompt,
-        duration: firstResult.duration || options.duration,
-        genre: options.genre,
-        mood: options.mood,
-        bpm: firstResult.bpm,
-        keyScale: firstResult.keyscale,
-        timeSignature: firstResult.timesignature,
-        vocalLanguage: firstResult.vocal_language,
-      },
-    };
+    // Download all variations in parallel
+    const variations = await Promise.all(
+      resultArray.map((item: any) => mapResultToGeneration(item, options))
+    );
+
+    // Sort by quality score descending if available
+    variations.sort((a, b) => (b.qualityScore ?? 0) - (a.qualityScore ?? 0));
+
+    return variations;
   },
 
   async checkStatus(): Promise<ProviderStatus> {
