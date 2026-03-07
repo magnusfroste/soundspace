@@ -29,6 +29,10 @@ export interface GenerationResult {
     duration: number;
     genre?: string;
     mood?: string;
+    bpm?: number;
+    keyScale?: string;
+    timeSignature?: string;
+    vocalLanguage?: string;
   };
 }
 
@@ -63,6 +67,10 @@ export interface GenerationHistoryItem {
   savedToLibrary: boolean;
   songId?: string;
   createdAt: Date;
+  bpm?: number;
+  keyScale?: string;
+  timeSignature?: string;
+  vocalLanguage?: string;
 }
 
 export const GENRES = ["Jazz", "Ambient", "Acoustic", "Electronic", "Classical", "Lo-Fi", "World"] as const;

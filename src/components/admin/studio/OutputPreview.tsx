@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Download, Save, Loader2, ListMusic, Type, ChevronDown, ChevronUp } from "lucide-react";
+import { Play, Pause, Download, Save, Loader2, ListMusic, Type, ChevronDown, ChevronUp, Music2, Key, Clock3, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,7 +106,7 @@ export function OutputPreview({
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h4 className="font-medium">Generated Track</h4>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
             <Badge variant="secondary" className="text-xs">
               {item.provider}
             </Badge>
@@ -136,6 +136,35 @@ export function OutputPreview({
         className="w-full"
         controls
       />
+
+      {(item.bpm || item.keyScale || item.timeSignature || item.vocalLanguage) && (
+        <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+          {item.bpm && (
+            <span className="flex items-center gap-1 rounded-md bg-muted px-2 py-1">
+              <Music2 className="h-3 w-3" />
+              {item.bpm} BPM
+            </span>
+          )}
+          {item.keyScale && (
+            <span className="flex items-center gap-1 rounded-md bg-muted px-2 py-1">
+              <Key className="h-3 w-3" />
+              {item.keyScale}
+            </span>
+          )}
+          {item.timeSignature && (
+            <span className="flex items-center gap-1 rounded-md bg-muted px-2 py-1">
+              <Clock3 className="h-3 w-3" />
+              {item.timeSignature}/4
+            </span>
+          )}
+          {item.vocalLanguage && item.vocalLanguage !== "unknown" && (
+            <span className="flex items-center gap-1 rounded-md bg-muted px-2 py-1">
+              <Mic className="h-3 w-3" />
+              {item.vocalLanguage}
+            </span>
+          )}
+        </div>
+      )}
 
       {item.lyrics && (
         <LyricsPanel lyrics={item.lyrics} />
