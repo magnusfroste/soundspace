@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Download, Save, Loader2, ListMusic, Type, ChevronDown, ChevronUp } from "lucide-react";
+import { Play, Pause, Download, Save, Loader2, ListMusic, Type, ChevronDown, ChevronUp, Music2, Key, Clock3, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,7 +106,7 @@ export function OutputPreview({
       <div className="flex items-center justify-between">
         <div className="space-y-1">
           <h4 className="font-medium">Generated Track</h4>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
             <Badge variant="secondary" className="text-xs">
               {item.provider}
             </Badge>
