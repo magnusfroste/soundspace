@@ -402,13 +402,30 @@ export function StudioPromptPanel({
             </Button>
           )}
         </div>
+        {isAceStep && (
+          <div className="flex flex-wrap gap-1.5">
+            {["[Verse]", "[Chorus]", "[Bridge]", "[Outro]", "[Intro]", "[Hook]"].map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => {
+                  const insert = lyrics ? `\n\n${tag}\n` : `${tag}\n`;
+                  setLyrics((prev) => prev + insert);
+                }}
+                className="rounded border border-border bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
         <Textarea
           id="lyrics"
-          placeholder="Paste or type song lyrics here..."
+          placeholder={isAceStep ? "[Verse]\nYour lyrics here...\n\n[Chorus]\nChorus lyrics..." : "Paste or type song lyrics here..."}
           value={lyrics}
           onChange={(e) => setLyrics(e.target.value)}
           disabled={isGenerating}
-          className="min-h-[80px] resize-none text-sm"
+          className="min-h-[100px] resize-none text-sm font-mono"
         />
       </div>
 
