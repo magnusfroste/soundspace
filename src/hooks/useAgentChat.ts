@@ -25,7 +25,9 @@ const AGENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sound-agent
 export function useAgentChat() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(() => {
+    try { return sessionStorage.getItem("agent-active-conv"); } catch { return null; }
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
