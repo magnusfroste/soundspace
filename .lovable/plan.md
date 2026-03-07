@@ -1,37 +1,41 @@
 
-# Custom User Playlists - Premium Feature
+## "Generate Similar" Input Analysis
 
-## Status: ✅ Implemented
+### Current Implementation
+**What data is passed:**
+- **URL Parameters** (from SongListRow.tsx:347-352):
+  - `prompt` - Original song's AI generation prompt
+  - `genre` - Genre tag
+  - `mood` - Mood tag
+  - `bpm` - BPM value (numeric)
+  - `lyrics` - Song lyrics text
 
-## Summary
-Add a premium feature that allows business users to create their own personal playlists and populate them either manually by browsing the song library, or automatically via AI based on their mood/style preferences.
+- **Pre-fill in Studio** (StudioPromptPanel.tsx:98-180):
+  - These URL params are extracted and populate form fields
+  - The prompt, lyrics, and musical metadata (BPM) are set into state
+  - URL params are cleared after hydration to prevent re-triggering
 
----
+- **Sent to ACE-Step** (acestep.ts:145-240):
+  - Only **text-based data** is sent:
+    - `caption` (prompt)
+    - `lyrics` 
+    - `bpm` (numeric)
+    - `keyscale` (if set)
+    - `timesignature` (if set)
+  - **The original audio file (`song.file_url`) is NOT sent** — only metadata about it
 
-## Implementation Complete
+### Key Findings
+1. **Input: Metadata only** — "Generate Similar" extracts and passes only the metadata fields stored in the songs table (prompt, lyrics, BPM, genre, mood), not the audio file itself.
 
-### Database
-- ✅ `user_playlists` table with RLS policies
-- ✅ `user_playlist_songs` table with RLS policies
-- ✅ Indexes for performance
+2. **No audio reference** — The actual MP3/audio file is ignored. This is text-to-music generation with metadata constraints, not audio-conditioned generation.
 
-### Backend
-- ✅ Edge function `ai-fill-playlist` using Lovable AI (gemini-3-flash)
+3. **ACE-Step receives** — Only the structured prompt, lyrics, and musical parameters—same as if a user manually entered them in the Studio.
 
-### Frontend
-- ✅ `/my-playlists` page - list and create playlists
-- ✅ `/my-playlists/:id` page - view/edit playlist with songs
-- ✅ `CreatePlaylistDialog` component
-- ✅ `AddSongsDialog` component - manual song selection
-- ✅ `AIFillDialog` component - AI-powered song selection
-- ✅ `useUserPlaylists` hook with CRUD operations
+4. **Alternative**: If you wanted actual audio-based similarity (e.g., "generate music that sounds like this song"), you'd need to:
+   - Send the audio file URL or blob to ACE-Step's "Cover" mode or "Reference Audio" feature
+   - Update the `generate()` function to detect and include the reference audio in the request
 
-### Admin Settings
-- ✅ Toggle for `custom_playlists_enabled` in Premium Features
-
-### Schedule Integration
-- ✅ User playlists appear in schedule dropdown grouped under "My Playlists"
-
-### Navigation
-- ✅ Sidebar shows "My Playlists" with Crown icon when feature is enabled
-
+### This means:
+- ✅ "Generate Similar" uses **metadata-driven variation** (prompt + lyrics + BPM constraints)
+- ❌ Not true **audio-conditioned generation** (which would require sending the audio file)
+- The current approach is lighter-weight and faster but less musically tied to the original
