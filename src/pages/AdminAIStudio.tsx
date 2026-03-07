@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Sparkles } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { useAIStudio } from "@/hooks/useAIStudio";
 import {
   ProviderTabs,
@@ -9,6 +11,7 @@ import {
 } from "@/components/admin/studio";
 
 export default function AdminAIStudio() {
+  const [searchParams] = useSearchParams();
   const {
     providers,
     activeProvider,
