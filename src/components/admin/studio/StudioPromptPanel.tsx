@@ -103,13 +103,17 @@ export function StudioPromptPanel({
     const b = searchParams.get("bpm");
     const l = searchParams.get("lyrics");
     const refAudioUrl = searchParams.get("ref_audio");
+    const ks = searchParams.get("key_scale");
+    const ts = searchParams.get("time_signature");
 
-    if (p || g || m || b || l || refAudioUrl) {
+    if (p || g || m || b || l || refAudioUrl || ks || ts) {
       if (p) setPrompt(p);
       if (g) setSelectedGenre(g as Genre);
       if (m) setSelectedMood(m as Mood);
       if (b) setBpm(b);
       if (l) setLyrics(l);
+      if (ks) setKeyScale(ks);
+      if (ts) setTimeSignature(ts);
 
       // If a reference audio URL is provided, fetch it and set as source audio in cover mode
       if (refAudioUrl) {

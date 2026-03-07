@@ -351,6 +351,8 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
                 if (song.bpm) params.set("bpm", String(song.bpm));
                 if (song.lyrics) params.set("lyrics", song.lyrics);
                 if (song.file_url) params.set("ref_audio", song.file_url);
+                if ((song as any).key_scale) params.set("key_scale", (song as any).key_scale);
+                if ((song as any).time_signature) params.set("time_signature", (song as any).time_signature);
                 navigate(`/admin/studio?${params.toString()}`);
               }}
             >

@@ -309,7 +309,9 @@ export function useAIStudio() {
           bpm: item.bpm || null,
           origin_source: `ai_${item.provider}`,
           prompt: item.prompt,
-        })
+          key_scale: item.keyScale || null,
+          time_signature: item.timeSignature || null,
+        } as any)
         .select("id")
         .single();
       if (insertError) throw insertError;
