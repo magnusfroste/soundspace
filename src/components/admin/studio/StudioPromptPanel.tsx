@@ -342,7 +342,7 @@ export function StudioPromptPanel({
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any</SelectItem>
+                  <SelectItem value="any">Any</SelectItem>
                   {KEY_OPTIONS.map((k) => (
                     <SelectItem key={k} value={k}>{k}</SelectItem>
                   ))}
@@ -356,7 +356,7 @@ export function StudioPromptPanel({
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any</SelectItem>
+                  <SelectItem value="any">Any</SelectItem>
                   {TIME_SIG_OPTIONS.map((ts) => (
                     <SelectItem key={ts} value={ts}>{ts}</SelectItem>
                   ))}
