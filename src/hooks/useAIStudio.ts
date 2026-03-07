@@ -8,6 +8,7 @@ import {
   type AIProvider,
   type GenerateOptions,
   type GenerationHistoryItem,
+  type GenerationResult,
 } from "@/lib/ai-providers";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -54,6 +55,10 @@ export function useAIStudio() {
   const [currentGeneration, setCurrentGeneration] = useState<GenerationHistoryItem | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Batch state
+  const [batchVariations, setBatchVariations] = useState<GenerationResult[] | null>(null);
+  const [selectedVariationIndex, setSelectedVariationIndex] = useState(0);
 
   // Fetch profile to get business_name for artist attribution
   const { data: profile } = useQuery({
@@ -137,16 +142,21 @@ export function useAIStudio() {
     }
   };
 
-  // Generate music mutation
+  // Generate music mutation (single or batch)
   const generateMutation = useMutation({
     mutationFn: async (options: GenerateOptions) => {
+      const isBatch = (options.batchSize ?? 1) > 1 && activeProvider.generateBatch;
+
+      if (isBatch) {
+        // Batch generation — return variations without saving yet
+        const variations = await activeProvider.generateBatch!(options);
+        return { type: "batch" as const, variations, options };
+      }
+
+      // Single generation — existing flow
       const result = await activeProvider.generate(options);
-      
-      // Get actual duration from the audio blob
       const actualDuration = await getAudioDuration(result.audioBlob);
-      console.log(`Requested duration: ${options.duration}s, Actual duration: ${actualDuration}s`);
-      
-      // Upload the blob to storage
+
       const fileName = `ai-gen/${crypto.randomUUID()}.mp3`;
       const { error: uploadError } = await supabase.storage
         .from("songs")
@@ -154,16 +164,11 @@ export function useAIStudio() {
           contentType: "audio/mpeg",
           cacheControl: "3600",
         });
-
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: urlData } = supabase.storage.from("songs").getPublicUrl(fileName);
-
-      // Prefer lyrics returned by ElevenLabs (post-generation), fallback to user-provided
       const finalLyrics = result.lyrics || options.lyrics || null;
 
-      // Save to database with ACTUAL duration, not requested duration
       const { data: dbRecord, error: insertError } = await supabase
         .from("ai_generations")
         .insert({
@@ -179,32 +184,94 @@ export function useAIStudio() {
         })
         .select()
         .single();
-
       if (insertError) throw insertError;
 
       return {
-        ...result,
+        type: "single" as const,
+        result,
         audioUrl: urlData.publicUrl,
         dbRecord: dbRecord as DBGeneration,
         actualDuration,
-        // Pass through ACE-Step metadata
         bpm: result.metadata.bpm,
         keyScale: result.metadata.keyScale,
         timeSignature: result.metadata.timeSignature,
         vocalLanguage: result.metadata.vocalLanguage,
       };
     },
-    onSuccess: (result) => {
+    onSuccess: (data) => {
+      if (data.type === "batch") {
+        setBatchVariations(data.variations);
+        setSelectedVariationIndex(0);
+        setCurrentGeneration(null);
+        toast.success(`${data.variations.length} variations generated — pick the best one!`);
+      } else {
+        setBatchVariations(null);
+        const newItem: GenerationHistoryItem = {
+          ...mapDBToHistoryItem(data.dbRecord),
+          bpm: data.bpm,
+          keyScale: data.keyScale,
+          timeSignature: data.timeSignature,
+          vocalLanguage: data.vocalLanguage,
+        };
+        setCurrentGeneration(newItem);
+        queryClient.invalidateQueries({ queryKey: ["ai_generations"] });
+        toast.success("Music generated successfully!");
+      }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  // Confirm a batch variation — upload and save to DB
+  const confirmVariationMutation = useMutation({
+    mutationFn: async (variation: GenerationResult) => {
+      const actualDuration = await getAudioDuration(variation.audioBlob);
+
+      const fileName = `ai-gen/${crypto.randomUUID()}.mp3`;
+      const { error: uploadError } = await supabase.storage
+        .from("songs")
+        .upload(fileName, variation.audioBlob, {
+          contentType: "audio/mpeg",
+          cacheControl: "3600",
+        });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from("songs").getPublicUrl(fileName);
+      const finalLyrics = variation.lyrics || null;
+
+      const { data: dbRecord, error: insertError } = await supabase
+        .from("ai_generations")
+        .insert({
+          user_id: user!.id,
+          provider: activeProvider.id,
+          prompt: variation.metadata.prompt,
+          genre: variation.metadata.genre || null,
+          mood: variation.metadata.mood || null,
+          lyrics: finalLyrics,
+          duration: actualDuration || variation.metadata.duration,
+          audio_url: urlData.publicUrl,
+          saved_to_library: false,
+        })
+        .select()
+        .single();
+      if (insertError) throw insertError;
+
+      return { variation, dbRecord: dbRecord as DBGeneration, actualDuration };
+    },
+    onSuccess: ({ variation, dbRecord }) => {
       const newItem: GenerationHistoryItem = {
-        ...mapDBToHistoryItem(result.dbRecord),
-        bpm: result.bpm,
-        keyScale: result.keyScale,
-        timeSignature: result.timeSignature,
-        vocalLanguage: result.vocalLanguage,
+        ...mapDBToHistoryItem(dbRecord),
+        bpm: variation.metadata.bpm,
+        keyScale: variation.metadata.keyScale,
+        timeSignature: variation.metadata.timeSignature,
+        vocalLanguage: variation.metadata.vocalLanguage,
+        qualityScore: variation.qualityScore,
       };
       setCurrentGeneration(newItem);
+      setBatchVariations(null);
       queryClient.invalidateQueries({ queryKey: ["ai_generations"] });
-      toast.success("Music generated successfully!");
+      toast.success("Variation selected and saved!");
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -225,10 +292,8 @@ export function useAIStudio() {
       if (!item.audioUrl) throw new Error("No audio to save");
 
       const songTitle = title.trim() || `AI Generated - ${new Date().toLocaleDateString()}`;
-
-      // Insert into songs table with prompt metadata
-      // Use profile business_name as artist attribution
       const artistName = profile?.business_name || "AI Studio";
+
       const { data: songData, error: insertError } = await supabase
         .from("songs")
         .insert({
@@ -245,21 +310,14 @@ export function useAIStudio() {
         })
         .select("id")
         .single();
-
       if (insertError) throw insertError;
 
-      // Update generation record
       const { error: updateError } = await supabase
         .from("ai_generations")
-        .update({
-          saved_to_library: true,
-          song_id: songData.id,
-        })
+        .update({ saved_to_library: true, song_id: songData.id })
         .eq("id", item.id);
-
       if (updateError) throw updateError;
 
-      // Add to playlist if selected
       if (playlistId && songData) {
         const { data: maxPosData } = await supabase
           .from("playlist_songs")
@@ -270,22 +328,15 @@ export function useAIStudio() {
           .single();
 
         const nextPosition = (maxPosData?.position ?? -1) + 1;
-
         const { error: playlistError } = await supabase
           .from("playlist_songs")
-          .insert({
-            playlist_id: playlistId,
-            song_id: songData.id,
-            position: nextPosition,
-          });
-
+          .insert({ playlist_id: playlistId, song_id: songData.id, position: nextPosition });
         if (playlistError) throw playlistError;
       }
 
       return { songId: songData.id, songTitle, playlistId };
     },
     onSuccess: ({ songId, songTitle, playlistId }, { item }) => {
-      // Update local state
       if (currentGeneration?.id === item.id) {
         setCurrentGeneration((prev) =>
           prev ? { ...prev, savedToLibrary: true, songId } : null
@@ -311,11 +362,7 @@ export function useAIStudio() {
   // Delete from history mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("ai_generations")
-        .delete()
-        .eq("id", id);
-
+      const { error } = await supabase.from("ai_generations").delete().eq("id", id);
       if (error) throw error;
       return id;
     },
@@ -335,7 +382,6 @@ export function useAIStudio() {
   // Audio controls
   const togglePlay = useCallback(() => {
     if (!audioRef.current) return;
-
     if (isPlaying) {
       audioRef.current.pause();
     } else {
@@ -346,6 +392,7 @@ export function useAIStudio() {
 
   const playItem = useCallback((item: GenerationHistoryItem) => {
     setCurrentGeneration(item);
+    setBatchVariations(null);
     setIsPlaying(false);
   }, []);
 
@@ -364,13 +411,20 @@ export function useAIStudio() {
     generate: generateMutation.mutate,
     isGenerating: generateMutation.isPending,
 
-    // Current output
+    // Current output (single)
     currentGeneration,
     setCurrentGeneration,
     audioRef,
     isPlaying,
     setIsPlaying,
     togglePlay,
+
+    // Batch
+    batchVariations,
+    selectedVariationIndex,
+    setSelectedVariationIndex,
+    confirmVariation: confirmVariationMutation.mutate,
+    isConfirmingVariation: confirmVariationMutation.isPending,
 
     // History
     history,
