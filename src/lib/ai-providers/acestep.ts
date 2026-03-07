@@ -80,9 +80,11 @@ async function pollResult(
   interval = 3000,
 ): Promise<any> {
   for (let i = 0; i < maxAttempts; i++) {
-    const json = await proxyCall("/query_result", "POST", { task_id_list: [taskId] });
+    const result = await proxyCall("/query_result", "POST", { task_id_list: [taskId] });
 
-    const task = json.data?.[0];
+    // After envelope unwrap, result is the array directly
+    const tasks = Array.isArray(result) ? result : result?.data || result;
+    const task = Array.isArray(tasks) ? tasks[0] : tasks;
     if (!task) throw new Error("AceStep: task not found");
 
     if (task.status === 1) {
