@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   allProviders,
+  getEnabledProviders,
   getProviderById,
   type AIProvider,
   type GenerateOptions,
