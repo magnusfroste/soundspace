@@ -207,7 +207,8 @@ export const aceStepProvider: AIProvider = {
 
     // 1. Submit generation task
     const releaseData = await proxyCall("/release_task", "POST", payload);
-    const taskId = releaseData.data?.task_id;
+    // After envelope unwrap, releaseData is {status, task_id} directly
+    const taskId = releaseData?.task_id || releaseData?.data?.task_id;
     if (!taskId) throw new Error("ACE-Step did not return a task_id");
 
     // 2. Poll for result
