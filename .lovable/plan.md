@@ -1,37 +1,13 @@
 
-# Custom User Playlists - Premium Feature
+# "Generate Similar" - Feature Analysis
 
-## Status: ✅ Implemented
+## Status: ✅ Documented
 
-## Summary
-Add a premium feature that allows business users to create their own personal playlists and populate them either manually by browsing the song library, or automatically via AI based on their mood/style preferences.
+### Current Approach: Metadata-driven variation
+- Passes `prompt`, `genre`, `mood`, `bpm`, `lyrics` via URL params to Studio
+- ACE-Step receives text-based data only (caption, lyrics, musical params)
+- Original audio file is **not** sent — lighter and faster
 
----
-
-## Implementation Complete
-
-### Database
-- ✅ `user_playlists` table with RLS policies
-- ✅ `user_playlist_songs` table with RLS policies
-- ✅ Indexes for performance
-
-### Backend
-- ✅ Edge function `ai-fill-playlist` using Lovable AI (gemini-3-flash)
-
-### Frontend
-- ✅ `/my-playlists` page - list and create playlists
-- ✅ `/my-playlists/:id` page - view/edit playlist with songs
-- ✅ `CreatePlaylistDialog` component
-- ✅ `AddSongsDialog` component - manual song selection
-- ✅ `AIFillDialog` component - AI-powered song selection
-- ✅ `useUserPlaylists` hook with CRUD operations
-
-### Admin Settings
-- ✅ Toggle for `custom_playlists_enabled` in Premium Features
-
-### Schedule Integration
-- ✅ User playlists appear in schedule dropdown grouped under "My Playlists"
-
-### Navigation
-- ✅ Sidebar shows "My Playlists" with Crown icon when feature is enabled
-
+### Potential Enhancement: Audio-conditioned generation
+- Would require sending the song's `file_url` as reference audio to ACE-Step's "Cover" or "Reference Audio" mode
+- Would produce musically closer variations but with heavier bandwidth usage
