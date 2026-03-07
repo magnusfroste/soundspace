@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { GENRES, MOODS, type Genre, type Mood, type AceStepTaskType } from "@/lib/ai-providers";
 import { enhanceCaption, formatLyrics } from "@/lib/ai-providers";
+import { AudioExtractPanel } from "./AudioExtractPanel";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
