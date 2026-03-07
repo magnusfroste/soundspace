@@ -434,10 +434,12 @@ export type Database = {
           file_url: string
           genre: string | null
           id: string
+          key_scale: string | null
           lyrics: string | null
           mood: string | null
           origin_source: string | null
           prompt: string | null
+          time_signature: string | null
           title: string
         }
         Insert: {
@@ -449,10 +451,12 @@ export type Database = {
           file_url: string
           genre?: string | null
           id?: string
+          key_scale?: string | null
           lyrics?: string | null
           mood?: string | null
           origin_source?: string | null
           prompt?: string | null
+          time_signature?: string | null
           title: string
         }
         Update: {
@@ -464,10 +468,12 @@ export type Database = {
           file_url?: string
           genre?: string | null
           id?: string
+          key_scale?: string | null
           lyrics?: string | null
           mood?: string | null
           origin_source?: string | null
           prompt?: string | null
+          time_signature?: string | null
           title?: string
         }
         Relationships: []

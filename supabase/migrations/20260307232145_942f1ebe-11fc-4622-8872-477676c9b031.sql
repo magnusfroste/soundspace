@@ -1,0 +1,1 @@
+ALTER TABLE public.songs ADD COLUMN key_scale text, ADD COLUMN time_signature text;
