@@ -137,6 +137,35 @@ export function OutputPreview({
         controls
       />
 
+      {(item.bpm || item.keyScale || item.timeSignature || item.vocalLanguage) && (
+        <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
+          {item.bpm && (
+            <span className="flex items-center gap-1 rounded-md bg-muted px-2 py-1">
+              <Music2 className="h-3 w-3" />
+              {item.bpm} BPM
+            </span>
+          )}
+          {item.keyScale && (
+            <span className="flex items-center gap-1 rounded-md bg-muted px-2 py-1">
+              <Key className="h-3 w-3" />
+              {item.keyScale}
+            </span>
+          )}
+          {item.timeSignature && (
+            <span className="flex items-center gap-1 rounded-md bg-muted px-2 py-1">
+              <Clock3 className="h-3 w-3" />
+              {item.timeSignature}/4
+            </span>
+          )}
+          {item.vocalLanguage && item.vocalLanguage !== "unknown" && (
+            <span className="flex items-center gap-1 rounded-md bg-muted px-2 py-1">
+              <Mic className="h-3 w-3" />
+              {item.vocalLanguage}
+            </span>
+          )}
+        </div>
+      )}
+
       {item.lyrics && (
         <LyricsPanel lyrics={item.lyrics} />
       )}
