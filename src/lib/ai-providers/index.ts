@@ -1,4 +1,5 @@
 export * from "./types";
+export type { BatchGenerationResult } from "./types";
 export { elevenlabsProvider } from "./elevenlabs";
 export { localAIProvider, getLocalConfig, setLocalConfig } from "./local";
 export { mubertProvider, getMubertConfig, setMubertConfig } from "./mubert";

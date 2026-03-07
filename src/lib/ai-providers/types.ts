@@ -21,12 +21,15 @@ export interface GenerateOptions {
   bpm?: number;
   keyScale?: string;
   timeSignature?: string;
+  /** Batch generation — number of variations (1-4) */
+  batchSize?: number;
 }
 
 export interface GenerationResult {
   audioBlob: Blob;
   audioUrl: string;
   lyrics?: string;
+  qualityScore?: number;
   metadata: {
     provider: string;
     prompt: string;
@@ -38,6 +41,12 @@ export interface GenerationResult {
     timeSignature?: string;
     vocalLanguage?: string;
   };
+}
+
+/** Multiple variations from a single generation request */
+export interface BatchGenerationResult {
+  variations: GenerationResult[];
+  selectedIndex: number;
 }
 
 export interface ProviderConfig {
@@ -54,6 +63,7 @@ export interface AIProvider {
   status: ProviderStatus;
   
   generate(options: GenerateOptions): Promise<GenerationResult>;
+  generateBatch?(options: GenerateOptions): Promise<GenerationResult[]>;
   checkStatus(): Promise<ProviderStatus>;
   configure?(config: ProviderConfig): void;
 }
@@ -75,6 +85,7 @@ export interface GenerationHistoryItem {
   keyScale?: string;
   timeSignature?: string;
   vocalLanguage?: string;
+  qualityScore?: number;
 }
 
 export const GENRES = ["Jazz", "Ambient", "Acoustic", "Electronic", "Classical", "Lo-Fi", "World"] as const;
