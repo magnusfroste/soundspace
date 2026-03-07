@@ -99,7 +99,7 @@ export default function AdminAgent() {
             variant="outline"
             size="sm"
             className="w-full justify-start gap-2"
-            onClick={() => createConversation.mutate()}
+            onClick={() => createConversation.mutate(undefined)}
           >
             <Plus className="h-4 w-4" />
             New Chat
