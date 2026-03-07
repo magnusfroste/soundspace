@@ -79,9 +79,10 @@ Deno.serve(async (req) => {
     }
 
     if (contentType.includes("audio") || contentType.includes("octet-stream")) {
+      // Return binary audio with octet-stream so supabase-js clients get a Blob
       return new Response(res.body, {
         status: res.status,
-        headers: { ...corsHeaders, "Content-Type": contentType },
+        headers: { ...corsHeaders, "Content-Type": "application/octet-stream" },
       });
     }
 
