@@ -192,6 +192,11 @@ export function StudioPromptPanel({
         </div>
       )}
 
+      {/* Audio Extract */}
+      {isAceStep && (
+        <AudioExtractPanel onApply={handleApplyExtract} />
+      )}
+
       {/* Prompt */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
