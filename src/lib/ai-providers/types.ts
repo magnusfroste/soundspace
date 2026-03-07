@@ -17,6 +17,10 @@ export interface GenerateOptions {
   repaintStart?: number;
   repaintEnd?: number;
   coverStrength?: number;
+  /** Musical control params */
+  bpm?: number;
+  keyScale?: string;
+  timeSignature?: string;
 }
 
 export interface GenerationResult {

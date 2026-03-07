@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
   try {
     const { endpoint, method, body } = await req.json();
 
-    const allowedExact = ["/health", "/v1/models", "/release_task", "/query_result", "/create_random_sample", "/format_lyrics"];
+    const allowedExact = ["/health", "/v1/models", "/release_task", "/query_result", "/create_random_sample", "/format_lyrics", "/enhance_caption"];
     const allowedPrefixes = ["/v1/audio"];
     const isAllowed = endpoint && (
       allowedExact.includes(endpoint) ||
