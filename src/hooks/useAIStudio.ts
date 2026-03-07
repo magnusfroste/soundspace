@@ -239,6 +239,7 @@ export function useAIStudio() {
           genre: item.genre || null,
           mood: item.mood || null,
           lyrics: item.lyrics || null,
+          bpm: item.bpm || null,
           origin_source: `ai_${item.provider}`,
           prompt: item.prompt,
         })
