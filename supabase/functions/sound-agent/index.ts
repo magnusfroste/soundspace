@@ -215,8 +215,11 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) 
   }
 
   const releaseData = await releaseRes.json();
-  const taskId = releaseData.task_id;
-  if (!taskId) return { error: "No task_id returned from ACE-Step" };
+  console.log("ACE-Step release_task response:", JSON.stringify(releaseData));
+  
+  // Handle various response formats from ACE-Step
+  const taskId = releaseData.task_id || releaseData.taskId || releaseData.id || (releaseData.data && (releaseData.data.task_id || releaseData.data.taskId || releaseData.data.id));
+  if (!taskId) return { error: `No task_id returned from ACE-Step. Response: ${JSON.stringify(releaseData).slice(0, 300)}` };
 
   // Poll for result (max 120s)
   for (let i = 0; i < 60; i++) {
