@@ -356,6 +356,12 @@ async function executeListLibrary(args: any, supabaseUrl: string) {
   return { songs: data, count: data?.length || 0 };
 }
 
+// ── SSE helpers ─────────────────────────────────────────────────────────
+
+function sseEvent(event: string, data: any): string {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
 // ── Main handler ────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -363,125 +369,194 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Use a ReadableStream to push SSE events as work progresses
+  const encoder = new TextEncoder();
+
+  let reqBody: any;
   try {
-    const { messages, conversation_id } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    reqBody = await req.json();
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+  const { messages, conversation_id } = reqBody;
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
-    // Build messages with system prompt
-    const llmMessages = [
-      { role: "system", content: SYSTEM_PROMPT },
-      ...messages,
-    ];
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const collectedAudioUrls: string[] = [];
-    const MAX_TOOL_CALLS = 10;
-    let toolCallCount = 0;
+  const stream = new ReadableStream({
+    async start(controller) {
+      const push = (event: string, data: any) => {
+        controller.enqueue(encoder.encode(sseEvent(event, data)));
+      };
 
-    // Tool-calling loop
-    while (toolCallCount < MAX_TOOL_CALLS) {
-      const llmRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
-          messages: llmMessages,
-          tools: TOOLS,
-          stream: false,
-        }),
-      });
+      try {
+        const llmMessages: any[] = [
+          { role: "system", content: SYSTEM_PROMPT },
+          ...messages,
+        ];
 
-      if (!llmRes.ok) {
-        const status = llmRes.status;
-        const text = await llmRes.text();
-        if (status === 429) {
-          return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again shortly." }), {
-            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        const collectedAudioUrls: string[] = [];
+        const MAX_TOOL_CALLS = 10;
+        let toolCallCount = 0;
+
+        // ── Tool-calling loop (non-streaming) ──
+        push("status", { phase: "thinking", message: "Analyzing your request..." });
+
+        while (toolCallCount < MAX_TOOL_CALLS) {
+          const llmRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "google/gemini-3-flash-preview",
+              messages: llmMessages,
+              tools: TOOLS,
+              stream: false,
+            }),
           });
-        }
-        if (status === 402) {
-          return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits in Settings → Workspace → Usage." }), {
-            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        throw new Error(`AI gateway error ${status}: ${text}`);
-      }
 
-      const llmData = await llmRes.json();
-      const choice = llmData.choices?.[0];
-      if (!choice) throw new Error("No response from AI");
-
-      const msg = choice.message;
-      llmMessages.push(msg);
-
-      // If no tool calls, we're done — stream the final response
-      if (!msg.tool_calls || msg.tool_calls.length === 0) {
-        break;
-      }
-
-      // Execute tool calls
-      for (const tc of msg.tool_calls) {
-        toolCallCount++;
-        const fn = tc.function.name;
-        const args = JSON.parse(tc.function.arguments || "{}");
-        let result: any;
-
-        try {
-          switch (fn) {
-            case "research_music_style":
-              result = executeResearch(args);
-              break;
-            case "generate_track":
-              result = await executeGenerate(args, supabaseUrl, anonKey);
-              if (result.audio_url) collectedAudioUrls.push(result.audio_url);
-              break;
-            case "analyze_track":
-              result = await executeAnalyze(args, supabaseUrl, anonKey);
-              break;
-            case "save_to_library":
-              result = await executeSave(args, supabaseUrl);
-              break;
-            case "list_library":
-              result = await executeListLibrary(args, supabaseUrl);
-              break;
-            default:
-              result = { error: `Unknown tool: ${fn}` };
+          if (!llmRes.ok) {
+            const status = llmRes.status;
+            const text = await llmRes.text();
+            if (status === 429) { push("error", { error: "Rate limit exceeded. Please try again shortly." }); break; }
+            if (status === 402) { push("error", { error: "AI credits exhausted. Please add credits." }); break; }
+            push("error", { error: `AI gateway error ${status}` });
+            break;
           }
-        } catch (e) {
-          result = { error: `Tool execution error: ${e.message}` };
+
+          const llmData = await llmRes.json();
+          const choice = llmData.choices?.[0];
+          if (!choice) { push("error", { error: "No response from AI" }); break; }
+
+          const msg = choice.message;
+          llmMessages.push(msg);
+
+          // No tool calls → break to stream final response
+          if (!msg.tool_calls || msg.tool_calls.length === 0) {
+            break;
+          }
+
+          // Execute tool calls with status updates
+          for (const tc of msg.tool_calls) {
+            toolCallCount++;
+            const fn = tc.function.name;
+            const args = JSON.parse(tc.function.arguments || "{}");
+            let result: any;
+
+            // Push status for each tool
+            const toolLabels: Record<string, string> = {
+              research_music_style: "Researching music style...",
+              generate_track: "Generating track via ACE-Step...",
+              analyze_track: "Analyzing audio quality...",
+              save_to_library: "Saving to library...",
+              list_library: "Checking existing library...",
+            };
+            push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
+
+            try {
+              switch (fn) {
+                case "research_music_style": result = executeResearch(args); break;
+                case "generate_track":
+                  result = await executeGenerate(args, supabaseUrl, anonKey);
+                  if (result.audio_url) collectedAudioUrls.push(result.audio_url);
+                  break;
+                case "analyze_track": result = await executeAnalyze(args, supabaseUrl, anonKey); break;
+                case "save_to_library": result = await executeSave(args, supabaseUrl); break;
+                case "list_library": result = await executeListLibrary(args, supabaseUrl); break;
+                default: result = { error: `Unknown tool: ${fn}` };
+              }
+            } catch (e) {
+              result = { error: `Tool error: ${e.message}` };
+            }
+
+            llmMessages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
+          }
         }
 
-        llmMessages.push({
-          role: "tool",
-          tool_call_id: tc.id,
-          content: JSON.stringify(result),
+        // ── Stream final response ──
+        push("status", { phase: "responding", message: "Composing response..." });
+
+        // If last message is already assistant text (from non-tool break), stream it token-by-token via a new streaming call
+        // Remove the last assistant message from history to re-request with streaming
+        const lastMsg = llmMessages[llmMessages.length - 1];
+        if (lastMsg.role === "assistant" && lastMsg.content && !lastMsg.tool_calls?.length) {
+          llmMessages.pop();
+        }
+
+        const streamRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-3-flash-preview",
+            messages: llmMessages,
+            tools: TOOLS,
+            stream: true,
+          }),
         });
+
+        if (!streamRes.ok || !streamRes.body) {
+          const text = await streamRes.text();
+          push("error", { error: `Streaming failed: ${streamRes.status}` });
+          push("done", { audio_urls: collectedAudioUrls });
+          controller.close();
+          return;
+        }
+
+        // Parse SSE from upstream and re-emit as token events
+        const reader = streamRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          let nlIdx: number;
+          while ((nlIdx = buffer.indexOf("\n")) !== -1) {
+            let line = buffer.slice(0, nlIdx);
+            buffer = buffer.slice(nlIdx + 1);
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (!line.startsWith("data: ")) continue;
+            const jsonStr = line.slice(6).trim();
+            if (jsonStr === "[DONE]") break;
+            try {
+              const parsed = JSON.parse(jsonStr);
+              const content = parsed.choices?.[0]?.delta?.content;
+              if (content) push("token", { content });
+            } catch { /* partial JSON, skip */ }
+          }
+        }
+
+        push("done", { audio_urls: collectedAudioUrls, tool_call_count: toolCallCount });
+        controller.close();
+      } catch (e) {
+        push("error", { error: e instanceof Error ? e.message : "Unknown error" });
+        controller.close();
       }
     }
+  });
 
-    // Extract final assistant content
-    const lastMsg = llmMessages[llmMessages.length - 1];
-    const content = lastMsg.role === "assistant" ? (lastMsg.content || "") : "I completed the tool operations but couldn't generate a summary.";
-
-    return new Response(
-      JSON.stringify({
-        content,
-        audio_urls: collectedAudioUrls,
-        tool_call_count: toolCallCount,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
-  } catch (e) {
-    console.error("sound-agent error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
-  }
+  return new Response(stream, {
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+    },
+  });
 });

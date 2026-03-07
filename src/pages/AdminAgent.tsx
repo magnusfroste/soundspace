@@ -61,6 +61,7 @@ export default function AdminAgent() {
     setActiveConversationId,
     isGenerating,
     streamingContent,
+    statusMessage,
     sendMessage,
     createConversation,
     deleteConversation,
@@ -183,11 +184,25 @@ export default function AdminAgent() {
             <MessageBubble key={m.id} message={m} />
           ))}
 
-          {streamingContent && (
-            <MessageBubble
-              message={{ role: "assistant", content: streamingContent }}
-              isStreaming
-            />
+          {(streamingContent !== null || statusMessage) && (
+            <div className="flex gap-3 py-3 justify-start">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Bot className="h-4 w-4 text-primary" />
+              </div>
+              <div className="max-w-[75%] rounded-xl px-4 py-3 bg-muted/50">
+                {streamingContent ? (
+                  <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
+                    <ReactMarkdown>{streamingContent}</ReactMarkdown>
+                  </div>
+                ) : null}
+                {statusMessage && (
+                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>{statusMessage}</span>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
 

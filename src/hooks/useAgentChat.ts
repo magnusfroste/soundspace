@@ -20,12 +20,15 @@ export interface AgentConversation {
   updated_at: string;
 }
 
+const AGENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sound-agent`;
+
 export function useAgentChat() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // Fetch conversations
   const { data: conversations = [] } = useQuery({
@@ -86,6 +89,71 @@ export function useAgentChat() {
     },
   });
 
+  // Parse SSE stream
+  const consumeSSE = useCallback(async (
+    response: Response,
+    onToken: (text: string) => void,
+    onStatus: (msg: string) => void,
+    onDone: (audioUrls: string[]) => void,
+    onError: (err: string) => void,
+  ) => {
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let nlIdx: number;
+      while ((nlIdx = buffer.indexOf("\n")) !== -1) {
+        let line = buffer.slice(0, nlIdx);
+        buffer = buffer.slice(nlIdx + 1);
+        if (line.endsWith("\r")) line = line.slice(0, -1);
+        if (line.trim() === "" || line.startsWith(":")) continue;
+
+        if (line.startsWith("event: ")) {
+          // Next data line
+          const eventType = line.slice(7).trim();
+          // Find corresponding data line
+          const dataIdx = buffer.indexOf("\n");
+          if (dataIdx === -1) {
+            // Put event line back and wait for more data
+            buffer = line + "\n" + buffer;
+            break;
+          }
+          let dataLine = buffer.slice(0, dataIdx);
+          buffer = buffer.slice(dataIdx + 1);
+          if (dataLine.endsWith("\r")) dataLine = dataLine.slice(0, -1);
+
+          if (!dataLine.startsWith("data: ")) continue;
+          const jsonStr = dataLine.slice(6).trim();
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            switch (eventType) {
+              case "token":
+                if (parsed.content) onToken(parsed.content);
+                break;
+              case "status":
+                if (parsed.message) onStatus(parsed.message);
+                break;
+              case "done":
+                onDone(parsed.audio_urls || []);
+                return;
+              case "error":
+                onError(parsed.error || "Unknown error");
+                return;
+            }
+          } catch { /* skip partial */ }
+        }
+      }
+    }
+    // Stream ended without done event
+    onDone([]);
+  }, []);
+
   // Send message
   const sendMessage = useCallback(async (content: string) => {
     if (!user || isGenerating) return;
@@ -125,35 +193,61 @@ export function useAgentChat() {
       .map((m: any) => ({ role: m.role, content: m.content }));
 
     setIsGenerating(true);
-    setStreamingContent("Thinking...");
+    setStreamingContent("");
+    setStatusMessage("Connecting...");
 
     try {
-      const res = await supabase.functions.invoke("sound-agent", {
-        body: { messages: llmMessages, conversation_id: convId },
+      const response = await fetch(AGENT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ messages: llmMessages, conversation_id: convId }),
       });
 
-      if (res.error) {
-        throw new Error(res.error.message || "Agent request failed");
+      if (!response.ok || !response.body) {
+        // Try to parse JSON error
+        try {
+          const errData = await response.json();
+          throw new Error(errData.error || `Request failed: ${response.status}`);
+        } catch {
+          throw new Error(`Request failed: ${response.status}`);
+        }
       }
 
-      const data = res.data;
+      let fullContent = "";
+      let audioUrls: string[] = [];
 
-      if (data.error) {
-        toast.error(data.error);
-        setStreamingContent(null);
-        setIsGenerating(false);
-        return;
-      }
+      await consumeSSE(
+        response,
+        (token) => {
+          fullContent += token;
+          setStreamingContent(fullContent);
+          setStatusMessage(null);
+        },
+        (msg) => {
+          setStatusMessage(msg);
+        },
+        (urls) => {
+          audioUrls = urls;
+        },
+        (err) => {
+          toast.error(err);
+        },
+      );
 
       // Save assistant message
-      await supabase.from("agent_messages").insert({
-        conversation_id: convId,
-        role: "assistant",
-        content: data.content || "",
-        audio_urls: data.audio_urls?.length ? data.audio_urls : null,
-      });
+      if (fullContent) {
+        await supabase.from("agent_messages").insert({
+          conversation_id: convId,
+          role: "assistant",
+          content: fullContent,
+          audio_urls: audioUrls.length ? audioUrls : null,
+        });
+      }
 
-      // Update conversation title from first user message
+      // Update conversation
       if (history && history.length <= 1) {
         await supabase
           .from("agent_conversations")
@@ -172,9 +266,10 @@ export function useAgentChat() {
       toast.error(e.message || "Failed to get agent response");
     } finally {
       setStreamingContent(null);
+      setStatusMessage(null);
       setIsGenerating(false);
     }
-  }, [user, activeConversationId, isGenerating, qc]);
+  }, [user, activeConversationId, isGenerating, qc, consumeSSE]);
 
   return {
     conversations,
@@ -183,6 +278,7 @@ export function useAgentChat() {
     setActiveConversationId,
     isGenerating,
     streamingContent,
+    statusMessage,
     sendMessage,
     createConversation,
     deleteConversation,
