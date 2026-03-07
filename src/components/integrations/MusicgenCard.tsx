@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Wand2, Loader2, CheckCircle, XCircle, Settings, ExternalLink } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { isIntegrationEnabled, setIntegrationEnabled } from "@/lib/integrations-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,9 +38,15 @@ export function MusicgenCard() {
   const [isTesting, setIsTesting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "connected" | "failed">("idle");
   const [open, setOpen] = useState(false);
+  const [enabled, setEnabled] = useState(() => isIntegrationEnabled("musicgen"));
 
   const isConfigured = Boolean(config.apiKey);
   const selectedModel = MUSICGEN_MODELS.find((m) => m.id === model);
+
+  const handleToggle = (checked: boolean) => {
+    setEnabled(checked);
+    setIntegrationEnabled("musicgen", checked);
+  };
 
   const handleTestConnection = async () => {
     if (!apiKey) {
@@ -105,6 +113,7 @@ export function MusicgenCard() {
               </CardDescription>
             </div>
           </div>
+          <Switch checked={enabled} onCheckedChange={handleToggle} />
         </div>
       </CardHeader>
 

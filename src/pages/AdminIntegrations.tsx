@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Plug, Sparkles, RefreshCw, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Switch } from "@/components/ui/switch";
+import { isIntegrationEnabled, setIntegrationEnabled } from "@/lib/integrations-state";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -44,6 +47,11 @@ function formatDate(isoString: string): string {
 }
 
 function ElevenLabsCard() {
+  const [enabled, setEnabled] = useState(() => isIntegrationEnabled("elevenlabs"));
+  const handleToggle = (checked: boolean) => {
+    setEnabled(checked);
+    setIntegrationEnabled("elevenlabs", checked);
+  };
   const {
     data: status,
     isLoading,
@@ -114,14 +122,17 @@ function ElevenLabsCard() {
               </CardDescription>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => refetch()}
-            disabled={isRefetching}
-          >
-            <RefreshCw className={`h-4 w-4 ${isRefetching ? "animate-spin" : ""}`} />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => refetch()}
+              disabled={isRefetching}
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefetching ? "animate-spin" : ""}`} />
+            </Button>
+            <Switch checked={enabled} onCheckedChange={handleToggle} />
+          </div>
         </div>
       </CardHeader>
 

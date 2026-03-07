@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Music, Loader2, CheckCircle, XCircle, Settings, ExternalLink } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { isIntegrationEnabled, setIntegrationEnabled } from "@/lib/integrations-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,8 +30,14 @@ export function MubertCard() {
   const [isTesting, setIsTesting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "connected" | "failed">("idle");
   const [open, setOpen] = useState(false);
+  const [enabled, setEnabled] = useState(() => isIntegrationEnabled("mubert"));
 
   const isConfigured = Boolean(config.apiKey);
+
+  const handleToggle = (checked: boolean) => {
+    setEnabled(checked);
+    setIntegrationEnabled("mubert", checked);
+  };
 
   const handleTestConnection = async () => {
     if (!apiKey) {
@@ -111,6 +119,7 @@ export function MubertCard() {
               </CardDescription>
             </div>
           </div>
+          <Switch checked={enabled} onCheckedChange={handleToggle} />
         </div>
       </CardHeader>
 
