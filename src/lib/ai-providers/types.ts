@@ -85,6 +85,7 @@ export interface GenerationHistoryItem {
   keyScale?: string;
   timeSignature?: string;
   vocalLanguage?: string;
+  qualityScore?: number;
 }
 
 export const GENRES = ["Jazz", "Ambient", "Acoustic", "Electronic", "Classical", "Lo-Fi", "World"] as const;
