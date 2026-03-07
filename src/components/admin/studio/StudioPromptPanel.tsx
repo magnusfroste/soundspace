@@ -55,6 +55,7 @@ interface StudioPromptPanelProps {
     bpm?: number;
     keyScale?: string;
     timeSignature?: string;
+    batchSize?: number;
   }) => void;
 }
 
@@ -82,6 +83,7 @@ export function StudioPromptPanel({
   const [bpm, setBpm] = useState<string>("");
   const [keyScale, setKeyScale] = useState<string>("");
   const [timeSignature, setTimeSignature] = useState<string>("");
+  const [batchSize, setBatchSize] = useState(1);
 
   // Enhance loading states
   const [enhancingPrompt, setEnhancingPrompt] = useState(false);
@@ -139,6 +141,7 @@ export function StudioPromptPanel({
         ...(bpm ? { bpm: Number(bpm) } : {}),
         ...(keyScale ? { keyScale } : {}),
         ...(timeSignature ? { timeSignature } : {}),
+        ...(batchSize > 1 ? { batchSize } : {}),
       }),
     });
   };
