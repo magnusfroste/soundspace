@@ -33,6 +33,13 @@ export default function AdminAIStudio() {
     isSaving,
   } = useAIStudio();
 
+  // Auto-select ACE-Step when navigating with ref_audio (Generate Similar with audio)
+  useEffect(() => {
+    if (searchParams.get("ref_audio") && activeProviderId !== "acestep") {
+      setActiveProviderId("acestep");
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <div className="space-y-6">
       {/* Header */}
