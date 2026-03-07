@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -25,7 +25,9 @@ const AGENT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sound-agent
 export function useAgentChat() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(() => {
+    try { return sessionStorage.getItem("agent-active-conv"); } catch { return null; }
+  });
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -44,6 +46,21 @@ export function useAgentChat() {
       return data as AgentConversation[];
     },
   });
+
+  // Persist active conversation to sessionStorage
+  const setActiveConv = useCallback((id: string | null) => {
+    setActiveConversationId(id);
+    try { if (id) sessionStorage.setItem("agent-active-conv", id); else sessionStorage.removeItem("agent-active-conv"); } catch {}
+  }, []);
+
+  // Auto-select most recent conversation if none active
+  useEffect(() => {
+    if (!activeConversationId && conversations.length > 0) {
+      setActiveConv(conversations[0].id);
+    } else if (activeConversationId && conversations.length > 0 && !conversations.find(c => c.id === activeConversationId)) {
+      setActiveConv(conversations[0].id);
+    }
+  }, [conversations, activeConversationId, setActiveConv]);
 
   // Fetch messages for active conversation
   const { data: messages = [] } = useQuery({
@@ -72,7 +89,7 @@ export function useAgentChat() {
       return data as AgentConversation;
     },
     onSuccess: (conv) => {
-      setActiveConversationId(conv.id);
+      setActiveConv(conv.id);
       qc.invalidateQueries({ queryKey: ["agent-conversations"] });
     },
   });
@@ -84,7 +101,7 @@ export function useAgentChat() {
       if (error) throw error;
     },
     onSuccess: (_, id) => {
-      if (activeConversationId === id) setActiveConversationId(null);
+      if (activeConversationId === id) setActiveConv(null);
       qc.invalidateQueries({ queryKey: ["agent-conversations"] });
     },
   });
@@ -169,7 +186,7 @@ export function useAgentChat() {
         .single();
       if (error) { toast.error("Failed to create conversation"); return; }
       convId = data.id;
-      setActiveConversationId(convId);
+      setActiveConv(convId);
       qc.invalidateQueries({ queryKey: ["agent-conversations"] });
     }
 
@@ -275,7 +292,7 @@ export function useAgentChat() {
     conversations,
     messages,
     activeConversationId,
-    setActiveConversationId,
+    setActiveConversationId: setActiveConv,
     isGenerating,
     streamingContent,
     statusMessage,
