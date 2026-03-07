@@ -96,6 +96,20 @@ export function StudioPromptPanel({
   const isAceStep = providerId === "acestep";
   const needsSourceAudio = isAceStep && ["cover", "repaint", "complete"].includes(taskType);
 
+  const handleApplyExtract = (data: {
+    prompt?: string;
+    bpm?: string;
+    keyScale?: string;
+    timeSignature?: string;
+    lyrics?: string;
+  }) => {
+    if (data.prompt) setPrompt(data.prompt);
+    if (data.bpm) setBpm(data.bpm);
+    if (data.keyScale) setKeyScale(data.keyScale);
+    if (data.timeSignature) setTimeSignature(data.timeSignature);
+    if (data.lyrics) setLyrics(data.lyrics);
+  };
+
   const handleEnhancePrompt = async () => {
     if (!prompt.trim()) return;
     setEnhancingPrompt(true);
