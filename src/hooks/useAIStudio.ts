@@ -76,7 +76,8 @@ export function useAIStudio() {
     enabled: !!user,
   });
 
-  const activeProvider = getProviderById(activeProviderId) || allProviders[0];
+  const providers = getEnabledProviders();
+  const activeProvider = getProviderById(activeProviderId) || providers[0] || allProviders[0];
   const [, setStatusTick] = useState(0);
 
   // Refresh provider statuses on mount
@@ -403,7 +404,7 @@ export function useAIStudio() {
 
   return {
     // Providers
-    providers: allProviders,
+    providers,
     activeProvider,
     activeProviderId,
     setActiveProviderId,
