@@ -33,10 +33,35 @@ async function blobToBase64(blob: Blob): Promise<string> {
 
 /** Call ACE-Step via edge function proxy */
 async function proxyCall(endpoint: string, method = "GET", body?: unknown): Promise<any> {
-  const { data, error } = await supabase.functions.invoke("acestep-proxy", {
-    body: { endpoint, method, body },
-  });
-  if (error) throw new Error(`ACE-Step proxy error: ${error.message}`);
+  let data: any;
+  let error: any;
+
+  try {
+    const result = await supabase.functions.invoke("acestep-proxy", {
+      body: { endpoint, method, body },
+    });
+    data = result.data;
+    error = result.error;
+  } catch (networkErr: any) {
+    throw new Error(
+      "Unable to reach the ACE-Step server. Please verify the container is running and try again."
+    );
+  }
+
+  if (error) {
+    throw new Error(`ACE-Step proxy error: ${error.message}`);
+  }
+
+  // The proxy returns a JSON error when the upstream server is unreachable (502)
+  if (data?.error) {
+    const detail = data.detail || data.error;
+    throw new Error(
+      typeof detail === "string" && detail.includes("unreachable")
+        ? "The ACE-Step server is currently offline. Please start the container and try again."
+        : `ACE-Step error: ${detail}`
+    );
+  }
+
   return data;
 }
 
