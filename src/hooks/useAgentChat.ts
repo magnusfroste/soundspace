@@ -89,7 +89,7 @@ export function useAgentChat() {
       return data as AgentConversation;
     },
     onSuccess: (conv) => {
-      setActiveConversationId(conv.id);
+      setActiveConv(conv.id);
       qc.invalidateQueries({ queryKey: ["agent-conversations"] });
     },
   });
@@ -101,7 +101,7 @@ export function useAgentChat() {
       if (error) throw error;
     },
     onSuccess: (_, id) => {
-      if (activeConversationId === id) setActiveConversationId(null);
+      if (activeConversationId === id) setActiveConv(null);
       qc.invalidateQueries({ queryKey: ["agent-conversations"] });
     },
   });
@@ -186,7 +186,7 @@ export function useAgentChat() {
         .single();
       if (error) { toast.error("Failed to create conversation"); return; }
       convId = data.id;
-      setActiveConversationId(convId);
+      setActiveConv(convId);
       qc.invalidateQueries({ queryKey: ["agent-conversations"] });
     }
 
@@ -292,7 +292,7 @@ export function useAgentChat() {
     conversations,
     messages,
     activeConversationId,
-    setActiveConversationId,
+    setActiveConversationId: setActiveConv,
     isGenerating,
     streamingContent,
     statusMessage,
