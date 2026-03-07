@@ -337,12 +337,12 @@ export function StudioPromptPanel({
             </div>
             <div className="space-y-1">
               <span className="text-xs text-muted-foreground">Key</span>
-              <Select value={keyScale} onValueChange={setKeyScale}>
+              <Select value={keyScale || "any"} onValueChange={(v) => setKeyScale(v === "any" ? "" : v)}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any</SelectItem>
+                  <SelectItem value="any">Any</SelectItem>
                   {KEY_OPTIONS.map((k) => (
                     <SelectItem key={k} value={k}>{k}</SelectItem>
                   ))}
@@ -351,12 +351,12 @@ export function StudioPromptPanel({
             </div>
             <div className="space-y-1">
               <span className="text-xs text-muted-foreground">Time Sig</span>
-              <Select value={timeSignature} onValueChange={setTimeSignature}>
+              <Select value={timeSignature || "any"} onValueChange={(v) => setTimeSignature(v === "any" ? "" : v)}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Any" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Any</SelectItem>
+                  <SelectItem value="any">Any</SelectItem>
                   {TIME_SIG_OPTIONS.map((ts) => (
                     <SelectItem key={ts} value={ts}>{ts}</SelectItem>
                   ))}
