@@ -252,9 +252,13 @@ export const aceStepProvider: AIProvider = {
       metadata: {
         provider: "acestep",
         prompt: options.prompt,
-        duration: options.duration,
+        duration: firstResult.duration || options.duration,
         genre: options.genre,
         mood: options.mood,
+        bpm: firstResult.bpm,
+        keyScale: firstResult.keyscale,
+        timeSignature: firstResult.timesignature,
+        vocalLanguage: firstResult.vocal_language,
       },
     };
   },
