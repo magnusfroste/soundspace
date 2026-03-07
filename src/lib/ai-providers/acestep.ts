@@ -189,6 +189,11 @@ export const aceStepProvider: AIProvider = {
       task_type: taskType,
     };
 
+    // Musical control params
+    if (options.bpm) payload.bpm = options.bpm;
+    if (options.keyScale) payload.keyscale = options.keyScale;
+    if (options.timeSignature) payload.timesignature = options.timeSignature;
+
     if (taskType === "repaint") {
       payload.repainting_start = options.repaintStart ?? 0;
       if (options.repaintEnd != null) payload.repainting_end = options.repaintEnd;
@@ -285,4 +290,16 @@ export function getAceStepConfig(): ProviderConfig {
 export function setAceStepConfig(config: Partial<ProviderConfig>) {
   aceStepConfig = { ...aceStepConfig, ...config };
   saveConfig(aceStepConfig);
+}
+
+/** Enhance a text prompt via ACE-Step LM */
+export async function enhanceCaption(prompt: string): Promise<string> {
+  const result = await proxyCall("/enhance_caption", "POST", { caption: prompt });
+  return result?.enhanced_caption || result?.caption || result || prompt;
+}
+
+/** Format/improve lyrics via ACE-Step LM */
+export async function formatLyrics(lyrics: string): Promise<string> {
+  const result = await proxyCall("/format_lyrics", "POST", { lyrics });
+  return result?.formatted_lyrics || result?.lyrics || result || lyrics;
 }

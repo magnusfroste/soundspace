@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
   try {
     const { endpoint, method, body } = await req.json();
 
-    const allowedExact = ["/health", "/v1/models", "/release_task", "/query_result", "/create_random_sample", "/format_lyrics"];
+    const allowedExact = ["/health", "/v1/models", "/release_task", "/query_result", "/create_random_sample", "/format_lyrics", "/enhance_caption"];
     const allowedPrefixes = ["/v1/audio"];
     const isAllowed = endpoint && (
       allowedExact.includes(endpoint) ||
@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     let jsonBody = body;
     if (body && endpoint === "/release_task") {
       jsonBody = { ...body };
-      const intKeys = ["audio_duration", "batch_size", "inference_steps", "repainting_start", "repainting_end"];
+      const intKeys = ["audio_duration", "batch_size", "inference_steps", "repainting_start", "repainting_end", "bpm"];
       for (const k of intKeys) {
         if (k in jsonBody) jsonBody[k] = Math.round(Number(jsonBody[k]));
       }
@@ -54,6 +54,7 @@ Deno.serve(async (req) => {
       if ("thinking" in jsonBody) {
         jsonBody.thinking = Boolean(jsonBody.thinking);
       }
+      // keyscale and timesignature are strings, no coercion needed
     }
 
     const httpMethod = (method || "GET").toUpperCase();
