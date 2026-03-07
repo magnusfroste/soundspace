@@ -63,11 +63,18 @@ export function AceStepCard() {
         toast.success("Connected to ACE-Step");
       } else {
         setConnectionStatus("failed");
-        toast.error(data?.error || "Failed to connect to ACE-Step");
+        const msg = data?.detail || data?.error || "Failed to connect to ACE-Step";
+        const isOffline = typeof msg === "string" && (msg.includes("unreachable") || msg.includes("502"));
+        toast.error(isOffline ? "ACE-Step server is offline. Start the container and try again." : msg);
       }
     } catch (err: any) {
       setConnectionStatus("failed");
-      toast.error(err?.message || "Connection failed");
+      const message = err?.message || "Connection failed";
+      toast.error(
+        message.includes("FunctionsFetchError") || message.includes("Failed to fetch")
+          ? "ACE-Step server is offline. Start the container and try again."
+          : message
+      );
     } finally {
       setIsTesting(false);
     }
