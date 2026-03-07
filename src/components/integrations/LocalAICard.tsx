@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Server, Loader2, CheckCircle, XCircle, Settings } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { isIntegrationEnabled, setIntegrationEnabled } from "@/lib/integrations-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,8 +32,14 @@ export function LocalAICard() {
   const [isTesting, setIsTesting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "connected" | "failed">("idle");
   const [open, setOpen] = useState(false);
+  const [enabled, setEnabled] = useState(() => isIntegrationEnabled("local"));
 
   const isConfigured = Boolean(config.endpointUrl && config.model);
+
+  const handleToggle = (checked: boolean) => {
+    setEnabled(checked);
+    setIntegrationEnabled("local", checked);
+  };
 
   const handleTestConnection = async () => {
     if (!endpointUrl) {
@@ -102,6 +110,7 @@ export function LocalAICard() {
               </CardDescription>
             </div>
           </div>
+          <Switch checked={enabled} onCheckedChange={handleToggle} />
         </div>
       </CardHeader>
 

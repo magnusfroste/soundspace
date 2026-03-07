@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Music, Loader2, CheckCircle, XCircle, Settings } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { isIntegrationEnabled, setIntegrationEnabled } from "@/lib/integrations-state";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
@@ -44,8 +46,14 @@ export function AceStepCard() {
   const [isTesting, setIsTesting] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"idle" | "connected" | "failed">("idle");
   const [open, setOpen] = useState(false);
+  const [enabled, setEnabled] = useState(() => isIntegrationEnabled("acestep"));
 
   const isConfigured = Boolean(config.endpointUrl);
+
+  const handleToggle = (checked: boolean) => {
+    setEnabled(checked);
+    setIntegrationEnabled("acestep", checked);
+  };
 
   const handleTestConnection = async () => {
     setIsTesting(true);
@@ -113,6 +121,7 @@ export function AceStepCard() {
               </CardDescription>
             </div>
           </div>
+          <Switch checked={enabled} onCheckedChange={handleToggle} />
         </div>
       </CardHeader>
 
