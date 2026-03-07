@@ -62,6 +62,14 @@ async function proxyCall(endpoint: string, method = "GET", body?: unknown): Prom
     );
   }
 
+  // Unwrap API envelope: responses are wrapped in {code, data, error, timestamp}
+  if (data && typeof data === "object" && "code" in data && "data" in data && "timestamp" in data) {
+    if (data.error) {
+      throw new Error(`ACE-Step error: ${data.error}`);
+    }
+    return data.data;
+  }
+
   return data;
 }
 
@@ -72,9 +80,11 @@ async function pollResult(
   interval = 3000,
 ): Promise<any> {
   for (let i = 0; i < maxAttempts; i++) {
-    const json = await proxyCall("/query_result", "POST", { task_id_list: [taskId] });
+    const result = await proxyCall("/query_result", "POST", { task_id_list: [taskId] });
 
-    const task = json.data?.[0];
+    // After envelope unwrap, result is the array directly
+    const tasks = Array.isArray(result) ? result : result?.data || result;
+    const task = Array.isArray(tasks) ? tasks[0] : tasks;
     if (!task) throw new Error("AceStep: task not found");
 
     if (task.status === 1) {
@@ -197,7 +207,8 @@ export const aceStepProvider: AIProvider = {
 
     // 1. Submit generation task
     const releaseData = await proxyCall("/release_task", "POST", payload);
-    const taskId = releaseData.data?.task_id;
+    // After envelope unwrap, releaseData is {status, task_id} directly
+    const taskId = releaseData?.task_id || releaseData?.data?.task_id;
     if (!taskId) throw new Error("ACE-Step did not return a task_id");
 
     // 2. Poll for result
