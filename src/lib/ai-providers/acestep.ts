@@ -62,6 +62,14 @@ async function proxyCall(endpoint: string, method = "GET", body?: unknown): Prom
     );
   }
 
+  // Unwrap API envelope: responses are wrapped in {code, data, error, timestamp}
+  if (data && typeof data === "object" && "code" in data && "data" in data && "timestamp" in data) {
+    if (data.error) {
+      throw new Error(`ACE-Step error: ${data.error}`);
+    }
+    return data.data;
+  }
+
   return data;
 }
 
