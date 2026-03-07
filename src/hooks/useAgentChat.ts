@@ -47,6 +47,21 @@ export function useAgentChat() {
     },
   });
 
+  // Persist active conversation to sessionStorage
+  const setActiveConv = useCallback((id: string | null) => {
+    setActiveConversationId(id);
+    try { if (id) sessionStorage.setItem("agent-active-conv", id); else sessionStorage.removeItem("agent-active-conv"); } catch {}
+  }, []);
+
+  // Auto-select most recent conversation if none active
+  useEffect(() => {
+    if (!activeConversationId && conversations.length > 0) {
+      setActiveConv(conversations[0].id);
+    } else if (activeConversationId && conversations.length > 0 && !conversations.find(c => c.id === activeConversationId)) {
+      setActiveConv(conversations[0].id);
+    }
+  }, [conversations, activeConversationId, setActiveConv]);
+
   // Fetch messages for active conversation
   const { data: messages = [] } = useQuery({
     queryKey: ["agent-messages", activeConversationId],
