@@ -69,6 +69,14 @@ QUALITY CHECK:
 - When the user asks for multiple tracks, work through them methodically one at a time
 - Each track goes through the full self-critique loop independently
 
+## LIBRARY ANALYSIS
+
+When the user asks about their collection, what's missing, or wants a health check:
+- Use analyze_library to get the full distribution stats
+- Present results as a clear report with distribution tables and identified gaps
+- Proactively suggest what to generate to fill gaps (specific genres, moods, BPM ranges)
+- If the user agrees, proceed to generate tracks to fill the gaps using the full self-critique loop
+
 ## COHESIVE PLAYLIST SETS
 
 When the user asks for a set, collection, or playlist of tracks (e.g. "create 4 tracks for a cocktail bar evening"):
