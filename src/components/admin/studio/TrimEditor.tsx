@@ -188,12 +188,12 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
         }
       }
 
-      const wavBlob = audioBufferToWav(trimmedBuffer);
+      const mp3Blob = await audioBufferToMp3(trimmedBuffer);
 
-      const fileName = `ai-gen/trimmed-${crypto.randomUUID()}.wav`;
+      const fileName = `ai-gen/trimmed-${crypto.randomUUID()}.mp3`;
       const { error: uploadError } = await supabase.storage
         .from("songs")
-        .upload(fileName, wavBlob, { contentType: "audio/wav" });
+        .upload(fileName, mp3Blob, { contentType: "audio/mpeg" });
 
       if (uploadError) throw uploadError;
 
