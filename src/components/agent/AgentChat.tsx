@@ -38,7 +38,11 @@ function MessageBubble({ message }: { message: AgentMessage | { role: string; co
   );
 }
 
-export function AgentChat() {
+interface AgentChatProps {
+  fullWidth?: boolean;
+}
+
+export function AgentChat({ fullWidth }: AgentChatProps) {
   const {
     conversations, messages, activeConversationId, setActiveConversationId,
     isGenerating, streamingContent, statusMessage, sendMessage, createConversation, deleteConversation,
@@ -62,10 +66,17 @@ export function AgentChat() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
+  const containerClass = fullWidth
+    ? "flex h-full overflow-hidden"
+    : "flex h-[calc(100vh-10rem)] gap-0 overflow-hidden rounded-lg border border-border";
+
   return (
-    <div className="flex h-[calc(100vh-10rem)] gap-0 overflow-hidden rounded-lg border border-border">
+    <div className={containerClass}>
       {/* Conversation sidebar */}
-      <div className="w-56 border-r border-border flex flex-col bg-muted/20 flex-shrink-0">
+      <div className={cn(
+        "border-r border-border flex flex-col bg-muted/20 flex-shrink-0",
+        fullWidth ? "w-64" : "w-56"
+      )}>
         <div className="p-3 border-b border-border">
           <Button variant="outline" size="sm" className="w-full justify-start gap-2" onClick={() => createConversation.mutate(undefined)}>
             <Plus className="h-4 w-4" /> New Chat
@@ -149,7 +160,7 @@ export function AgentChat() {
         </div>
 
         <div className="border-t border-border p-4 flex-shrink-0">
-          <div className="flex gap-2 items-end max-w-3xl mx-auto">
+          <div className={cn("flex gap-2 items-end mx-auto", fullWidth ? "max-w-2xl" : "max-w-3xl")}>
             <Textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Describe your music production task..." className="min-h-[44px] max-h-32 resize-none" rows={1} disabled={isGenerating} />
             <Button size="icon" onClick={handleSend} disabled={!input.trim() || isGenerating} className="h-11 w-11 flex-shrink-0">
               {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

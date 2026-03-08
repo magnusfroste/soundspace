@@ -1,6 +1,5 @@
-import { Bot, MessageSquare, Target, Brain, Timer } from "lucide-react";
+import { Bot, Target, Brain, Timer } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { AgentChat } from "@/components/agent/AgentChat";
 import { AgentObjectives } from "@/components/agent/AgentObjectives";
 import { AgentSkillsMemories } from "@/components/agent/AgentSkillsMemories";
 import { AgentAutomation } from "@/components/agent/AgentAutomation";
@@ -14,15 +13,12 @@ export default function AdminAgent() {
         </div>
         <div>
           <h1 className="text-xl font-bold">SoundAgent</h1>
-          <p className="text-xs text-muted-foreground">Autonomous music production assistant</p>
+          <p className="text-xs text-muted-foreground">Manage objectives, skills and automation</p>
         </div>
       </div>
 
-      <Tabs defaultValue="chat">
+      <Tabs defaultValue="objectives">
         <TabsList>
-          <TabsTrigger value="chat" className="gap-2">
-            <MessageSquare className="h-4 w-4" /> Chat
-          </TabsTrigger>
           <TabsTrigger value="objectives" className="gap-2">
             <Target className="h-4 w-4" /> Objectives
           </TabsTrigger>
@@ -34,9 +30,6 @@ export default function AdminAgent() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="chat" className="mt-4">
-          <AgentChat />
-        </TabsContent>
         <TabsContent value="objectives" className="mt-4">
           <AgentObjectives />
         </TabsContent>
