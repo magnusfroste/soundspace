@@ -1119,6 +1119,7 @@ Deno.serve(async (req) => {
                 case "find_incomplete_songs": result = await executeFindIncomplete(args, supabaseUrl); break;
                 case "transcribe_song": result = await executeTranscribeSong(args, supabaseUrl, anonKey, sttProvider); break;
                 case "generate_song_cover": result = await executeGenerateSongCover(args, supabaseUrl); break;
+                case "update_song": result = await executeUpdateSong(args, supabaseUrl); break;
                 case "save_skill": result = userId ? await executeSaveSkill(args, supabaseUrl, userId) : { error: "No user context" }; break;
                 case "save_memory": result = userId ? await executeSaveMemory(args, supabaseUrl, userId) : { error: "No user context" }; break;
                 case "list_objectives": result = userId ? await executeListObjectives(supabaseUrl, userId) : { objectives: [], count: 0 }; break;
