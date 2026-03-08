@@ -16,7 +16,9 @@ export function useModuleSettings() {
       if (error) throw error;
 
       const modulesRow = data?.find((r) => r.key === "modules");
-      if (modulesRow) return (modulesRow.value as ModuleSettingsData) || { enabled_modules: [] };
+      if (modulesRow) {
+        return (modulesRow.value as any) || { enabled_modules: [] };
+      }
 
       const pluginsRow = data?.find((r) => r.key === "plugins");
       if (pluginsRow) {
