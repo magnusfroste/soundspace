@@ -644,6 +644,7 @@ Deno.serve(async (req) => {
               analyze_track: "Analyzing audio quality...",
               save_to_library: "Saving to library...",
               list_library: "Checking existing library...",
+              create_playlist: "Creating playlist...",
             };
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
@@ -657,6 +658,7 @@ Deno.serve(async (req) => {
                 case "analyze_track": result = await executeAnalyze(args, supabaseUrl, anonKey); break;
                 case "save_to_library": result = await executeSave(args, supabaseUrl); break;
                 case "list_library": result = await executeListLibrary(args, supabaseUrl); break;
+                case "create_playlist": result = await executeCreatePlaylist(args, supabaseUrl); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) {
