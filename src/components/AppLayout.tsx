@@ -94,7 +94,9 @@ export function AppLayout() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2, ease: "easeInOut" }}
               >
-                <Outlet />
+                <ErrorBoundary fallbackMessage="This page encountered an error">
+                  <Outlet />
+                </ErrorBoundary>
               </motion.main>
             )}
           </AnimatePresence>
