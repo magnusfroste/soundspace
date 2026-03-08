@@ -76,7 +76,7 @@ export function ChatSidebar({
                 )}
                 onClick={() => onSelectConversation(c.id)}
               >
-                <MessageSquare className="h-4 w-4 flex-shrink-0" />
+                
                 <span className="truncate flex-1 min-w-0 group-data-[collapsible=icon]:hidden text-xs pr-1">
                   {c.title}
                 </span>
