@@ -1278,15 +1278,14 @@ Deno.serve(async (req) => {
         // ── Tool-calling loop (non-streaming) ──
         push("status", { phase: "thinking", message: "Analyzing your request..." });
 
+        const llmConfig = getLLMConfig(chatModel);
+
         while (toolCallCount < MAX_TOOL_CALLS) {
-          const llmRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          const llmRes = await fetch(llmConfig.url, {
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
-              "Content-Type": "application/json",
-            },
+            headers: llmConfig.headers,
             body: JSON.stringify({
-              model: chatModel,
+              model: llmConfig.model,
               messages: llmMessages,
               tools: TOOLS,
               stream: false,
@@ -1377,14 +1376,11 @@ Deno.serve(async (req) => {
           llmMessages.pop();
         }
 
-        const streamRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const streamRes = await fetch(llmConfig.url, {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
+          headers: llmConfig.headers,
           body: JSON.stringify({
-            model: chatModel,
+            model: llmConfig.model,
             messages: llmMessages,
             tools: TOOLS,
             stream: true,
