@@ -57,30 +57,30 @@ export default function PlaylistDetail() {
   if (!playlist) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-pulse text-muted-foreground">Carregando...</div>
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-end gap-6">
-        <div className="h-40 w-40 rounded-xl bg-muted flex items-center justify-center overflow-hidden shrink-0">
+      {/* Header — stacks vertically on mobile */}
+      <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 sm:gap-6">
+        <div className="h-32 w-32 sm:h-40 sm:w-40 rounded-xl bg-muted flex items-center justify-center overflow-hidden shrink-0">
           {playlist.cover_image_url ? (
             <img src={playlist.cover_image_url} alt={playlist.title} className="h-full w-full object-cover" />
           ) : (
-            <Music className="h-16 w-16 text-muted-foreground" />
+            <Music className="h-12 sm:h-16 w-12 sm:w-16 text-muted-foreground" />
           )}
         </div>
-        <div>
+        <div className="text-center sm:text-left">
           <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Playlist</p>
-          <h1 className="text-3xl font-bold">{playlist.title}</h1>
-          {playlist.description && <p className="text-muted-foreground mt-2">{playlist.description}</p>}
-          <div className="flex items-center gap-3 mt-4">
+          <h1 className="text-2xl sm:text-3xl font-bold">{playlist.title}</h1>
+          {playlist.description && <p className="text-muted-foreground mt-2 text-sm sm:text-base">{playlist.description}</p>}
+          <div className="flex items-center justify-center sm:justify-start gap-3 mt-4">
             <Button onClick={handlePlayAll} className="gap-2">
               <Play className="h-4 w-4" />
-              Tocar tudo
+              Play All
             </Button>
           </div>
         </div>
@@ -95,11 +95,11 @@ export default function PlaylistDetail() {
               <button
                 key={song.id}
                 onClick={() => handlePlaySong(i)}
-                className={`w-full flex items-center gap-4 p-3 rounded-lg transition-colors text-left ${
+                className={`w-full flex items-center gap-3 sm:gap-4 p-3 rounded-lg transition-colors text-left ${
                   isActive ? "bg-primary/10 text-primary" : "hover:bg-muted/50"
                 }`}
               >
-                <span className="w-8 text-center text-sm text-muted-foreground">
+                <span className="w-6 sm:w-8 text-center text-sm text-muted-foreground shrink-0">
                   {isActive && isPlaying ? (
                     <Pause className="h-4 w-4 mx-auto text-primary" />
                   ) : (
@@ -111,12 +111,12 @@ export default function PlaylistDetail() {
                   <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
                 </div>
                 {song.genre && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground hidden sm:inline-block">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground hidden md:inline-block shrink-0">
                     {song.genre}
                   </span>
                 )}
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
+                <span className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
+                  <Clock className="h-3 w-3 hidden sm:block" />
                   {formatDuration(song.duration)}
                 </span>
               </button>
@@ -125,7 +125,7 @@ export default function PlaylistDetail() {
         ) : (
           <div className="text-center py-12 text-muted-foreground">
             <Music className="h-10 w-10 mx-auto mb-2" />
-            <p>Nenhuma música nesta playlist.</p>
+            <p>No songs in this playlist.</p>
           </div>
         )}
       </div>

@@ -99,7 +99,6 @@ export default function SchedulePage() {
   const handleCopyDay = useCallback(async (sourceDay: number, targetDays: number[]) => {
     setIsCopying(true);
     try {
-      // Get entries from source day
       const sourceEntries = entries.filter(e => e.day_of_week === sourceDay);
       
       if (sourceEntries.length === 0) {
@@ -107,8 +106,6 @@ export default function SchedulePage() {
         return;
       }
 
-      // Create copies for each target day
-      let successCount = 0;
       for (const targetDay of targetDays) {
         for (const entry of sourceEntries) {
           await createEntry({
@@ -118,7 +115,6 @@ export default function SchedulePage() {
             end_time: entry.end_time,
             color: entry.color || undefined,
           });
-          successCount++;
         }
       }
       
@@ -131,7 +127,6 @@ export default function SchedulePage() {
   }, [entries, createEntry]);
 
   const handleCopyWeek = useCallback(async () => {
-    // Future enhancement: save as template
     toast.info("Week templates coming soon!");
   }, []);
 
@@ -151,18 +146,18 @@ export default function SchedulePage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 py-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <Calendar className="h-6 w-6 text-primary" />
-          <div>
-            <h1 className="text-xl font-semibold">Weekly Schedule</h1>
+          <Calendar className="h-6 w-6 text-primary shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-semibold">Weekly Schedule</h1>
             {profile?.business_name && (
-              <p className="text-sm text-muted-foreground">{profile.business_name}</p>
+              <p className="text-sm text-muted-foreground truncate">{profile.business_name}</p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
           {/* Schedule Mode Toggle */}
           <div className="flex items-center gap-2">
             {scheduleMode ? (
@@ -170,7 +165,7 @@ export default function SchedulePage() {
             ) : (
               <PowerOff className="h-4 w-4 text-muted-foreground" />
             )}
-            <span className="text-sm text-muted-foreground">Auto-play</span>
+            <span className="text-sm text-muted-foreground hidden sm:inline">Auto-play</span>
             <Switch
               checked={scheduleMode}
               onCheckedChange={setScheduleMode}
@@ -180,9 +175,9 @@ export default function SchedulePage() {
           {/* Copy Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" disabled={entries.length === 0}>
-                <Copy className="h-4 w-4 mr-2" />
-                Copy
+              <Button variant="outline" size="sm" disabled={entries.length === 0}>
+                <Copy className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Copy</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -195,9 +190,9 @@ export default function SchedulePage() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button onClick={() => handleAddBlock(new Date().getDay(), 9)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Block
+          <Button size="sm" onClick={() => handleAddBlock(new Date().getDay(), 9)}>
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add Block</span>
           </Button>
         </div>
       </header>
@@ -216,7 +211,7 @@ export default function SchedulePage() {
       {/* Empty state */}
       {entries.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="text-center">
+          <div className="text-center px-4">
             <Calendar className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-muted-foreground">No schedule set</h3>
             <p className="text-sm text-muted-foreground/70 mt-1">

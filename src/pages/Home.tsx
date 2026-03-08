@@ -63,19 +63,15 @@ export default function HomePage() {
   // Auto-play all suggested playlists after onboarding
   useEffect(() => {
     const autoPlay = async () => {
-      // Only auto-play once per session and if no music is playing
       if (hasAutoPlayedRef.current || currentSong) return;
       if (!suggestedPlaylists || suggestedPlaylists.length === 0) return;
 
-      // Check if we just came from onboarding
       const justOnboarded = sessionStorage.getItem("just_onboarded");
       if (!justOnboarded) return;
 
-      // Clear the flag
       sessionStorage.removeItem("just_onboarded");
       hasAutoPlayedRef.current = true;
 
-      // Fetch songs from ALL suggested playlists
       const allSongs: Tables<"songs">[] = [];
       
       for (const playlist of suggestedPlaylists) {
@@ -117,7 +113,6 @@ export default function HomePage() {
   const { data: continueListening } = useQuery({
     queryKey: ["continue-listening", user?.id],
     queryFn: async () => {
-      // Get the most recent play log with its song
       const { data: recentLog, error: logError } = await supabase
         .from("play_logs")
         .select("song_id, played_at")
@@ -128,7 +123,6 @@ export default function HomePage() {
 
       if (logError || !recentLog) return null;
 
-      // Find which playlist contains this song
       const { data: playlistLink } = await supabase
         .from("playlist_songs")
         .select("playlist_id")
@@ -138,7 +132,6 @@ export default function HomePage() {
 
       if (!playlistLink) return null;
 
-      // Fetch the playlist details
       const { data: playlist } = await supabase
         .from("playlists")
         .select("*")
@@ -147,7 +140,6 @@ export default function HomePage() {
 
       if (!playlist) return null;
 
-      // Fetch songs for resume
       const { data: songs } = await supabase
         .from("playlist_songs")
         .select("song:songs(*)")
@@ -158,7 +150,6 @@ export default function HomePage() {
         .map((ps) => ps.song)
         .filter((s): s is Tables<"songs"> => s !== null);
 
-      // Find the index of the last played song
       const resumeIndex = Math.max(0, songList.findIndex((s) => s.id === recentLog.song_id));
 
       return { playlist, songs: songList, resumeIndex, playedAt: recentLog.played_at };
@@ -167,7 +158,6 @@ export default function HomePage() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Filter out suggested playlists from "Explore more" section
   const explorePlaylists = allPlaylists?.filter(
     (pl) => !profile?.suggested_playlist_ids?.includes(pl.id)
   );
@@ -190,10 +180,10 @@ export default function HomePage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Welcome to SomHonesto</h1>
-        <p className="text-muted-foreground mt-2">
+        <h1 className="text-2xl sm:text-3xl font-bold">Welcome to SoundSpace</h1>
+        <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
           {hasSuggestedPlaylists && energyLabel
             ? `${energyLabel.charAt(0).toUpperCase() + energyLabel.slice(1)} playlists for your space`
             : "High-quality ambient music for your space."}
@@ -203,13 +193,13 @@ export default function HomePage() {
       {/* Continue Listening Section */}
       {continueListening && continueListening.songs.length > 0 && (
         <section>
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
             <Headphones className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-semibold">Continue Listening</h2>
+            <h2 className="text-lg sm:text-xl font-semibold">Continue Listening</h2>
           </div>
 
-          <div className="glass rounded-xl p-4 flex items-center gap-4">
-            <div className="h-16 w-16 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
+          <div className="glass rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
+            <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
               {continueListening.playlist.cover_image_url ? (
                 <img
                   src={continueListening.playlist.cover_image_url}
@@ -218,12 +208,12 @@ export default function HomePage() {
                 />
               ) : (
                 <div className="h-full w-full flex items-center justify-center">
-                  <Music className="h-6 w-6 text-muted-foreground" />
+                  <Music className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
                 </div>
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold truncate">{continueListening.playlist.title}</h3>
+              <h3 className="font-semibold truncate text-sm sm:text-base">{continueListening.playlist.title}</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {continueListening.songs.length} songs · Track {continueListening.resumeIndex + 1}
               </p>
@@ -240,7 +230,7 @@ export default function HomePage() {
               }
             >
               <Play className="h-3.5 w-3.5" />
-              Resume
+              <span className="hidden sm:inline">Resume</span>
             </Button>
           </div>
         </section>
@@ -249,30 +239,30 @@ export default function HomePage() {
       {/* Suggested Playlists Section */}
       {hasSuggestedPlaylists && (
         <section>
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-3 sm:mb-4">
             <Sparkles className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-semibold">Your Playlists</h2>
-            <Badge variant="secondary" className="ml-2">Recommended</Badge>
+            <h2 className="text-lg sm:text-xl font-semibold">Your Playlists</h2>
+            <Badge variant="secondary" className="ml-2 hidden sm:inline-flex">Recommended</Badge>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {suggestedPlaylists.map((pl) => (
               <Link
                 key={pl.id}
                 to={`/playlists/${pl.id}`}
-                className="glass glass-hover rounded-xl p-4 group cursor-pointer border-2 border-primary/20"
+                className="glass glass-hover rounded-xl p-3 sm:p-4 group cursor-pointer border-2 border-primary/20"
               >
-                <div className="h-32 rounded-lg bg-muted mb-3 flex items-center justify-center overflow-hidden relative">
+                <div className="aspect-square rounded-lg bg-muted mb-2 sm:mb-3 flex items-center justify-center overflow-hidden relative">
                   {pl.cover_image_url ? (
                     <img src={pl.cover_image_url} alt={pl.title} className="h-full w-full object-cover" />
                   ) : (
-                    <Music className="h-10 w-10 text-muted-foreground" />
+                    <Music className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
                   )}
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Play className="h-10 w-10 text-primary" />
+                    <Play className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
                   </div>
                 </div>
-                <h3 className="font-semibold truncate">{pl.title}</h3>
+                <h3 className="font-semibold truncate text-sm sm:text-base">{pl.title}</h3>
                 <p className="text-xs text-muted-foreground truncate mt-1">{pl.description || "Playlist"}</p>
               </Link>
             ))}
@@ -282,8 +272,8 @@ export default function HomePage() {
 
       {/* Explore More Section */}
       <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold flex items-center gap-2">
+        <div className="flex items-center justify-between mb-3 sm:mb-4">
+          <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
             <ListMusic className="h-5 w-5 text-primary" />
             {hasSuggestedPlaylists ? "Explore More" : "Featured Playlists"}
           </h2>
@@ -294,31 +284,31 @@ export default function HomePage() {
         </div>
 
         {explorePlaylists && explorePlaylists.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {explorePlaylists.slice(0, hasSuggestedPlaylists ? 3 : 6).map((pl) => (
               <Link
                 key={pl.id}
                 to={`/playlists/${pl.id}`}
-                className="glass glass-hover rounded-xl p-4 group cursor-pointer"
+                className="glass glass-hover rounded-xl p-3 sm:p-4 group cursor-pointer"
               >
-                <div className="h-32 rounded-lg bg-muted mb-3 flex items-center justify-center overflow-hidden relative">
+                <div className="aspect-square rounded-lg bg-muted mb-2 sm:mb-3 flex items-center justify-center overflow-hidden relative">
                   {pl.cover_image_url ? (
                     <img src={pl.cover_image_url} alt={pl.title} className="h-full w-full object-cover" />
                   ) : (
-                    <Music className="h-10 w-10 text-muted-foreground" />
+                    <Music className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
                   )}
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Play className="h-10 w-10 text-primary" />
+                    <Play className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
                   </div>
                 </div>
-                <h3 className="font-semibold truncate">{pl.title}</h3>
+                <h3 className="font-semibold truncate text-sm sm:text-base">{pl.title}</h3>
                 <p className="text-xs text-muted-foreground truncate mt-1">{pl.description || "Playlist"}</p>
               </Link>
             ))}
           </div>
         ) : !hasSuggestedPlaylists ? (
-          <div className="glass rounded-xl p-8 text-center">
-            <Music className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+          <div className="glass rounded-xl p-6 sm:p-8 text-center">
+            <Music className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3" />
             <p className="text-muted-foreground">No playlists available yet.</p>
             <p className="text-xs text-muted-foreground mt-1">An admin needs to create playlists to get started.</p>
           </div>
