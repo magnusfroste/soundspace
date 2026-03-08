@@ -383,6 +383,40 @@ const TOOLS = [
       }
     }
   },
+  {
+    type: "function",
+    function: {
+      name: "bulk_update_songs",
+      description: "Update metadata on multiple songs in a single call. Each entry specifies a song_id and the fields to update. Much more efficient than calling update_song repeatedly.",
+      parameters: {
+        type: "object",
+        properties: {
+          updates: {
+            type: "array",
+            description: "Array of song updates, each with song_id and fields to change",
+            items: {
+              type: "object",
+              properties: {
+                song_id: { type: "string" },
+                title: { type: "string" },
+                artist: { type: "string" },
+                genre: { type: "string" },
+                mood: { type: "string" },
+                bpm: { type: "number" },
+                key_scale: { type: "string" },
+                time_signature: { type: "string" },
+                lyrics: { type: "string" },
+                quality_score: { type: "number" },
+              },
+              required: ["song_id"],
+            }
+          }
+        },
+        required: ["updates"],
+        additionalProperties: false
+      }
+    }
+  },
   // ── Persistence tools ──
   {
     type: "function",
@@ -601,6 +635,39 @@ async function executeUpdateSong(args: any, supabaseUrl: string) {
   const { error } = await sb.from("songs").update(updates).eq("id", args.song_id);
   if (error) return { error: `Update failed: ${error.message}` };
   return { success: true, song_id: args.song_id, updated_fields: Object.keys(updates), message: `Song updated: ${Object.keys(updates).join(", ")}` };
+}
+
+async function executeBulkUpdateSongs(args: { updates: any[] }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const results: { song_id: string; success: boolean; updated_fields?: string[]; error?: string }[] = [];
+
+  for (const item of args.updates) {
+    const updates: Record<string, any> = {};
+    if (item.title !== undefined) updates.title = item.title;
+    if (item.artist !== undefined) updates.artist = item.artist;
+    if (item.genre !== undefined) updates.genre = item.genre;
+    if (item.mood !== undefined) updates.mood = item.mood;
+    if (item.bpm !== undefined) updates.bpm = Math.round(item.bpm);
+    if (item.key_scale !== undefined) updates.key_scale = item.key_scale;
+    if (item.time_signature !== undefined) updates.time_signature = item.time_signature;
+    if (item.lyrics !== undefined) updates.lyrics = item.lyrics;
+    if (item.quality_score !== undefined) updates.quality_score = item.quality_score;
+
+    if (Object.keys(updates).length === 0) {
+      results.push({ song_id: item.song_id, success: false, error: "No fields to update" });
+      continue;
+    }
+
+    const { error } = await sb.from("songs").update(updates).eq("id", item.song_id);
+    if (error) {
+      results.push({ song_id: item.song_id, success: false, error: error.message });
+    } else {
+      results.push({ song_id: item.song_id, success: true, updated_fields: Object.keys(updates) });
+    }
+  }
+
+  const succeeded = results.filter(r => r.success).length;
+  return { success: true, total: results.length, succeeded, failed: results.length - succeeded, results, message: `Bulk update: ${succeeded}/${results.length} songs updated.` };
 }
 
 async function executeCreatePlaylist(args: { title: string; description?: string; song_ids: string[] }, supabaseUrl: string) {
@@ -1097,6 +1164,7 @@ Deno.serve(async (req) => {
               transcribe_song: "Transcribing lyrics...",
               generate_song_cover: "Generating cover art...",
               update_song: "Updating song metadata...",
+              bulk_update_songs: "Bulk updating songs...",
               save_skill: "Saving learned skill...",
               save_memory: "Saving memory...",
               list_objectives: "Checking objectives...",
@@ -1120,6 +1188,7 @@ Deno.serve(async (req) => {
                 case "transcribe_song": result = await executeTranscribeSong(args, supabaseUrl, anonKey, sttProvider); break;
                 case "generate_song_cover": result = await executeGenerateSongCover(args, supabaseUrl); break;
                 case "update_song": result = await executeUpdateSong(args, supabaseUrl); break;
+                case "bulk_update_songs": result = await executeBulkUpdateSongs(args, supabaseUrl); break;
                 case "save_skill": result = userId ? await executeSaveSkill(args, supabaseUrl, userId) : { error: "No user context" }; break;
                 case "save_memory": result = userId ? await executeSaveMemory(args, supabaseUrl, userId) : { error: "No user context" }; break;
                 case "list_objectives": result = userId ? await executeListObjectives(supabaseUrl, userId) : { objectives: [], count: 0 }; break;
