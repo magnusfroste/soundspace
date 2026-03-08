@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { PlayerBar } from "@/components/PlayerBar";
@@ -44,7 +45,19 @@ export function AppLayout() {
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         {/* Sidebar — hidden in chat mode and on mobile */}
-        {!isChat && !isMobile && <AppSidebar />}
+        <AnimatePresence mode="wait">
+          {!isChat && !isMobile && (
+            <motion.div
+              key="sidebar"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+            >
+              <AppSidebar />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="flex-1 flex flex-col h-screen overflow-hidden">
           {/* Header with mode toggle */}
@@ -54,21 +67,43 @@ export function AppLayout() {
             showChatToggle={showChatToggle}
           />
 
-          {isChat ? (
-            /* Full-width chat view */
-            <div className="flex-1 overflow-hidden">
-              <AgentChat fullWidth />
-            </div>
-          ) : (
-            <main className="flex-1 overflow-auto p-4 md:p-6 pb-36 md:pb-6">
-              <Outlet />
-            </main>
-          )}
+          <AnimatePresence mode="wait">
+            {isChat ? (
+              /* Full-width chat view */
+              <motion.div
+                key="chat"
+                className="flex-1 overflow-hidden"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+              >
+                <AgentChat fullWidth />
+              </motion.div>
+            ) : (
+              <motion.main
+                key="dashboard"
+                className="flex-1 overflow-auto p-4 md:p-6 pb-36 md:pb-6"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+              >
+                <Outlet />
+              </motion.main>
+            )}
+          </AnimatePresence>
 
           {!isChat && (
-            <div className="flex-shrink-0">
+            <motion.div
+              className="flex-shrink-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+            >
               <PlayerBar />
-            </div>
+            </motion.div>
           )}
         </div>
 
