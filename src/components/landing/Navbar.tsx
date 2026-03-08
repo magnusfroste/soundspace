@@ -38,6 +38,7 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-3">
+            <ThemeToggle />
             <Button 
               variant="ghost" 
               className="text-sm"

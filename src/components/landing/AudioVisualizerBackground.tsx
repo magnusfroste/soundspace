@@ -192,7 +192,7 @@ export function AudioVisualizerBackground() {
       <div 
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: "radial-gradient(ellipse at center, transparent 0%, hsl(0, 0%, 7%) 100%)",
+          background: "radial-gradient(ellipse at center, transparent 0%, hsl(var(--background)) 100%)",
         }}
       />
     </div>
