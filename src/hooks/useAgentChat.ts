@@ -52,7 +52,7 @@ export function useAgentChat() {
   });
 
   // Fetch conversations
-  const { data: conversations = [] } = useQuery({
+  const { data: conversations = [], isFetched: conversationsFetched } = useQuery({
     queryKey: ["agent-conversations", user?.id],
     enabled: !!user,
     queryFn: async () => {
@@ -74,12 +74,17 @@ export function useAgentChat() {
 
   // Auto-select most recent conversation if none active
   useEffect(() => {
-    if (!activeConversationId && conversations.length > 0) {
-      setActiveConv(conversations[0].id);
-    } else if (activeConversationId && conversations.length > 0 && !conversations.find(c => c.id === activeConversationId)) {
+    if (!conversationsFetched) return;
+
+    if (conversations.length === 0) {
+      if (activeConversationId) setActiveConv(null);
+      return;
+    }
+
+    if (!activeConversationId || !conversations.find((c) => c.id === activeConversationId)) {
       setActiveConv(conversations[0].id);
     }
-  }, [conversations, activeConversationId, setActiveConv]);
+  }, [conversations, conversationsFetched, activeConversationId, setActiveConv]);
 
   // Fetch messages for active conversation
   const { data: messages = [] } = useQuery({
@@ -196,6 +201,12 @@ export function useAgentChat() {
 
     let convId = activeConversationId;
 
+    // Guard against stale session conversation IDs (e.g. deleted/foreign IDs)
+    if (convId && !conversations.some((c) => c.id === convId)) {
+      convId = null;
+      setActiveConv(null);
+    }
+
     // Create conversation if none active
     if (!convId) {
       const { data, error } = await supabase
@@ -210,11 +221,17 @@ export function useAgentChat() {
     }
 
     // Save user message
-    await supabase.from("agent_messages").insert({
+    const { error: userMessageError } = await supabase.from("agent_messages").insert({
       conversation_id: convId,
       role: "user",
       content,
     });
+
+    if (userMessageError) {
+      toast.error("Failed to save your message");
+      return;
+    }
+
     qc.invalidateQueries({ queryKey: ["agent-messages", convId] });
 
     // Build message history for LLM
@@ -279,12 +296,16 @@ export function useAgentChat() {
 
       // Save assistant message
       if (fullContent) {
-        await supabase.from("agent_messages").insert({
+        const { error: assistantMessageError } = await supabase.from("agent_messages").insert({
           conversation_id: convId,
           role: "assistant",
           content: fullContent,
           audio_urls: audioUrls.length ? audioUrls : null,
         });
+
+        if (assistantMessageError) {
+          toast.error("Failed to save assistant response");
+        }
       }
 
       // Update conversation
@@ -310,7 +331,7 @@ export function useAgentChat() {
       setStatusMessage(null);
       setIsGenerating(false);
     }
-  }, [user, activeConversationId, isGenerating, qc, consumeSSE]);
+  }, [user, activeConversationId, conversations, isGenerating, qc, consumeSSE, agentSettings, setActiveConv]);
 
   return {
     conversations,
