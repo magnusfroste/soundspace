@@ -354,7 +354,7 @@ async function audioBufferToMp3(buffer: AudioBuffer): Promise<Blob> {
   const encoder = new Mp3Encoder(numChannels, sampleRate, kbps);
 
   const blockSize = 1152;
-  const mp3Data: Int8Array[] = [];
+  const mp3Data: Uint8Array[] = [];
 
   // Convert float32 to int16
   const toInt16 = (float32: Float32Array): Int16Array => {
