@@ -4,17 +4,18 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import type { ModuleSettings } from "@/lib/modules";
+import { isIntegrationEnabled } from "@/lib/integrations-state";
 
 const SETTINGS_KEY = "module:sound-agent";
 
-const CHAT_MODELS = [
-  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash (fast)" },
-  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro (strongest)" },
-  { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
-  { value: "openai/gpt-5-mini", label: "GPT-5 Mini" },
-  { value: "openai/gpt-5", label: "GPT-5" },
-  { value: "openai/gpt-5.2", label: "GPT-5.2 (latest)" },
+const ALL_CHAT_MODELS = [
+  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash (fast)", provider: "gemini" as const },
+  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "gemini" as const },
+  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro (strongest)", provider: "gemini" as const },
+  { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", provider: "gemini" as const },
+  { value: "openai/gpt-5-mini", label: "GPT-5 Mini", provider: "openai" as const },
+  { value: "openai/gpt-5", label: "GPT-5", provider: "openai" as const },
+  { value: "openai/gpt-5.2", label: "GPT-5.2 (latest)", provider: "openai" as const },
 ];
 
 const GENERATION_PROVIDERS = [
@@ -65,6 +66,10 @@ export function SoundAgentSettings() {
   const update = (field: string, value: string) => {
     mutation.mutate({ ...settings, [field]: value });
   };
+
+  const CHAT_MODELS = ALL_CHAT_MODELS.filter(
+    (m) => isIntegrationEnabled(m.provider)
+  );
 
   if (!settings) return null;
 
