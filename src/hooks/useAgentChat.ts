@@ -52,7 +52,7 @@ export function useAgentChat() {
   });
 
   // Fetch conversations
-  const { data: conversations = [] } = useQuery({
+  const { data: conversations = [], isFetched: conversationsFetched } = useQuery({
     queryKey: ["agent-conversations", user?.id],
     enabled: !!user,
     queryFn: async () => {
