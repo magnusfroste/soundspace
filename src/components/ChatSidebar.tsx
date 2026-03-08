@@ -68,7 +68,7 @@ export function ChatSidebar({
               <div
                 key={c.id}
                 className={cn(
-                  "group/conv flex items-center gap-2 rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors min-w-0",
+                  "group/conv flex items-center gap-2 rounded-lg px-2 py-2 text-sm cursor-pointer transition-colors min-w-0",
                   "group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2",
                   c.id === activeConversationId
                     ? "bg-sidebar-accent text-sidebar-accent-foreground"
@@ -77,15 +77,17 @@ export function ChatSidebar({
                 onClick={() => onSelectConversation(c.id)}
               >
                 <MessageSquare className="h-4 w-4 flex-shrink-0" />
-                <span className="truncate flex-1 min-w-0 group-data-[collapsible=icon]:hidden text-xs">
+                <span className="truncate flex-1 min-w-0 group-data-[collapsible=icon]:hidden text-xs pr-1">
                   {c.title}
                 </span>
                 <button
-                  className="opacity-0 group-hover/conv:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 flex-shrink-0 group-data-[collapsible=icon]:hidden"
+                  className="opacity-70 hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 flex-shrink-0 group-data-[collapsible=icon]:hidden"
                   onClick={(e) => {
                     e.stopPropagation();
                     onDeleteConversation(c.id);
                   }}
+                  aria-label="Delete conversation"
+                  type="button"
                 >
                   <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
                 </button>
