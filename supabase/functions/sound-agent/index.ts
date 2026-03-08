@@ -190,7 +190,8 @@ const TOOLS = [
           time_signature: { type: "string", description: "Time signature" },
           duration: { type: "number", description: "Duration in seconds" },
           lyrics: { type: "string", description: "Lyrics if any" },
-          prompt: { type: "string", description: "The prompt used for generation" }
+          prompt: { type: "string", description: "The prompt used for generation" },
+          quality_score: { type: "number", description: "Quality score 0-100 from the self-critique loop (percentage of checks passed)" }
         },
         required: ["title", "audio_url", "duration"],
         additionalProperties: false
