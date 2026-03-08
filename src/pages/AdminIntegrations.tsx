@@ -234,32 +234,74 @@ function ElevenLabsCard() {
   );
 }
 
+function IntegrationSection({ icon: Icon, title, description, children }: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+          <Icon className="h-4 w-4 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {children}
+      </div>
+    </section>
+  );
+}
+
 export default function AdminIntegrations() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold flex items-center gap-2">
           <Plug className="h-6 w-6 text-primary" />
           Integrations
         </h1>
         <p className="text-muted-foreground mt-1">
-          Configure AI providers and external services
+          Configure AI providers, music generators and distribution services
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <IntegrationSection
+        icon={Brain}
+        title="AI Providers"
+        description="Language models and general AI services"
+      >
         <LovableAICard />
         <OpenAICard />
         <GeminiCard />
+      </IntegrationSection>
+
+      <IntegrationSection
+        icon={Music}
+        title="Music Generation"
+        description="AI-powered music and audio creation"
+      >
         <ElevenLabsCard />
         <AceStepCard />
         <MubertCard />
         <MusicgenCard />
         <LocalAICard />
+      </IntegrationSection>
+
+      <IntegrationSection
+        icon={Truck}
+        title="Distribution"
+        description="Deliver music to streaming platforms and stores"
+      >
         <RevelatorCard />
         <FugaCard />
         <DistroKidCard />
-      </div>
+      </IntegrationSection>
     </div>
   );
 }
