@@ -161,16 +161,17 @@ export default function AdminAgent() {
                 <Music className="h-8 w-8 text-primary" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold">Welcome to SoundAgent</h3>
+                <h3 className="text-lg font-semibold">SoundAgent</h3>
                 <p className="text-sm text-muted-foreground mt-1 max-w-md">
-                  Describe what music you need and I'll research, generate, evaluate, and save tracks autonomously.
+                  Your creative music partner. Describe what you need — I'll reason through the best approach, we'll refine a brief together, and I'll produce on your go.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="flex flex-wrap gap-2 mt-2 max-w-lg justify-center">
                 {[
-                  "Create 5 jazz tracks for an upscale restaurant",
-                  "Generate ambient music for a hotel lobby",
-                  "Make energetic lo-fi beats for a café",
+                  "I need music for a high-end cocktail bar — let's plan",
+                  "What would work for a minimalist Scandinavian café?",
+                  "Check my library health and fill gaps",
+                  "Optimize playlist flow for smoother transitions",
                 ].map((s) => (
                   <button
                     key={s}
