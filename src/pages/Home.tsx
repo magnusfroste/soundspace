@@ -195,140 +195,158 @@ export default function HomePage() {
   }
 
   return (
-    <div className="space-y-6 sm:space-y-8">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold">Welcome to SoundSpace</h1>
-        <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
-          {hasSuggestedPlaylists && energyLabel
-            ? `${energyLabel.charAt(0).toUpperCase() + energyLabel.slice(1)} playlists for your space`
-            : "High-quality ambient music for your space."}
-        </p>
-      </div>
-
-      {/* Continue Listening Section */}
-      {continueListening && continueListening.songs.length > 0 && (
-        <section>
-          <div className="flex items-center gap-2 mb-3 sm:mb-4">
-            <Headphones className="h-5 w-5 text-primary" />
-            <h2 className="text-lg sm:text-xl font-semibold">Continue Listening</h2>
-          </div>
-
-          <div className="glass rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
-            <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
-              {continueListening.playlist.cover_image_url ? (
-                <img
-                  src={continueListening.playlist.cover_image_url}
-                  alt={continueListening.playlist.title}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="h-full w-full flex items-center justify-center">
-                  <Music className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
-                </div>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold truncate text-sm sm:text-base">{continueListening.playlist.title}</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {continueListening.songs.length} songs · Track {continueListening.resumeIndex + 1}
-              </p>
-            </div>
-            <Button
-              size="sm"
-              className="flex-shrink-0 gap-1.5"
-              onClick={() =>
-                playQueue(
-                  continueListening.songs,
-                  continueListening.resumeIndex,
-                  continueListening.playlist.id
-                )
-              }
-            >
-              <Play className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Resume</span>
-            </Button>
-          </div>
-        </section>
+    <div ref={containerRef}>
+      {/* Pull-to-refresh indicator (mobile only) */}
+      {isMobile && (pullDistance > 0 || isRefreshing) && (
+        <div
+          className="flex items-center justify-center overflow-hidden transition-all duration-200"
+          style={{ height: pullDistance > 0 ? pullDistance : isRefreshing ? 48 : 0 }}
+        >
+          <Loader2
+            className={`h-5 w-5 text-primary ${isRefreshing ? "animate-spin" : ""}`}
+            style={{
+              opacity: Math.min(pullDistance / 60, 1),
+              transform: `rotate(${pullDistance * 3}deg)`,
+            }}
+          />
+        </div>
       )}
 
-      {/* Suggested Playlists Section */}
-      {hasSuggestedPlaylists && (
-        <section>
-          <div className="flex items-center gap-2 mb-3 sm:mb-4">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <h2 className="text-lg sm:text-xl font-semibold">Your Playlists</h2>
-            <Badge variant="secondary" className="ml-2 hidden sm:inline-flex">Recommended</Badge>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {suggestedPlaylists.map((pl) => (
-              <Link
-                key={pl.id}
-                to={`/playlists/${pl.id}`}
-                className="glass glass-hover rounded-xl p-3 sm:p-4 group cursor-pointer border-2 border-primary/20"
-              >
-                <div className="aspect-square rounded-lg bg-muted mb-2 sm:mb-3 flex items-center justify-center overflow-hidden relative">
-                  {pl.cover_image_url ? (
-                    <img src={pl.cover_image_url} alt={pl.title} className="h-full w-full object-cover" />
-                  ) : (
-                    <Music className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
-                  )}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Play className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
-                  </div>
-                </div>
-                <h3 className="font-semibold truncate text-sm sm:text-base">{pl.title}</h3>
-                <p className="text-xs text-muted-foreground truncate mt-1">{pl.description || "Playlist"}</p>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Explore More Section */}
-      <section>
-        <div className="flex items-center justify-between mb-3 sm:mb-4">
-          <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
-            <ListMusic className="h-5 w-5 text-primary" />
-            {hasSuggestedPlaylists ? "Explore More" : "Featured Playlists"}
-          </h2>
-          <Link to="/playlists" className="text-sm text-primary hover:underline flex items-center gap-1">
-            View all
-            <ChevronRight className="h-4 w-4" />
-          </Link>
+      <div className="space-y-6 sm:space-y-8">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold">Welcome to SoundSpace</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
+            {hasSuggestedPlaylists && energyLabel
+              ? `${energyLabel.charAt(0).toUpperCase() + energyLabel.slice(1)} playlists for your space`
+              : "High-quality ambient music for your space."}
+          </p>
         </div>
 
-        {explorePlaylists && explorePlaylists.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {explorePlaylists.slice(0, hasSuggestedPlaylists ? 3 : 6).map((pl) => (
-              <Link
-                key={pl.id}
-                to={`/playlists/${pl.id}`}
-                className="glass glass-hover rounded-xl p-3 sm:p-4 group cursor-pointer"
-              >
-                <div className="aspect-square rounded-lg bg-muted mb-2 sm:mb-3 flex items-center justify-center overflow-hidden relative">
-                  {pl.cover_image_url ? (
-                    <img src={pl.cover_image_url} alt={pl.title} className="h-full w-full object-cover" />
-                  ) : (
-                    <Music className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
-                  )}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Play className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
+        {/* Continue Listening Section */}
+        {continueListening && continueListening.songs.length > 0 && (
+          <section>
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <Headphones className="h-5 w-5 text-primary" />
+              <h2 className="text-lg sm:text-xl font-semibold">Continue Listening</h2>
+            </div>
+
+            <div className="glass rounded-xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
+              <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
+                {continueListening.playlist.cover_image_url ? (
+                  <img
+                    src={continueListening.playlist.cover_image_url}
+                    alt={continueListening.playlist.title}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center">
+                    <Music className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
                   </div>
-                </div>
-                <h3 className="font-semibold truncate text-sm sm:text-base">{pl.title}</h3>
-                <p className="text-xs text-muted-foreground truncate mt-1">{pl.description || "Playlist"}</p>
-              </Link>
-            ))}
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold truncate text-sm sm:text-base">{continueListening.playlist.title}</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {continueListening.songs.length} songs · Track {continueListening.resumeIndex + 1}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                className="flex-shrink-0 gap-1.5"
+                onClick={() =>
+                  playQueue(
+                    continueListening.songs,
+                    continueListening.resumeIndex,
+                    continueListening.playlist.id
+                  )
+                }
+              >
+                <Play className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Resume</span>
+              </Button>
+            </div>
+          </section>
+        )}
+
+        {/* Suggested Playlists Section */}
+        {hasSuggestedPlaylists && (
+          <section>
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <Sparkles className="h-5 w-5 text-primary" />
+              <h2 className="text-lg sm:text-xl font-semibold">Your Playlists</h2>
+              <Badge variant="secondary" className="ml-2 hidden sm:inline-flex">Recommended</Badge>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {suggestedPlaylists.map((pl) => (
+                <Link
+                  key={pl.id}
+                  to={`/playlists/${pl.id}`}
+                  className="glass glass-hover rounded-xl p-3 sm:p-4 group cursor-pointer border-2 border-primary/20"
+                >
+                  <div className="aspect-square rounded-lg bg-muted mb-2 sm:mb-3 flex items-center justify-center overflow-hidden relative">
+                    {pl.cover_image_url ? (
+                      <img src={pl.cover_image_url} alt={pl.title} className="h-full w-full object-cover" />
+                    ) : (
+                      <Music className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Play className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
+                    </div>
+                  </div>
+                  <h3 className="font-semibold truncate text-sm sm:text-base">{pl.title}</h3>
+                  <p className="text-xs text-muted-foreground truncate mt-1">{pl.description || "Playlist"}</p>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Explore More Section */}
+        <section>
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
+              <ListMusic className="h-5 w-5 text-primary" />
+              {hasSuggestedPlaylists ? "Explore More" : "Featured Playlists"}
+            </h2>
+            <Link to="/playlists" className="text-sm text-primary hover:underline flex items-center gap-1">
+              View all
+              <ChevronRight className="h-4 w-4" />
+            </Link>
           </div>
-        ) : !hasSuggestedPlaylists ? (
-          <div className="glass rounded-xl p-6 sm:p-8 text-center">
-            <Music className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground">No playlists available yet.</p>
-            <p className="text-xs text-muted-foreground mt-1">An admin needs to create playlists to get started.</p>
-          </div>
-        ) : null}
-      </section>
+
+          {explorePlaylists && explorePlaylists.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {explorePlaylists.slice(0, hasSuggestedPlaylists ? 3 : 6).map((pl) => (
+                <Link
+                  key={pl.id}
+                  to={`/playlists/${pl.id}`}
+                  className="glass glass-hover rounded-xl p-3 sm:p-4 group cursor-pointer"
+                >
+                  <div className="aspect-square rounded-lg bg-muted mb-2 sm:mb-3 flex items-center justify-center overflow-hidden relative">
+                    {pl.cover_image_url ? (
+                      <img src={pl.cover_image_url} alt={pl.title} className="h-full w-full object-cover" />
+                    ) : (
+                      <Music className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground" />
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Play className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
+                    </div>
+                  </div>
+                  <h3 className="font-semibold truncate text-sm sm:text-base">{pl.title}</h3>
+                  <p className="text-xs text-muted-foreground truncate mt-1">{pl.description || "Playlist"}</p>
+                </Link>
+              ))}
+            </div>
+          ) : !hasSuggestedPlaylists ? (
+            <div className="glass rounded-xl p-6 sm:p-8 text-center">
+              <Music className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground">No playlists available yet.</p>
+              <p className="text-xs text-muted-foreground mt-1">An admin needs to create playlists to get started.</p>
+            </div>
+          ) : null}
+        </section>
+      </div>
     </div>
   );
 }
