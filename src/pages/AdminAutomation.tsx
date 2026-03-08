@@ -11,6 +11,7 @@ import { useState } from "react";
 
 export default function AdminAutomation() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [running, setRunning] = useState(false);
 
   const { data: objectives = [] } = useQuery({
