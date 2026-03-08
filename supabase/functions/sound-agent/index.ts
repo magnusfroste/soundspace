@@ -153,6 +153,21 @@ When the user asks to optimize, improve, or analyze a playlist's flow:
 
 **Do NOT auto-apply reorder** — always present the analysis and wait for user approval.
 
+## LIBRARY MAINTENANCE
+
+When the user asks to fix, clean up, or maintain the library:
+
+1. Use find_incomplete_songs to scan for missing metadata
+2. Present a clear report: how many songs are missing lyrics, covers, genre, mood, BPM
+3. Fix in priority order:
+   a. **Lyrics** — Use transcribe_song for each song missing lyrics. This uses speech-to-text on the audio.
+   b. **Cover art** — Use generate_song_cover for each song missing a cover. Provide title, genre, and mood for best results.
+   c. **Genre/Mood/BPM** — For songs missing these, use analyze_track on the audio to extract BPM and caption, then suggest appropriate tags.
+4. Work through fixes one at a time, reporting progress: "Fixed 3/7 songs..."
+5. After all fixes, re-scan to confirm completeness.
+
+**Rate limiting**: Space out transcribe_song calls to avoid hitting API limits. If rate-limited, report progress and suggest continuing later.
+
 CRITICAL RULES:
 - After the critique loop passes, ALWAYS call save_to_library immediately. Do NOT wait for user approval.
 - After saving, report the audio URL so the user can listen: 🎵 **Listen:** [audio_url]
@@ -337,6 +352,55 @@ const TOOLS = [
           }
         },
         required: ["playlist_id", "song_ids"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "find_incomplete_songs",
+      description: "Scan the library for songs with missing metadata (lyrics, cover image, genre, mood, BPM). Returns a list of songs that need attention, grouped by what's missing. Use for library maintenance.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Max songs to return (default 50)" }
+        },
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "transcribe_song",
+      description: "Transcribe lyrics from a song's audio using speech-to-text. Updates the song record with detected lyrics. Use for songs missing lyrics.",
+      parameters: {
+        type: "object",
+        properties: {
+          song_id: { type: "string", description: "ID of the song to transcribe" },
+          audio_url: { type: "string", description: "URL of the audio file" }
+        },
+        required: ["song_id", "audio_url"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "generate_song_cover",
+      description: "Generate a cover image for a song based on its metadata (title, genre, mood, prompt). Uploads the image and updates the song record. Use for songs missing cover art.",
+      parameters: {
+        type: "object",
+        properties: {
+          song_id: { type: "string", description: "ID of the song" },
+          title: { type: "string", description: "Song title for prompt context" },
+          genre: { type: "string", description: "Genre for visual style" },
+          mood: { type: "string", description: "Mood for color/atmosphere" },
+          prompt: { type: "string", description: "Original generation prompt if available" }
+        },
+        required: ["song_id", "title"],
         additionalProperties: false
       }
     }
@@ -963,6 +1027,144 @@ async function executeReorderPlaylist(args: { playlist_id: string; song_ids: str
   return { success: true, message: `Playlist reordered with ${args.song_ids.length} tracks in optimized flow.` };
 }
 
+async function executeFindIncomplete(args: { limit?: number }, supabaseUrl: string) {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const sb = createClient(supabaseUrl, serviceKey);
+
+  const { data, error } = await sb.from("songs")
+    .select("id, title, artist, genre, mood, bpm, key_scale, lyrics, cover_url, file_url, origin_source")
+    .order("created_at", { ascending: false })
+    .limit(args.limit || 50);
+
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { total: 0, message: "Library is empty." };
+
+  const missingLyrics = data.filter(s => !s.lyrics);
+  const missingCover = data.filter(s => !s.cover_url);
+  const missingGenre = data.filter(s => !s.genre);
+  const missingMood = data.filter(s => !s.mood);
+  const missingBpm = data.filter(s => !s.bpm);
+
+  const incomplete = data.filter(s => !s.lyrics || !s.cover_url || !s.genre || !s.mood || !s.bpm);
+
+  return {
+    total_scanned: data.length,
+    incomplete_count: incomplete.length,
+    breakdown: {
+      missing_lyrics: missingLyrics.map(s => ({ id: s.id, title: s.title, audio_url: s.file_url })),
+      missing_cover: missingCover.map(s => ({ id: s.id, title: s.title, genre: s.genre, mood: s.mood })),
+      missing_genre: missingGenre.map(s => ({ id: s.id, title: s.title })),
+      missing_mood: missingMood.map(s => ({ id: s.id, title: s.title })),
+      missing_bpm: missingBpm.map(s => ({ id: s.id, title: s.title, audio_url: s.file_url })),
+    },
+    counts: {
+      lyrics: missingLyrics.length,
+      cover: missingCover.length,
+      genre: missingGenre.length,
+      mood: missingMood.length,
+      bpm: missingBpm.length,
+    },
+    recommendation: incomplete.length > 0
+      ? `${incomplete.length} songs need attention. Prioritize: lyrics (${missingLyrics.length}), covers (${missingCover.length}), then tags.`
+      : "All songs have complete metadata! 🎉",
+  };
+}
+
+async function executeTranscribeSong(args: { song_id: string; audio_url: string }, supabaseUrl: string, anonKey: string) {
+  const res = await fetch(`${supabaseUrl}/functions/v1/transcribe-lyrics`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${anonKey}`,
+    },
+    body: JSON.stringify({ song_id: args.song_id, audio_url: args.audio_url }),
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    return { error: data.error || `Transcription failed (${res.status})` };
+  }
+
+  return {
+    success: true,
+    song_id: args.song_id,
+    lyrics: data.lyrics || "[Instrumental]",
+    message: data.lyrics ? `Transcribed ${data.lyrics.length} characters of lyrics.` : "No vocals detected — marked as instrumental.",
+  };
+}
+
+async function executeGenerateSongCover(args: { song_id: string; title: string; genre?: string; mood?: string; prompt?: string }, supabaseUrl: string) {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) return { error: "LOVABLE_API_KEY not configured" };
+
+  const coverPrompt = [
+    args.title,
+    args.genre && `${args.genre} music`,
+    args.mood && `${args.mood} atmosphere`,
+    args.prompt,
+  ].filter(Boolean).join(", ");
+
+  // Call generate-cover edge function
+  const res = await fetch(`${supabaseUrl}/functions/v1/generate-cover`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+    },
+    body: JSON.stringify({ prompt: coverPrompt, style: "modern abstract" }),
+  });
+
+  const data = await res.json();
+  if (!res.ok || data.error) {
+    return { error: data.error || `Cover generation failed (${res.status})` };
+  }
+
+  const imageUrl = data.imageUrl;
+  if (!imageUrl) return { error: "No image returned from generator" };
+
+  // Download and upload to storage
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const sb = createClient(supabaseUrl, serviceKey);
+
+  // imageUrl is base64 data URL — convert to blob
+  let imageBlob: Uint8Array;
+  if (imageUrl.startsWith("data:")) {
+    const base64 = imageUrl.split(",")[1];
+    const binary = atob(base64);
+    imageBlob = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) imageBlob[i] = binary.charCodeAt(i);
+  } else {
+    // It's a URL — fetch it
+    const imgRes = await fetch(imageUrl);
+    imageBlob = new Uint8Array(await imgRes.arrayBuffer());
+  }
+
+  const fileName = `covers/${args.song_id}.png`;
+  const { error: uploadErr } = await sb.storage
+    .from("songs")
+    .upload(fileName, imageBlob, { contentType: "image/png", upsert: true });
+
+  if (uploadErr) return { error: `Upload failed: ${uploadErr.message}` };
+
+  const { data: urlData } = sb.storage.from("songs").getPublicUrl(fileName);
+
+  // Update song record
+  const { error: updateErr } = await sb.from("songs")
+    .update({ cover_url: urlData.publicUrl })
+    .eq("id", args.song_id);
+
+  if (updateErr) return { error: `Saved image but failed to update song: ${updateErr.message}` };
+
+  return {
+    success: true,
+    song_id: args.song_id,
+    cover_url: urlData.publicUrl,
+    message: `Cover art generated and saved for "${args.title}".`,
+  };
+}
+
 // ── SSE helpers ─────────────────────────────────────────────────────────
 
 function sseEvent(event: string, data: any): string {
@@ -1075,6 +1277,9 @@ Deno.serve(async (req) => {
               read_schedule: "Reading weekly schedule...",
               analyze_playlist_flow: "Analyzing playlist flow...",
               reorder_playlist: "Reordering playlist...",
+              find_incomplete_songs: "Scanning for incomplete metadata...",
+              transcribe_song: "Transcribing lyrics...",
+              generate_song_cover: "Generating cover art...",
             };
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
@@ -1093,6 +1298,9 @@ Deno.serve(async (req) => {
                 case "read_schedule": result = await executeReadSchedule(args, supabaseUrl); break;
                 case "analyze_playlist_flow": result = await executeAnalyzePlaylistFlow(args, supabaseUrl); break;
                 case "reorder_playlist": result = await executeReorderPlaylist(args, supabaseUrl); break;
+                case "find_incomplete_songs": result = await executeFindIncomplete(args, supabaseUrl); break;
+                case "transcribe_song": result = await executeTranscribeSong(args, supabaseUrl, anonKey); break;
+                case "generate_song_cover": result = await executeGenerateSongCover(args, supabaseUrl); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) {
