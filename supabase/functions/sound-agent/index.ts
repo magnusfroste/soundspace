@@ -1222,6 +1222,7 @@ Deno.serve(async (req) => {
           if (!llmRes.ok) {
             const status = llmRes.status;
             const text = await llmRes.text();
+            console.error(`[sound-agent] LLM error ${status}:`, text.slice(0, 500));
             if (status === 429) { push("error", { error: "Rate limit exceeded. Please try again shortly." }); break; }
             if (status === 402) { push("error", { error: "AI credits exhausted. Please add credits." }); break; }
             push("error", { error: `AI gateway error ${status}` });
@@ -1230,7 +1231,7 @@ Deno.serve(async (req) => {
 
           const llmData = await llmRes.json();
           const choice = llmData.choices?.[0];
-          if (!choice) { push("error", { error: "No response from AI" }); break; }
+          if (!choice) { console.error("[sound-agent] No choice in LLM response:", JSON.stringify(llmData).slice(0, 300)); push("error", { error: "No response from AI" }); break; }
 
           const msg = choice.message;
           llmMessages.push(msg);
