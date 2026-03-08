@@ -27,7 +27,7 @@
 - **Natural Back-and-Forth:** Each turn feels conversational — agent acknowledges answers, asks natural follow-ups
 - **Constraint:** ONE question per turn. Never list multiple questions. Builds brief organically through dialogue
 
-### Tools (19 total)
+### Tools (20 total)
 | Tool | Category | Description |
 |------|----------|-------------|
 | `research_music_style` | Knowledge | Venue-specific music recommendations |
@@ -37,7 +37,8 @@
 | `list_library` | Query | Search existing library |
 | `create_playlist` | Storage | Bundle tracks into playlist |
 | `analyze_library` | Analytics | Genre/mood/BPM distribution + gap analysis |
-| `update_song` | Action | Update song metadata (genre, mood, BPM, key, lyrics) |
+| `update_song` | Action | Update single song metadata |
+| `bulk_update_songs` | Action | Batch update multiple songs in one call |
 | `read_schedule` | Query | Weekly schedule with coverage analysis |
 | `analyze_playlist_flow` | Analytics | Key/BPM transition scoring |
 | `reorder_playlist` | Action | Apply optimized song order |
