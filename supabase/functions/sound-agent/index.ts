@@ -117,6 +117,25 @@ C → G → D → A → E → B → F# → Db → Ab → Eb → Bb → F → C
 - Upbeat/Groove: 100-125 BPM
 - Energy/Dance: 120-150 BPM
 
+## SCHEDULE-DRIVEN GENERATION
+
+When the user asks about their schedule, filling time slots, or auto-generating for the week:
+
+1. Use read_schedule to get all time slots with coverage analysis
+2. Present a summary: which slots are well-covered (≥80%) and which need more music
+3. For under-covered slots, suggest what to generate based on:
+   - Time of day → appropriate energy level (morning=calm, afternoon=focus, evening=upbeat, night=chill)
+   - Slot duration → how many tracks are needed (aim for ≥80% coverage)
+4. If user agrees, generate tracks using the full self-critique loop, save them, and add to the slot's playlist
+5. Use list_library first to check if suitable existing tracks could fill gaps before generating new ones
+
+**Time-of-day energy mapping:**
+- 06:00-10:00 → Calm/Focus (BPM 70-95)
+- 10:00-14:00 → Focus/Upbeat (BPM 85-110)
+- 14:00-18:00 → Upbeat/Groove (BPM 95-120)
+- 18:00-22:00 → Groove/Energy (BPM 100-130)
+- 22:00-02:00 → Chill/Calm (BPM 70-95)
+
 CRITICAL RULES:
 - After the critique loop passes, ALWAYS call save_to_library immediately. Do NOT wait for user approval.
 - After saving, report the audio URL so the user can listen: 🎵 **Listen:** [audio_url]
@@ -252,6 +271,20 @@ const TOOLS = [
       parameters: {
         type: "object",
         properties: {},
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_schedule",
+      description: "Read the weekly music schedule. Returns all time slots with their assigned playlists, song counts, and total music duration per slot. Identifies slots where music coverage is insufficient (playlist duration < slot duration). Use when the user wants to check schedule gaps or auto-fill time slots.",
+      parameters: {
+        type: "object",
+        properties: {
+          profile_id: { type: "string", description: "Profile ID to read schedule for. If not provided, reads all schedules." }
+        },
         additionalProperties: false
       }
     }
@@ -634,6 +667,93 @@ async function executeAnalyzeLibrary(supabaseUrl: string) {
   };
 }
 
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: string) {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const sb = createClient(supabaseUrl, serviceKey);
+
+  // Get schedule entries with playlist info
+  let query = sb.from("schedule_entries")
+    .select("id, day_of_week, start_time, end_time, is_active, playlist_id, color")
+    .order("day_of_week")
+    .order("start_time");
+
+  if (args.profile_id) query = query.eq("profile_id", args.profile_id);
+
+  const { data: entries, error } = await query;
+  if (error) return { error: error.message };
+  if (!entries || entries.length === 0) return { total_slots: 0, message: "No schedule entries found. The schedule is empty." };
+
+  // Get playlist details + song counts for all referenced playlists
+  const playlistIds = [...new Set(entries.map(e => e.playlist_id))];
+  const { data: playlists } = await sb.from("playlists")
+    .select("id, title")
+    .in("id", playlistIds);
+
+  const playlistMap = new Map((playlists || []).map(p => [p.id, p]));
+
+  // Get song counts and total duration per playlist
+  const { data: playlistSongs } = await sb.from("playlist_songs")
+    .select("playlist_id, song_id")
+    .in("playlist_id", playlistIds);
+
+  const songIds = [...new Set((playlistSongs || []).map(ps => ps.song_id))];
+  const { data: songs } = await sb.from("songs")
+    .select("id, duration")
+    .in("id", songIds.length > 0 ? songIds : ["none"]);
+
+  const songDurationMap = new Map((songs || []).map(s => [s.id, s.duration || 0]));
+
+  // Calculate per-playlist stats
+  const playlistStats: Record<string, { song_count: number; total_duration_min: number }> = {};
+  for (const pid of playlistIds) {
+    const pSongs = (playlistSongs || []).filter(ps => ps.playlist_id === pid);
+    const totalDur = pSongs.reduce((sum, ps) => sum + (songDurationMap.get(ps.song_id) || 0), 0);
+    playlistStats[pid] = { song_count: pSongs.length, total_duration_min: Math.round(totalDur / 60) };
+  }
+
+  // Build schedule view with gap analysis
+  const slots = entries.map(e => {
+    const playlist = playlistMap.get(e.playlist_id);
+    const stats = playlistStats[e.playlist_id] || { song_count: 0, total_duration_min: 0 };
+
+    // Calculate slot duration in minutes
+    const [sh, sm] = e.start_time.split(":").map(Number);
+    const [eh, em] = e.end_time.split(":").map(Number);
+    const slotMinutes = (eh * 60 + em) - (sh * 60 + sm);
+
+    const coveragePercent = slotMinutes > 0 ? Math.round((stats.total_duration_min / slotMinutes) * 100) : 0;
+    const needsMoreMusic = coveragePercent < 80;
+
+    return {
+      day: DAY_NAMES[e.day_of_week] || `Day ${e.day_of_week}`,
+      time: `${e.start_time.slice(0, 5)}-${e.end_time.slice(0, 5)}`,
+      slot_duration_min: slotMinutes,
+      playlist_title: playlist?.title || "Unknown",
+      playlist_id: e.playlist_id,
+      song_count: stats.song_count,
+      music_duration_min: stats.total_duration_min,
+      coverage_percent: coveragePercent,
+      needs_more_music: needsMoreMusic,
+      is_active: e.is_active,
+    };
+  });
+
+  const underCovered = slots.filter(s => s.needs_more_music && s.is_active);
+
+  return {
+    total_slots: slots.length,
+    active_slots: slots.filter(s => s.is_active).length,
+    schedule: slots,
+    under_covered_slots: underCovered.length,
+    summary: underCovered.length > 0
+      ? `${underCovered.length} active slot(s) have less than 80% music coverage. These need more tracks.`
+      : "All active slots have sufficient music coverage (≥80%).",
+  };
+}
+
 // ── SSE helpers ─────────────────────────────────────────────────────────
 
 function sseEvent(event: string, data: any): string {
@@ -743,6 +863,7 @@ Deno.serve(async (req) => {
               list_library: "Checking existing library...",
               create_playlist: "Creating playlist...",
               analyze_library: "Analyzing library collection...",
+              read_schedule: "Reading weekly schedule...",
             };
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
@@ -758,6 +879,7 @@ Deno.serve(async (req) => {
                 case "list_library": result = await executeListLibrary(args, supabaseUrl); break;
                 case "create_playlist": result = await executeCreatePlaylist(args, supabaseUrl); break;
                 case "analyze_library": result = await executeAnalyzeLibrary(supabaseUrl); break;
+                case "read_schedule": result = await executeReadSchedule(args, supabaseUrl); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) {
