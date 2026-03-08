@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Download, Save, Loader2, ListMusic, Type, ChevronDown, ChevronUp, Music2, Key, Clock3, Mic } from "lucide-react";
+import { Play, Pause, Download, Save, Loader2, ListMusic, Type, ChevronDown, ChevronUp, Music2, Key, Clock3, Mic, Scissors } from "lucide-react";
+import { TrimEditor } from "./TrimEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,6 +65,8 @@ export function OutputPreview({
   const [isPlaying, setIsPlaying] = useState(false);
   const [title, setTitle] = useState("");
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>("");
+  const [showTrimEditor, setShowTrimEditor] = useState(false);
+  const [currentAudioUrl, setCurrentAudioUrl] = useState(item.audioUrl);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
@@ -71,7 +74,9 @@ export function OutputPreview({
     setIsPlaying(false);
     setTitle("");
     setSelectedPlaylistId("");
-  }, [item.id]);
+    setShowTrimEditor(false);
+    setCurrentAudioUrl(item.audioUrl);
+  }, [item.id, item.audioUrl]);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
@@ -86,11 +91,18 @@ export function OutputPreview({
 
   const handleDownload = () => {
     const link = document.createElement("a");
-    link.href = item.audioUrl;
+    link.href = currentAudioUrl;
     link.download = `${title || "generated-music"}-${Date.now()}.mp3`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleTrimmed = (newUrl: string) => {
+    setCurrentAudioUrl(newUrl);
+    setShowTrimEditor(false);
+    // Update the item's audioUrl for saving
+    item.audioUrl = newUrl;
   };
 
   const handleSave = () => {
@@ -123,19 +135,39 @@ export function OutputPreview({
               <Play className="h-4 w-4" />
             )}
           </Button>
+          {!item.savedToLibrary && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowTrimEditor(!showTrimEditor)}
+              title="Trim audio"
+            >
+              <Scissors className="h-4 w-4" />
+            </Button>
+          )}
           <Button variant="outline" size="icon" onClick={handleDownload}>
             <Download className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      <audio
-        ref={audioRef}
-        src={item.audioUrl}
-        onEnded={() => setIsPlaying(false)}
-        className="w-full"
-        controls
-      />
+      {showTrimEditor && (
+        <TrimEditor
+          audioUrl={currentAudioUrl}
+          onTrimmed={handleTrimmed}
+          onCancel={() => setShowTrimEditor(false)}
+        />
+      )}
+
+      {!showTrimEditor && (
+        <audio
+          ref={audioRef}
+          src={currentAudioUrl}
+          onEnded={() => setIsPlaying(false)}
+          className="w-full"
+          controls
+        />
+      )}
 
       {(item.bpm || item.keyScale || item.timeSignature || item.vocalLanguage) && (
         <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
