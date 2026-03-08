@@ -611,6 +611,11 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) 
 }
 
 async function executeAnalyze(args: { audio_url: string }, supabaseUrl: string, anonKey: string) {
+  // Check if ACE-Step integration is enabled
+  const aceStepEnabled = await isIntegrationEnabledServer("acestep", supabaseUrl);
+  if (!aceStepEnabled) {
+    return { error: "ACE-Step integration is disabled. Enable it in the Integrations panel to analyze tracks." };
+  }
   const acestepProxy = `${supabaseUrl}/functions/v1/acestep-proxy`;
   const extractRes = await fetch(acestepProxy, {
     method: "POST",
