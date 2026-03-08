@@ -789,6 +789,163 @@ async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: s
   };
 }
 
+// Circle of Fifths distance for transition scoring
+const KEY_ORDER = ["C", "G", "D", "A", "E", "B", "F#", "Db", "Ab", "Eb", "Bb", "F"];
+
+function keyDistance(a: string, b: string): number {
+  if (!a || !b) return 6; // unknown = neutral
+  const normalizeKey = (k: string) => k.replace(/ (major|minor)$/i, "").replace("♯", "#").replace("♭", "b");
+  const isMinor = (k: string) => /minor/i.test(k);
+  // Convert minor to relative major for comparison
+  const minorToMajor: Record<string, string> = { "A": "C", "E": "G", "B": "D", "F#": "A", "C#": "E", "G#": "B", "D#": "F#", "Bb": "Db", "F": "Ab", "C": "Eb", "G": "Bb", "D": "F" };
+  
+  let ka = normalizeKey(a);
+  let kb = normalizeKey(b);
+  if (isMinor(a) && minorToMajor[ka]) ka = minorToMajor[ka];
+  if (isMinor(b) && minorToMajor[kb]) kb = minorToMajor[kb];
+  
+  const ia = KEY_ORDER.indexOf(ka);
+  const ib = KEY_ORDER.indexOf(kb);
+  if (ia === -1 || ib === -1) return 3;
+  const dist = Math.abs(ia - ib);
+  return Math.min(dist, 12 - dist);
+}
+
+function transitionScore(keyDist: number, bpmDiff: number): { score: number; label: string } {
+  // Key: 0-1 steps = great, 2 = ok, 3+ = rough
+  // BPM: <8 = great, 8-15 = ok, 15+ = rough
+  const keyScore = keyDist <= 1 ? 3 : keyDist <= 2 ? 2 : 1;
+  const bpmScore = bpmDiff <= 8 ? 3 : bpmDiff <= 15 ? 2 : 1;
+  const total = keyScore + bpmScore; // 2-6
+  const label = total >= 5 ? "smooth" : total >= 3 ? "acceptable" : "rough";
+  return { score: total, label };
+}
+
+async function executeAnalyzePlaylistFlow(args: { playlist_id: string }, supabaseUrl: string) {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const sb = createClient(supabaseUrl, serviceKey);
+
+  // Get playlist info
+  const { data: playlist } = await sb.from("playlists").select("id, title").eq("id", args.playlist_id).single();
+  if (!playlist) return { error: "Playlist not found" };
+
+  // Get songs in order
+  const { data: entries } = await sb.from("playlist_songs")
+    .select("song_id, position")
+    .eq("playlist_id", args.playlist_id)
+    .order("position");
+
+  if (!entries || entries.length === 0) return { error: "Playlist is empty" };
+
+  const songIds = entries.map(e => e.song_id);
+  const { data: songs } = await sb.from("songs")
+    .select("id, title, bpm, key_scale, mood, genre")
+    .in("id", songIds);
+
+  if (!songs) return { error: "Could not fetch song details" };
+
+  const songMap = new Map(songs.map(s => [s.id, s]));
+  const ordered = songIds.map(id => songMap.get(id)).filter(Boolean) as any[];
+
+  // Analyze current flow
+  const transitions: any[] = [];
+  let totalScore = 0;
+  for (let i = 0; i < ordered.length - 1; i++) {
+    const a = ordered[i];
+    const b = ordered[i + 1];
+    const kd = keyDistance(a.key_scale || "", b.key_scale || "");
+    const bd = Math.abs((a.bpm || 0) - (b.bpm || 0));
+    const ts = transitionScore(kd, bd);
+    totalScore += ts.score;
+    transitions.push({
+      from: a.title,
+      to: b.title,
+      key_from: a.key_scale || "?",
+      key_to: b.key_scale || "?",
+      bpm_from: a.bpm || "?",
+      bpm_to: b.bpm || "?",
+      key_distance: kd,
+      bpm_diff: bd,
+      quality: ts.label,
+      score: ts.score,
+    });
+  }
+
+  const avgScore = transitions.length > 0 ? Math.round((totalScore / (transitions.length * 6)) * 100) : 100;
+  const roughTransitions = transitions.filter(t => t.quality === "rough").length;
+
+  // Generate optimized order using nearest-neighbor on Circle of Fifths + BPM
+  const optimized = [ordered[0]];
+  const remaining = ordered.slice(1);
+  while (remaining.length > 0) {
+    const last = optimized[optimized.length - 1];
+    let bestIdx = 0;
+    let bestCost = Infinity;
+    for (let i = 0; i < remaining.length; i++) {
+      const kd = keyDistance(last.key_scale || "", remaining[i].key_scale || "");
+      const bd = Math.abs((last.bpm || 0) - (remaining[i].bpm || 0));
+      const cost = kd * 3 + bd * 0.2; // Weight key transitions more
+      if (cost < bestCost) { bestCost = cost; bestIdx = i; }
+    }
+    optimized.push(remaining.splice(bestIdx, 1)[0]);
+  }
+
+  // Score optimized order
+  let optScore = 0;
+  for (let i = 0; i < optimized.length - 1; i++) {
+    const kd = keyDistance(optimized[i].key_scale || "", optimized[i + 1].key_scale || "");
+    const bd = Math.abs((optimized[i].bpm || 0) - (optimized[i + 1].bpm || 0));
+    optScore += transitionScore(kd, bd).score;
+  }
+  const optAvgScore = optimized.length > 1 ? Math.round((optScore / ((optimized.length - 1) * 6)) * 100) : 100;
+
+  return {
+    playlist_title: playlist.title,
+    track_count: ordered.length,
+    current_flow_score: avgScore,
+    rough_transitions: roughTransitions,
+    transitions,
+    optimized_flow_score: optAvgScore,
+    improvement: optAvgScore - avgScore,
+    suggested_order: optimized.map((s, i) => ({
+      position: i,
+      song_id: s.id,
+      title: s.title,
+      bpm: s.bpm,
+      key: s.key_scale,
+    })),
+    suggested_song_ids: optimized.map(s => s.id),
+    recommendation: optAvgScore > avgScore
+      ? `Reordering can improve flow from ${avgScore}% to ${optAvgScore}% (+${optAvgScore - avgScore}%). Use reorder_playlist to apply.`
+      : "Current order is already well-optimized.",
+  };
+}
+
+async function executeReorderPlaylist(args: { playlist_id: string; song_ids: string[] }, supabaseUrl: string) {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const sb = createClient(supabaseUrl, serviceKey);
+
+  // Delete existing entries and re-insert in new order
+  const { error: delErr } = await sb.from("playlist_songs")
+    .delete()
+    .eq("playlist_id", args.playlist_id);
+
+  if (delErr) return { error: `Failed to clear playlist: ${delErr.message}` };
+
+  const entries = args.song_ids.map((songId, i) => ({
+    playlist_id: args.playlist_id,
+    song_id: songId,
+    position: i,
+  }));
+
+  const { error: insErr } = await sb.from("playlist_songs").insert(entries);
+  if (insErr) return { error: `Failed to reorder: ${insErr.message}` };
+
+  return { success: true, message: `Playlist reordered with ${args.song_ids.length} tracks in optimized flow.` };
+}
+
 // ── SSE helpers ─────────────────────────────────────────────────────────
 
 function sseEvent(event: string, data: any): string {
