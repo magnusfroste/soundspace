@@ -78,6 +78,10 @@ export function Navbar() {
               <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 About
               </a>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-sm text-muted-foreground">Theme</span>
+                <ThemeToggle />
+              </div>
               <Button 
                 className="w-full rounded-full bg-primary hover:bg-primary/90 mt-2"
                 onClick={() => navigate("/auth")}
