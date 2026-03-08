@@ -36,22 +36,8 @@ export function AppHeader({ viewMode, onViewModeChange, showChatToggle }: AppHea
   return (
     <header className="h-12 flex items-center justify-between border-b border-border bg-background/95 backdrop-blur-sm px-4 flex-shrink-0">
       <div className="flex items-center gap-3">
-        {/* Sidebar trigger — only in dashboard mode */}
-        {viewMode === "dashboard" && (
-          <SidebarTrigger className="h-7 w-7" />
-        )}
-
-        {/* Logo — visible in chat mode when sidebar is hidden */}
-        {viewMode === "chat" && (
-          <div className="flex items-center gap-2 mr-2">
-            <div className="h-7 w-7 rounded-md bg-primary flex items-center justify-center">
-              <Music2 className="h-3.5 w-3.5 text-primary-foreground" />
-            </div>
-            <span className="text-sm font-bold tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
-              SoundSpace
-            </span>
-          </div>
-        )}
+        {/* Sidebar trigger — always visible (controls whichever sidebar is active) */}
+        <SidebarTrigger className="h-7 w-7" />
 
         {/* Mode toggle */}
         {showChatToggle && (
