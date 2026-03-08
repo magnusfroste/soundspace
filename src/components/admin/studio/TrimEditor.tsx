@@ -309,36 +309,57 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
         </div>
       )}
 
-      {/* Fade controls */}
+      {/* Fade and Normalize controls */}
       {isReady && (
-        <div className="grid grid-cols-2 gap-4 p-3 rounded-md border bg-muted/20">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Fade In</Label>
-              <span className="text-xs font-mono text-muted-foreground">{fadeIn.toFixed(1)}s</span>
+        <div className="space-y-3 p-3 rounded-md border bg-muted/20">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Fade In</Label>
+                <span className="text-xs font-mono text-muted-foreground">{fadeIn.toFixed(1)}s</span>
+              </div>
+              <Slider
+                value={[fadeIn]}
+                onValueChange={([v]) => setFadeIn(Math.round(v * 10) / 10)}
+                min={0}
+                max={Math.min(maxFade, 10)}
+                step={0.1}
+                className="w-full"
+              />
             </div>
-            <Slider
-              value={[fadeIn]}
-              onValueChange={([v]) => setFadeIn(Math.round(v * 10) / 10)}
-              min={0}
-              max={Math.min(maxFade, 10)}
-              step={0.1}
-              className="w-full"
-            />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Fade Out</Label>
+                <span className="text-xs font-mono text-muted-foreground">{fadeOut.toFixed(1)}s</span>
+              </div>
+              <Slider
+                value={[fadeOut]}
+                onValueChange={([v]) => setFadeOut(Math.round(v * 10) / 10)}
+                min={0}
+                max={Math.min(maxFade, 10)}
+                step={0.1}
+                className="w-full"
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Fade Out</Label>
-              <span className="text-xs font-mono text-muted-foreground">{fadeOut.toFixed(1)}s</span>
-            </div>
-            <Slider
-              value={[fadeOut]}
-              onValueChange={([v]) => setFadeOut(Math.round(v * 10) / 10)}
-              min={0}
-              max={Math.min(maxFade, 10)}
-              step={0.1}
-              className="w-full"
+          
+          {/* Normalize checkbox */}
+          <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+            <Checkbox
+              id="normalize"
+              checked={normalizeAudio}
+              onCheckedChange={(checked) => setNormalizeAudio(checked as boolean)}
+              disabled={isTrimming}
             />
+            <label htmlFor="normalize" className="flex items-center gap-2 cursor-pointer text-xs font-medium">
+              <Volume2 className="h-3.5 w-3.5 text-primary" />
+              Normalize volume to -3dB
+            </label>
+            {peakLevel !== null && (
+              <span className="text-xs text-muted-foreground ml-auto font-mono">
+                Peak: {peakLevel.toFixed(1)} dB
+              </span>
+            )}
           </div>
         </div>
       )}
