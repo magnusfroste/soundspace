@@ -200,6 +200,52 @@ export default function HomePage() {
         </p>
       </div>
 
+      {/* Continue Listening Section */}
+      {continueListening && continueListening.songs.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Headphones className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-semibold">Continue Listening</h2>
+          </div>
+
+          <div className="glass rounded-xl p-4 flex items-center gap-4">
+            <div className="h-16 w-16 rounded-lg bg-muted flex-shrink-0 overflow-hidden">
+              {continueListening.playlist.cover_image_url ? (
+                <img
+                  src={continueListening.playlist.cover_image_url}
+                  alt={continueListening.playlist.title}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="h-full w-full flex items-center justify-center">
+                  <Music className="h-6 w-6 text-muted-foreground" />
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold truncate">{continueListening.playlist.title}</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {continueListening.songs.length} songs · Track {continueListening.resumeIndex + 1}
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="flex-shrink-0 gap-1.5"
+              onClick={() =>
+                playQueue(
+                  continueListening.songs,
+                  continueListening.resumeIndex,
+                  continueListening.playlist.id
+                )
+              }
+            >
+              <Play className="h-3.5 w-3.5" />
+              Resume
+            </Button>
+          </div>
+        </section>
+      )}
+
       {/* Suggested Playlists Section */}
       {hasSuggestedPlaylists && (
         <section>
