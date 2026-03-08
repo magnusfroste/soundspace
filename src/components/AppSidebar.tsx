@@ -47,24 +47,7 @@ export function AppSidebar() {
   const isAdmin = role === "admin";
 
   // Fetch enabled modules to conditionally show SoundAgent
-  const { data: moduleSettings } = useQuery({
-    queryKey: ["site-settings", "modules"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("site_settings")
-        .select("*")
-        .in("key", ["modules", "plugins"]);
-      if (error) throw error;
-      const modulesRow = data?.find((r) => r.key === "modules");
-      if (modulesRow) return (modulesRow.value as any) || { enabled_modules: [] };
-      const pluginsRow = data?.find((r) => r.key === "plugins");
-      if (pluginsRow) {
-        const legacy = pluginsRow.value as any;
-        return { enabled_modules: legacy?.enabled_plugins || [] };
-      }
-      return { enabled_modules: [] };
-    },
-  });
+  const { data: moduleSettings } = useModuleSettings();
 
   const enabledModules: string[] = Array.isArray(moduleSettings?.enabled_modules) ? moduleSettings.enabled_modules : [];
   const soundAgentEnabled = enabledModules.includes("sound-agent");
