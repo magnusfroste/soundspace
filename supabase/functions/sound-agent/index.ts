@@ -525,7 +525,25 @@ function executeResearch(args: { venue_type: string; atmosphere?: string }) {
   };
 }
 
+async function isIntegrationEnabledServer(integrationId: string, supabaseUrl: string): Promise<boolean> {
+  try {
+    const sb = getServiceClient(supabaseUrl);
+    const { data } = await sb.from("site_settings").select("value").eq("key", "integrations_enabled").maybeSingle();
+    if (!data?.value) return true; // Default to enabled if no settings found
+    const state = data.value as Record<string, boolean>;
+    return state[integrationId] !== false;
+  } catch {
+    return true; // Default to enabled on error
+  }
+}
+
 async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) {
+  // Check if ACE-Step integration is enabled
+  const aceStepEnabled = await isIntegrationEnabledServer("acestep", supabaseUrl);
+  if (!aceStepEnabled) {
+    return { error: "ACE-Step integration is disabled. Enable it in the Integrations panel to generate tracks." };
+  }
+
   const acestepProxy = `${supabaseUrl}/functions/v1/acestep-proxy`;
   const headers: Record<string, string> = { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` };
   const caption = args.prompt;
