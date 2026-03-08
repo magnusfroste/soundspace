@@ -66,14 +66,52 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("AI response received");
+    console.log("AI response keys:", JSON.stringify(Object.keys(data)));
 
-    // Extract the image from the response
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    // Try multiple response formats:
+    // 1. OpenAI-style: choices[0].message.images[0].image_url.url
+    // 2. Lovable Gateway: choices[0].message.content with inline base64 parts
+    // 3. Gemini native: candidates[0].content.parts[].inlineData
+    let imageUrl: string | null = null;
+
+    // Format 1: images array
+    imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url ?? null;
+
+    // Format 2: content parts with inline_image or image_url
+    if (!imageUrl) {
+      const content = data.choices?.[0]?.message?.content;
+      if (Array.isArray(content)) {
+        for (const part of content) {
+          if (part.type === "image_url" && part.image_url?.url) {
+            imageUrl = part.image_url.url;
+            break;
+          }
+          if (part.inline_data?.data) {
+            imageUrl = `data:${part.inline_data.mime_type || "image/png"};base64,${part.inline_data.data}`;
+            break;
+          }
+        }
+      }
+    }
+
+    // Format 3: Gemini native candidates format
+    if (!imageUrl && data.candidates?.[0]?.content?.parts) {
+      for (const part of data.candidates[0].content.parts) {
+        if (part.inlineData?.data) {
+          imageUrl = `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`;
+          break;
+        }
+      }
+    }
+
+    // Format 4: OpenAI images.generate style (b64_json)
+    if (!imageUrl && data.data?.[0]?.b64_json) {
+      imageUrl = `data:image/png;base64,${data.data[0].b64_json}`;
+    }
 
     if (!imageUrl) {
-      console.error("No image in response:", JSON.stringify(data));
-      throw new Error("No image generated");
+      console.error("No image in response. Response structure:", JSON.stringify(data).slice(0, 500));
+      throw new Error("No image generated — unexpected response format");
     }
 
     return new Response(
