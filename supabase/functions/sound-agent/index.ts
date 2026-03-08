@@ -340,6 +340,55 @@ const TOOLS = [
         additionalProperties: false
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "find_incomplete_songs",
+      description: "Scan the library for songs with missing metadata (lyrics, cover image, genre, mood, BPM). Returns a list of songs that need attention, grouped by what's missing. Use for library maintenance.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Max songs to return (default 50)" }
+        },
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "transcribe_song",
+      description: "Transcribe lyrics from a song's audio using speech-to-text. Updates the song record with detected lyrics. Use for songs missing lyrics.",
+      parameters: {
+        type: "object",
+        properties: {
+          song_id: { type: "string", description: "ID of the song to transcribe" },
+          audio_url: { type: "string", description: "URL of the audio file" }
+        },
+        required: ["song_id", "audio_url"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "generate_song_cover",
+      description: "Generate a cover image for a song based on its metadata (title, genre, mood, prompt). Uploads the image and updates the song record. Use for songs missing cover art.",
+      parameters: {
+        type: "object",
+        properties: {
+          song_id: { type: "string", description: "ID of the song" },
+          title: { type: "string", description: "Song title for prompt context" },
+          genre: { type: "string", description: "Genre for visual style" },
+          mood: { type: "string", description: "Mood for color/atmosphere" },
+          prompt: { type: "string", description: "Original generation prompt if available" }
+        },
+        required: ["song_id", "title"],
+        additionalProperties: false
+      }
+    }
   }
 ];
 
