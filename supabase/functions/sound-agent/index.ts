@@ -552,6 +552,80 @@ async function executeListLibrary(args: any, supabaseUrl: string) {
   return { songs: data, count: data?.length || 0 };
 }
 
+async function executeAnalyzeLibrary(supabaseUrl: string) {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const sb = createClient(supabaseUrl, serviceKey);
+
+  const { data, error } = await sb.from("songs")
+    .select("genre, mood, bpm, key_scale, quality_score, duration");
+
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { total: 0, message: "Library is empty. No songs to analyze." };
+
+  // Genre distribution
+  const genreCounts: Record<string, number> = {};
+  const moodCounts: Record<string, number> = {};
+  const keyCounts: Record<string, number> = {};
+  const bpmBuckets = { "60-85 (Calm)": 0, "85-100 (Focus)": 0, "100-125 (Upbeat)": 0, "125-160 (Energy)": 0, "other": 0 };
+  let totalDuration = 0;
+  let withBpm = 0;
+  let qualityScores: number[] = [];
+
+  for (const song of data) {
+    const genre = song.genre || "Untagged";
+    genreCounts[genre] = (genreCounts[genre] || 0) + 1;
+
+    const mood = song.mood || "Untagged";
+    moodCounts[mood] = (moodCounts[mood] || 0) + 1;
+
+    if (song.key_scale) keyCounts[song.key_scale] = (keyCounts[song.key_scale] || 0) + 1;
+
+    if (song.bpm) {
+      withBpm++;
+      if (song.bpm >= 60 && song.bpm < 85) bpmBuckets["60-85 (Calm)"]++;
+      else if (song.bpm >= 85 && song.bpm < 100) bpmBuckets["85-100 (Focus)"]++;
+      else if (song.bpm >= 100 && song.bpm < 125) bpmBuckets["100-125 (Upbeat)"]++;
+      else if (song.bpm >= 125 && song.bpm <= 160) bpmBuckets["125-160 (Energy)"]++;
+      else bpmBuckets["other"]++;
+    }
+
+    if (song.quality_score != null) qualityScores.push(Number(song.quality_score));
+    totalDuration += song.duration || 0;
+  }
+
+  // Identify gaps
+  const expectedGenres = ["Jazz", "Ambient", "Acoustic", "Electronic", "Classical", "Lo-Fi", "World"];
+  const missingGenres = expectedGenres.filter(g => !Object.keys(genreCounts).some(k => k.toLowerCase().includes(g.toLowerCase())));
+
+  const expectedMoods = ["Relaxed", "Energetic", "Focused", "Uplifting", "Calm", "Romantic"];
+  const missingMoods = expectedMoods.filter(m => !Object.keys(moodCounts).some(k => k.toLowerCase().includes(m.toLowerCase())));
+
+  const emptyBpmRanges = Object.entries(bpmBuckets).filter(([k, v]) => v === 0 && k !== "other").map(([k]) => k);
+
+  const avgQuality = qualityScores.length > 0
+    ? Math.round(qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length)
+    : null;
+
+  return {
+    total_tracks: data.length,
+    total_duration_minutes: Math.round(totalDuration / 60),
+    genre_distribution: genreCounts,
+    mood_distribution: moodCounts,
+    bpm_distribution: bpmBuckets,
+    key_distribution: keyCounts,
+    average_quality_score: avgQuality,
+    gaps: {
+      missing_genres: missingGenres,
+      missing_moods: missingMoods,
+      empty_bpm_ranges: emptyBpmRanges,
+    },
+    recommendations: missingGenres.length > 0 || missingMoods.length > 0 || emptyBpmRanges.length > 0
+      ? `Gaps found: ${missingGenres.length} missing genres, ${missingMoods.length} missing moods, ${emptyBpmRanges.length} empty BPM ranges. Consider generating tracks to fill these.`
+      : "Library is well-balanced across genres, moods, and BPM ranges.",
+  };
+}
+
 // ── SSE helpers ─────────────────────────────────────────────────────────
 
 function sseEvent(event: string, data: any): string {
