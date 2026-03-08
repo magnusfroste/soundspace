@@ -73,7 +73,10 @@ export function AppSidebar() {
   // Build admin nav with conditional SoundAgent
   const adminNav = [
     ...adminNavStatic.slice(0, 2), // Dashboard, AI Studio
-    ...(soundAgentEnabled ? [{ title: "SoundAgent", url: "/admin/agent", icon: Bot }] : []),
+    ...(soundAgentEnabled ? [
+      { title: "SoundAgent", url: "/admin/agent", icon: Bot },
+      { title: "Objectives", url: "/admin/objectives", icon: Target },
+    ] : []),
     ...adminNavStatic.slice(2), // rest
   ];
 

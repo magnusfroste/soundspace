@@ -99,6 +99,7 @@ const App = () => (
               <Route path="/admin/plugins" element={<AdminModules />} />
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/agent" element={<AdminAgent />} />
+              <Route path="/admin/objectives" element={<AdminObjectives />} />
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
