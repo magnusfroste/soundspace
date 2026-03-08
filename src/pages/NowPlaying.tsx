@@ -6,21 +6,21 @@ export default function NowPlaying() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold flex items-center gap-2">
-        <Radio className="h-6 w-6 text-primary" />
-        Tocando Agora
+      <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+        <Radio className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+        Now Playing
       </h1>
 
       {currentSong ? (
-        <div className="glass rounded-2xl p-8 flex flex-col items-center text-center">
-          <div className="h-48 w-48 rounded-2xl bg-muted flex items-center justify-center overflow-hidden mb-6">
+        <div className="glass rounded-2xl p-6 sm:p-8 flex flex-col items-center text-center">
+          <div className="h-40 w-40 sm:h-48 sm:w-48 rounded-2xl bg-muted flex items-center justify-center overflow-hidden mb-4 sm:mb-6">
             {currentSong.cover_url ? (
               <img src={currentSong.cover_url} alt={currentSong.title} className="h-full w-full object-cover" />
             ) : (
-              <Music className="h-20 w-20 text-muted-foreground" />
+              <Music className="h-16 w-16 sm:h-20 sm:w-20 text-muted-foreground" />
             )}
           </div>
-          <h2 className="text-2xl font-bold">{currentSong.title}</h2>
+          <h2 className="text-xl sm:text-2xl font-bold">{currentSong.title}</h2>
           <p className="text-muted-foreground mt-1">{currentSong.artist}</p>
           {currentSong.genre && (
             <span className="mt-3 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs">
@@ -37,9 +37,9 @@ export default function NowPlaying() {
           )}
 
           {queue.length > 1 && (
-            <div className="mt-8 w-full max-w-md">
-              <h3 className="text-sm font-medium text-muted-foreground mb-3">Fila ({queue.length} músicas)</h3>
-              <div className="space-y-1">
+            <div className="mt-6 sm:mt-8 w-full max-w-md">
+              <h3 className="text-sm font-medium text-muted-foreground mb-3">Queue ({queue.length} songs)</h3>
+              <div className="space-y-1 max-h-[40vh] overflow-auto">
                 {queue.map((s, i) => (
                   <div
                     key={s.id}
@@ -47,9 +47,9 @@ export default function NowPlaying() {
                       s.id === currentSong.id ? "bg-primary/10 text-primary" : "text-muted-foreground"
                     }`}
                   >
-                    <span className="w-6 text-center">{i + 1}</span>
+                    <span className="w-6 text-center shrink-0">{i + 1}</span>
                     <span className="truncate flex-1">{s.title}</span>
-                    <span className="text-xs">{s.artist}</span>
+                    <span className="text-xs shrink-0 hidden sm:inline">{s.artist}</span>
                   </div>
                 ))}
               </div>
@@ -57,10 +57,10 @@ export default function NowPlaying() {
           )}
         </div>
       ) : (
-        <div className="glass rounded-2xl p-12 text-center">
-          <Music className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Nada tocando</h2>
-          <p className="text-muted-foreground">Escolha uma playlist para começar.</p>
+        <div className="glass rounded-2xl p-8 sm:p-12 text-center">
+          <Music className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-lg sm:text-xl font-semibold mb-2">Nothing playing</h2>
+          <p className="text-muted-foreground text-sm sm:text-base">Choose a playlist to get started.</p>
         </div>
       )}
     </div>

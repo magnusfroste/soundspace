@@ -6,7 +6,6 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 const COLORS = ["hsl(var(--primary))", "hsl(var(--accent))", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
 export default function AdminDashboard() {
-  // Fetch stats
   const { data: stats } = useQuery({
     queryKey: ["admin-stats"],
     queryFn: async () => {
@@ -26,7 +25,6 @@ export default function AdminDashboard() {
     },
   });
 
-  // Fetch top songs
   const { data: topSongs } = useQuery({
     queryKey: ["admin-top-songs"],
     queryFn: async () => {
@@ -37,7 +35,6 @@ export default function AdminDashboard() {
 
       if (error) throw error;
 
-      // Count plays per song
       const counts: Record<string, { title: string; artist: string; plays: number }> = {};
       data?.forEach((log) => {
         const songId = log.song_id;
@@ -56,7 +53,6 @@ export default function AdminDashboard() {
     },
   });
 
-  // Fetch top playlists by song count
   const { data: topPlaylists } = useQuery({
     queryKey: ["admin-top-playlists"],
     queryFn: async () => {
@@ -79,14 +75,10 @@ export default function AdminDashboard() {
     },
   });
 
-  // Fetch plays by genre
   const { data: genreData } = useQuery({
     queryKey: ["admin-genre-stats"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("songs")
-        .select("genre");
-
+      const { data, error } = await supabase.from("songs").select("genre");
       if (error) throw error;
 
       const counts: Record<string, number> = {};
@@ -111,48 +103,49 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold flex items-center gap-2">
-        <LayoutDashboard className="h-6 w-6 text-primary" />
+      <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+        <LayoutDashboard className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
         Analytics Dashboard
       </h1>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statCards.map((stat) => (
-          <div key={stat.label} className="glass rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <stat.icon className={`h-5 w-5 ${stat.color}`} />
-              <span className="text-sm text-muted-foreground">{stat.label}</span>
+          <div key={stat.label} className="glass rounded-xl p-4 sm:p-5">
+            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+              <stat.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${stat.color}`} />
+              <span className="text-xs sm:text-sm text-muted-foreground truncate">{stat.label}</span>
             </div>
-            <p className="text-3xl font-bold">{stat.value}</p>
+            <p className="text-2xl sm:text-3xl font-bold">{stat.value}</p>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Top Songs Chart */}
-        <div className="glass rounded-xl p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-primary" />
+        <div className="glass rounded-xl p-4 sm:p-6">
+          <h2 className="text-base sm:text-lg font-semibold mb-4 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             Most Played Songs
           </h2>
           {topSongs && topSongs.length > 0 ? (
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={topSongs} layout="vertical" margin={{ left: 80 }}>
-                <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+              <BarChart data={topSongs} layout="vertical" margin={{ left: 60, right: 10, top: 5, bottom: 5 }}>
+                <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={11} />
                 <YAxis
                   type="category"
                   dataKey="title"
                   stroke="hsl(var(--muted-foreground))"
-                  fontSize={12}
-                  width={75}
-                  tickFormatter={(v) => (v.length > 12 ? v.slice(0, 12) + "…" : v)}
+                  fontSize={11}
+                  width={55}
+                  tickFormatter={(v) => (v.length > 10 ? v.slice(0, 10) + "…" : v)}
                 />
                 <Tooltip
                   contentStyle={{
                     background: "hsl(var(--card))",
                     border: "1px solid hsl(var(--border))",
                     borderRadius: "8px",
+                    fontSize: "12px",
                   }}
                   labelStyle={{ color: "hsl(var(--foreground))" }}
                 />
@@ -170,14 +163,14 @@ export default function AdminDashboard() {
         </div>
 
         {/* Genre Distribution */}
-        <div className="glass rounded-xl p-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Music className="h-5 w-5 text-primary" />
+        <div className="glass rounded-xl p-4 sm:p-6">
+          <h2 className="text-base sm:text-lg font-semibold mb-4 flex items-center gap-2">
+            <Music className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
             Songs by Genre
           </h2>
           {genreData && genreData.length > 0 ? (
-            <div className="flex items-center gap-4">
-              <ResponsiveContainer width="50%" height={200}>
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <ResponsiveContainer width="100%" height={200} className="sm:max-w-[50%]">
                 <PieChart>
                   <Pie
                     data={genreData}
@@ -185,8 +178,8 @@ export default function AdminDashboard() {
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={80}
-                    innerRadius={40}
+                    outerRadius={70}
+                    innerRadius={35}
                   >
                     {genreData.map((_, index) => (
                       <Cell key={index} fill={COLORS[index % COLORS.length]} />
@@ -197,19 +190,20 @@ export default function AdminDashboard() {
                       background: "hsl(var(--card))",
                       border: "1px solid hsl(var(--border))",
                       borderRadius: "8px",
+                      fontSize: "12px",
                     }}
                   />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="flex-1 space-y-2">
+              <div className="flex-1 space-y-2 w-full sm:w-auto">
                 {genreData.map((item, index) => (
                   <div key={item.name} className="flex items-center gap-2 text-sm">
                     <div
-                      className="h-3 w-3 rounded-full"
+                      className="h-3 w-3 rounded-full shrink-0"
                       style={{ background: COLORS[index % COLORS.length] }}
                     />
-                    <span className="text-muted-foreground">{item.name}</span>
-                    <span className="ml-auto font-medium">{item.value}</span>
+                    <span className="text-muted-foreground truncate">{item.name}</span>
+                    <span className="ml-auto font-medium shrink-0">{item.value}</span>
                   </div>
                 ))}
               </div>
@@ -223,24 +217,24 @@ export default function AdminDashboard() {
       </div>
 
       {/* Top Playlists */}
-      <div className="glass rounded-xl p-6">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <ListMusic className="h-5 w-5 text-primary" />
+      <div className="glass rounded-xl p-4 sm:p-6">
+        <h2 className="text-base sm:text-lg font-semibold mb-4 flex items-center gap-2">
+          <ListMusic className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
           Top Playlists
         </h2>
         {topPlaylists && topPlaylists.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
             {topPlaylists.map((pl, index) => (
               <div key={pl.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30">
-                <div className="text-2xl font-bold text-muted-foreground w-6">
+                <div className="text-xl sm:text-2xl font-bold text-muted-foreground w-5 sm:w-6 shrink-0">
                   {index + 1}
                 </div>
-                <div className="h-12 w-12 rounded-lg bg-muted overflow-hidden shrink-0">
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg bg-muted overflow-hidden shrink-0">
                   {pl.cover ? (
                     <img src={pl.cover} alt={pl.title} className="h-full w-full object-cover" />
                   ) : (
                     <div className="h-full w-full flex items-center justify-center">
-                      <Music className="h-5 w-5 text-muted-foreground" />
+                      <Music className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                     </div>
                   )}
                 </div>
