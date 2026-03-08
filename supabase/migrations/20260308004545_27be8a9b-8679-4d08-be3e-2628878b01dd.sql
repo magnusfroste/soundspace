@@ -1,0 +1,1 @@
+ALTER TABLE public.songs ADD COLUMN quality_score numeric NULL;

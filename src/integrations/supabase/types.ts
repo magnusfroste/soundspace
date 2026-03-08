@@ -501,6 +501,7 @@ export type Database = {
           mood: string | null
           origin_source: string | null
           prompt: string | null
+          quality_score: number | null
           time_signature: string | null
           title: string
         }
@@ -518,6 +519,7 @@ export type Database = {
           mood?: string | null
           origin_source?: string | null
           prompt?: string | null
+          quality_score?: number | null
           time_signature?: string | null
           title: string
         }
@@ -535,6 +537,7 @@ export type Database = {
           mood?: string | null
           origin_source?: string | null
           prompt?: string | null
+          quality_score?: number | null
           time_signature?: string | null
           title?: string
         }
