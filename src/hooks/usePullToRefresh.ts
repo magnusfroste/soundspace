@@ -44,6 +44,10 @@ export function usePullToRefresh({
     pulling.current = false;
 
     if (pullDistance >= threshold) {
+      // Haptic feedback if available
+      if (navigator.vibrate) {
+        navigator.vibrate(15);
+      }
       setIsRefreshing(true);
       setPullDistance(threshold * 0.6); // Settle to spinner position
       try {
