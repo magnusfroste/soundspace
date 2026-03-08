@@ -1167,6 +1167,8 @@ Deno.serve(async (req) => {
   const { messages, conversation_id, settings } = reqBody;
   const chatModel = settings?.chatModel || "google/gemini-3-flash-preview";
   const sttProvider = settings?.sttProvider || "elevenlabs";
+
+  console.log(`[sound-agent] Request: model=${chatModel}, messages=${messages?.length || 0}, conv=${conversation_id}`);
   
   // Determine which API to use based on model prefix
   const useNativeOpenAI = chatModel.startsWith("openai/") && Deno.env.get("OPENAI_API_KEY");
@@ -1175,6 +1177,7 @@ Deno.serve(async (req) => {
   // Fallback to Lovable gateway if no native key configured
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!useNativeOpenAI && !useNativeGemini && !LOVABLE_API_KEY) {
+    console.error("[sound-agent] No AI API key configured");
     return new Response(JSON.stringify({ error: "No AI API key configured. Add OPENAI_API_KEY, GOOGLE_AI_API_KEY, or LOVABLE_API_KEY." }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
