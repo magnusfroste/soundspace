@@ -1165,6 +1165,57 @@ async function executeGenerateSongCover(args: { song_id: string; title: string; 
   };
 }
 
+// ── LLM routing helpers ─────────────────────────────────────────────────
+
+interface LLMConfig {
+  url: string;
+  headers: Record<string, string>;
+  model: string;
+}
+
+function getLLMConfig(chatModel: string): LLMConfig {
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+  const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+
+  // Native OpenAI
+  if (chatModel.startsWith("openai/") && OPENAI_API_KEY) {
+    // Strip "openai/" prefix for native API — e.g. "openai/gpt-5" → "gpt-5"
+    const nativeModel = chatModel.replace("openai/", "");
+    return {
+      url: "https://api.openai.com/v1/chat/completions",
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      model: nativeModel,
+    };
+  }
+
+  // Native Gemini via OpenAI-compatible endpoint
+  if (chatModel.startsWith("google/") && GOOGLE_AI_API_KEY) {
+    const nativeModel = chatModel.replace("google/", "");
+    return {
+      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      headers: {
+        Authorization: `Bearer ${GOOGLE_AI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      model: nativeModel,
+    };
+  }
+
+  // Fallback: Lovable AI Gateway
+  return {
+    url: "https://ai.gateway.lovable.dev/v1/chat/completions",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    model: chatModel,
+  };
+}
+
 // ── SSE helpers ─────────────────────────────────────────────────────────
 
 function sseEvent(event: string, data: any): string {
