@@ -637,6 +637,39 @@ async function executeUpdateSong(args: any, supabaseUrl: string) {
   return { success: true, song_id: args.song_id, updated_fields: Object.keys(updates), message: `Song updated: ${Object.keys(updates).join(", ")}` };
 }
 
+async function executeBulkUpdateSongs(args: { updates: any[] }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const results: { song_id: string; success: boolean; updated_fields?: string[]; error?: string }[] = [];
+
+  for (const item of args.updates) {
+    const updates: Record<string, any> = {};
+    if (item.title !== undefined) updates.title = item.title;
+    if (item.artist !== undefined) updates.artist = item.artist;
+    if (item.genre !== undefined) updates.genre = item.genre;
+    if (item.mood !== undefined) updates.mood = item.mood;
+    if (item.bpm !== undefined) updates.bpm = Math.round(item.bpm);
+    if (item.key_scale !== undefined) updates.key_scale = item.key_scale;
+    if (item.time_signature !== undefined) updates.time_signature = item.time_signature;
+    if (item.lyrics !== undefined) updates.lyrics = item.lyrics;
+    if (item.quality_score !== undefined) updates.quality_score = item.quality_score;
+
+    if (Object.keys(updates).length === 0) {
+      results.push({ song_id: item.song_id, success: false, error: "No fields to update" });
+      continue;
+    }
+
+    const { error } = await sb.from("songs").update(updates).eq("id", item.song_id);
+    if (error) {
+      results.push({ song_id: item.song_id, success: false, error: error.message });
+    } else {
+      results.push({ song_id: item.song_id, success: true, updated_fields: Object.keys(updates) });
+    }
+  }
+
+  const succeeded = results.filter(r => r.success).length;
+  return { success: true, total: results.length, succeeded, failed: results.length - succeeded, results, message: `Bulk update: ${succeeded}/${results.length} songs updated.` };
+}
+
 async function executeCreatePlaylist(args: { title: string; description?: string; song_ids: string[] }, supabaseUrl: string) {
   const sb = getServiceClient(supabaseUrl);
   const { data: playlist, error: plErr } = await sb.from("playlists").insert({ title: args.title, description: args.description || null }).select("id").single();
