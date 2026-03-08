@@ -484,6 +484,7 @@ async function executeSave(args: any, supabaseUrl: string) {
     duration: Math.round(args.duration || 60),
     lyrics: args.lyrics || null,
     prompt: args.prompt || null,
+    quality_score: args.quality_score ?? null,
     artist: "SoundAgent AI",
     origin_source: "sound_agent",
   }).select("id").single();
