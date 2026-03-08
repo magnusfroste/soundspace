@@ -3,6 +3,7 @@
 export interface ModuleSettings {
   chatProvider?: string;
   chatModel?: string;
+  sttProvider?: string;
   analysisProvider?: string;
   generationProvider?: string;
   [key: string]: unknown;
@@ -49,6 +50,7 @@ export const moduleRegistry: Module[] = [
     defaultSettings: {
       chatProvider: "lovable",
       chatModel: "google/gemini-3-flash-preview",
+      sttProvider: "elevenlabs",
       analysisProvider: "acestep",
       generationProvider: "acestep",
     },

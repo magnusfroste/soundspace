@@ -43,6 +43,11 @@ const GENERATION_PROVIDERS = [
   { value: "acestep", label: "ACE-Step" },
 ];
 
+const STT_PROVIDERS = [
+  { value: "elevenlabs", label: "ElevenLabs Scribe v2", integration: "elevenlabs" as const },
+  { value: "openai", label: "OpenAI Whisper", integration: "openai" as const },
+];
+
 const ANALYSIS_PROVIDERS = [
   { value: "acestep", label: "ACE-Step Extract" },
 ];
@@ -72,6 +77,7 @@ export function SoundAgentSettings() {
       return (data?.value as unknown as ModuleSettings) || {
         chatProvider: "lovable",
         chatModel: "google/gemini-3-flash-preview",
+        sttProvider: "elevenlabs",
         analysisProvider: "acestep",
         generationProvider: "acestep",
       };
@@ -105,6 +111,14 @@ export function SoundAgentSettings() {
     if (p.value === "openai") return keyStatus?.openai === true;
     if (p.value === "gemini") return keyStatus?.gemini === true;
     return true; // lovable always available if enabled
+  });
+
+  // Filter STT providers by enabled integrations + configured keys
+  const availableSttProviders = STT_PROVIDERS.filter((p) => {
+    if (!isIntegrationEnabled(p.integration)) return false;
+    if (p.value === "openai") return keyStatus?.openai === true;
+    if (p.value === "elevenlabs") return keyStatus?.elevenlabs === true;
+    return true;
   });
 
   const currentProvider = (settings?.chatProvider || "lovable") as ChatProvider;
@@ -168,6 +182,21 @@ export function SoundAgentSettings() {
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">Music generation backend used by the agent.</p>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="stt-provider">Speech-to-Text Provider</Label>
+        <Select value={settings.sttProvider || "elevenlabs"} onValueChange={(v) => update({ sttProvider: v })}>
+          <SelectTrigger id="stt-provider">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {availableSttProviders.map((p) => (
+              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">Engine used for lyrics transcription from audio.</p>
       </div>
 
       <div className="space-y-2">
