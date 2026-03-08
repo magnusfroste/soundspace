@@ -383,6 +383,40 @@ const TOOLS = [
       }
     }
   },
+  {
+    type: "function",
+    function: {
+      name: "bulk_update_songs",
+      description: "Update metadata on multiple songs in a single call. Each entry specifies a song_id and the fields to update. Much more efficient than calling update_song repeatedly.",
+      parameters: {
+        type: "object",
+        properties: {
+          updates: {
+            type: "array",
+            description: "Array of song updates, each with song_id and fields to change",
+            items: {
+              type: "object",
+              properties: {
+                song_id: { type: "string" },
+                title: { type: "string" },
+                artist: { type: "string" },
+                genre: { type: "string" },
+                mood: { type: "string" },
+                bpm: { type: "number" },
+                key_scale: { type: "string" },
+                time_signature: { type: "string" },
+                lyrics: { type: "string" },
+                quality_score: { type: "number" },
+              },
+              required: ["song_id"],
+            }
+          }
+        },
+        required: ["updates"],
+        additionalProperties: false
+      }
+    }
+  },
   // ── Persistence tools ──
   {
     type: "function",
