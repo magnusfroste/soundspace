@@ -122,10 +122,14 @@ export default function AdminAgent() {
                 <MessageSquare className="h-4 w-4 flex-shrink-0" />
                 <span className="truncate flex-1">{c.title}</span>
                 <button
-                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  className={cn(
+                    "transition-opacity p-1 rounded hover:bg-destructive/10",
+                    c.id === activeConversationId ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  )}
                   onClick={(e) => { e.stopPropagation(); deleteConversation.mutate(c.id); }}
+                  title="Delete conversation"
                 >
-                  <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
                 </button>
               </div>
             ))}
