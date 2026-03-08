@@ -1056,6 +1056,8 @@ Deno.serve(async (req) => {
               create_playlist: "Creating playlist...",
               analyze_library: "Analyzing library collection...",
               read_schedule: "Reading weekly schedule...",
+              analyze_playlist_flow: "Analyzing playlist flow...",
+              reorder_playlist: "Reordering playlist...",
             };
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
@@ -1072,6 +1074,8 @@ Deno.serve(async (req) => {
                 case "create_playlist": result = await executeCreatePlaylist(args, supabaseUrl); break;
                 case "analyze_library": result = await executeAnalyzeLibrary(supabaseUrl); break;
                 case "read_schedule": result = await executeReadSchedule(args, supabaseUrl); break;
+                case "analyze_playlist_flow": result = await executeAnalyzePlaylistFlow(args, supabaseUrl); break;
+                case "reorder_playlist": result = await executeReorderPlaylist(args, supabaseUrl); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) {
