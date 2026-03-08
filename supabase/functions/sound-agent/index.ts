@@ -519,9 +519,7 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) 
   }
 
   // Upload to storage
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   const fileName = `agent/${crypto.randomUUID()}.wav`;
   const { error: uploadErr } = await sb.storage
@@ -581,9 +579,7 @@ async function executeAnalyze(args: { audio_url: string }, supabaseUrl: string, 
 }
 
 async function executeSave(args: any, supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   const { data, error } = await sb.from("songs").insert({
     title: args.title,
@@ -606,9 +602,7 @@ async function executeSave(args: any, supabaseUrl: string) {
 }
 
 async function executeCreatePlaylist(args: { title: string; description?: string; song_ids: string[] }, supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   // Create playlist
   const { data: playlist, error: plErr } = await sb.from("playlists").insert({
@@ -638,9 +632,7 @@ async function executeCreatePlaylist(args: { title: string; description?: string
 }
 
 async function executeListLibrary(args: any, supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   let query = sb.from("songs").select("id, title, artist, genre, mood, bpm, key_scale, duration").order("created_at", { ascending: false }).limit(args.limit || 20);
   if (args.genre) query = query.ilike("genre", `%${args.genre}%`);
@@ -652,9 +644,7 @@ async function executeListLibrary(args: any, supabaseUrl: string) {
 }
 
 async function executeAnalyzeLibrary(supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   const { data, error } = await sb.from("songs")
     .select("genre, mood, bpm, key_scale, quality_score, duration");
@@ -728,9 +718,7 @@ async function executeAnalyzeLibrary(supabaseUrl: string) {
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   // Get schedule entries with playlist info
   let query = sb.from("schedule_entries")
@@ -845,9 +833,7 @@ function transitionScore(keyDist: number, bpmDiff: number): { score: number; lab
 }
 
 async function executeAnalyzePlaylistFlow(args: { playlist_id: string }, supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   // Get playlist info
   const { data: playlist } = await sb.from("playlists").select("id, title").eq("id", args.playlist_id).single();
@@ -946,9 +932,7 @@ async function executeAnalyzePlaylistFlow(args: { playlist_id: string }, supabas
 }
 
 async function executeReorderPlaylist(args: { playlist_id: string; song_ids: string[] }, supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   // Delete existing entries and re-insert in new order
   const { error: delErr } = await sb.from("playlist_songs")
@@ -970,9 +954,7 @@ async function executeReorderPlaylist(args: { playlist_id: string; song_ids: str
 }
 
 async function executeFindIncomplete(args: { limit?: number }, supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   const { data, error } = await sb.from("songs")
     .select("id, title, artist, genre, mood, bpm, key_scale, lyrics, cover_url, file_url, origin_source")
@@ -1066,9 +1048,7 @@ async function executeGenerateSongCover(args: { song_id: string; title: string; 
   if (!imageUrl) return { error: "No image returned from generator" };
 
   // Download and upload to storage
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   // imageUrl is base64 data URL — convert to blob
   let imageBlob: Uint8Array;
