@@ -24,6 +24,19 @@ export default function HomePage() {
   const { user } = useAuth();
   const { playQueue, currentSong } = usePlayer();
   const hasAutoPlayedRef = useRef(false);
+  const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
+
+  const handleRefresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+    await queryClient.invalidateQueries({ queryKey: ["playlists"] });
+    await queryClient.invalidateQueries({ queryKey: ["continue-listening", user?.id] });
+    await queryClient.invalidateQueries({ queryKey: ["suggested-playlists"] });
+  }, [queryClient, user?.id]);
+
+  const { containerRef, pullDistance, isRefreshing } = usePullToRefresh({
+    onRefresh: handleRefresh,
+  });
 
   // Fetch profile to check onboarding status
   const { data: profile, isLoading: profileLoading } = useQuery({
