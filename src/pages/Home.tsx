@@ -113,6 +113,60 @@ export default function HomePage() {
     enabled: !!user,
   });
 
+  // Continue Listening — find the last played playlist
+  const { data: continueListening } = useQuery({
+    queryKey: ["continue-listening", user?.id],
+    queryFn: async () => {
+      // Get the most recent play log with its song
+      const { data: recentLog, error: logError } = await supabase
+        .from("play_logs")
+        .select("song_id, played_at")
+        .eq("user_id", user!.id)
+        .order("played_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (logError || !recentLog) return null;
+
+      // Find which playlist contains this song
+      const { data: playlistLink } = await supabase
+        .from("playlist_songs")
+        .select("playlist_id")
+        .eq("song_id", recentLog.song_id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!playlistLink) return null;
+
+      // Fetch the playlist details
+      const { data: playlist } = await supabase
+        .from("playlists")
+        .select("*")
+        .eq("id", playlistLink.playlist_id)
+        .maybeSingle();
+
+      if (!playlist) return null;
+
+      // Fetch songs for resume
+      const { data: songs } = await supabase
+        .from("playlist_songs")
+        .select("song:songs(*)")
+        .eq("playlist_id", playlist.id)
+        .order("position");
+
+      const songList = (songs || [])
+        .map((ps) => ps.song)
+        .filter((s): s is Tables<"songs"> => s !== null);
+
+      // Find the index of the last played song
+      const resumeIndex = Math.max(0, songList.findIndex((s) => s.id === recentLog.song_id));
+
+      return { playlist, songs: songList, resumeIndex, playedAt: recentLog.played_at };
+    },
+    enabled: !!user,
+    staleTime: 1000 * 60 * 5,
+  });
+
   // Filter out suggested playlists from "Explore more" section
   const explorePlaylists = allPlaylists?.filter(
     (pl) => !profile?.suggested_playlist_ids?.includes(pl.id)
