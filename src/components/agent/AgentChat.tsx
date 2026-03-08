@@ -193,9 +193,6 @@ function ChatContent({
       {messages.map((m) => <MessageBubble key={m.id} message={m} />)}
       {(streamingContent !== null || statusMessage) && (
         <div className="flex gap-3 py-3 justify-start">
-          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Bot className="h-4 w-4 text-primary" />
-          </div>
           <div className="max-w-[75%] rounded-xl px-4 py-3 bg-muted/50">
             {streamingContent && (
               <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
