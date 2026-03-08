@@ -1,6 +1,7 @@
 // Module registry — each module is a self-contained, toggleable unit of functionality
 
 export interface ModuleSettings {
+  chatProvider?: string;
   chatModel?: string;
   analysisProvider?: string;
   generationProvider?: string;
