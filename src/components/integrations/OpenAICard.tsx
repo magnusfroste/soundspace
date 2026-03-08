@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Brain, CheckCircle, XCircle, Loader2, Settings } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { isIntegrationEnabled, setIntegrationEnabled } from "@/lib/integrations-state";
@@ -22,15 +23,24 @@ const OPENAI_MODELS = [
   { id: "openai/gpt-5.2", label: "GPT-5.2" },
 ];
 
-const STORAGE_KEY = "somhonesto_openai_configured";
-
 export function OpenAICard() {
   const [enabled, setEnabled] = useState(() => isIntegrationEnabled("openai"));
   const [open, setOpen] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [isTesting, setIsTesting] = useState(false);
-  const [status, setStatus] = useState<"idle" | "connected" | "failed">("idle");
-  const [isConfigured] = useState(() => localStorage.getItem(STORAGE_KEY) === "true");
+  const [testStatus, setTestStatus] = useState<"idle" | "connected" | "failed">("idle");
+
+  const { data: keyStatus } = useQuery({
+    queryKey: ["ai-key-status"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("check-ai-keys");
+      if (error) throw error;
+      return data as Record<string, boolean>;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const isConfigured = keyStatus?.openai ?? false;
 
   const handleToggle = (checked: boolean) => {
     setEnabled(checked);
@@ -43,20 +53,20 @@ export function OpenAICard() {
       return;
     }
     setIsTesting(true);
-    setStatus("idle");
+    setTestStatus("idle");
     try {
       const res = await fetch("https://api.openai.com/v1/models", {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
       if (res.ok) {
-        setStatus("connected");
+        setTestStatus("connected");
         toast.success("OpenAI API key is valid");
       } else {
-        setStatus("failed");
+        setTestStatus("failed");
         toast.error("Invalid API key");
       }
     } catch {
-      setStatus("failed");
+      setTestStatus("failed");
       toast.error("Connection failed");
     } finally {
       setIsTesting(false);
@@ -64,19 +74,7 @@ export function OpenAICard() {
   };
 
   const handleSave = async () => {
-    // Store via site_settings so the edge function can read it
-    const { createClient } = await import("@supabase/supabase-js");
-    const { error } = await supabase
-      .from("site_settings")
-      .upsert({ key: "secret:openai_api_key", value: JSON.stringify({ hint: apiKey.slice(-4) }) }, { onConflict: "key" });
-
-    if (error) {
-      toast.error("Failed to save");
-      return;
-    }
-
-    localStorage.setItem(STORAGE_KEY, "true");
-    toast.success("OpenAI API key saved. Add the key as a backend secret named OPENAI_API_KEY.");
+    toast.success("Use the backend secrets manager to update OPENAI_API_KEY.");
     setOpen(false);
   };
 
@@ -94,7 +92,7 @@ export function OpenAICard() {
                 {isConfigured ? (
                   <Badge variant="outline" className="text-green-600 border-green-600/30 bg-green-500/10">
                     <CheckCircle className="h-3 w-3 mr-1" />
-                    Configured
+                    Connected
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30">
@@ -152,10 +150,10 @@ export function OpenAICard() {
                 <Button variant="outline" onClick={handleTest} disabled={isTesting || !apiKey}>
                   {isTesting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Testing...</> : "Test Connection"}
                 </Button>
-                {status === "connected" && (
+                {testStatus === "connected" && (
                   <Badge variant="default" className="gap-1"><CheckCircle className="h-3 w-3" />Valid</Badge>
                 )}
-                {status === "failed" && (
+                {testStatus === "failed" && (
                   <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />Failed</Badge>
                 )}
               </div>
