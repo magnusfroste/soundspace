@@ -266,14 +266,14 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
       {/* Prompt (read-only) */}
       <div className="w-48 flex-shrink-0 hidden xl:block">
         {song.prompt ? (
-          <Tooltip>
+          <Tooltip delayDuration={100}>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-1 text-xs text-muted-foreground cursor-help">
                 <Sparkles className="h-3 w-3 text-primary flex-shrink-0" />
                 <span className="truncate">{song.prompt}</span>
               </div>
             </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-sm">
+            <TooltipContent side="top" className="max-w-sm pointer-events-auto">
               <p className="text-xs">{song.prompt}</p>
             </TooltipContent>
           </Tooltip>
