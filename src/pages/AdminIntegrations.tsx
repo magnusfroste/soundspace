@@ -258,6 +258,7 @@ export default function AdminIntegrations() {
         <LocalAICard />
         <RevelatorCard />
         <FugaCard />
+        <DistroKidCard />
       </div>
     </div>
   );
