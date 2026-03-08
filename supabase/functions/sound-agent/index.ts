@@ -1165,6 +1165,57 @@ async function executeGenerateSongCover(args: { song_id: string; title: string; 
   };
 }
 
+// ── LLM routing helpers ─────────────────────────────────────────────────
+
+interface LLMConfig {
+  url: string;
+  headers: Record<string, string>;
+  model: string;
+}
+
+function getLLMConfig(chatModel: string): LLMConfig {
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+  const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+
+  // Native OpenAI
+  if (chatModel.startsWith("openai/") && OPENAI_API_KEY) {
+    // Strip "openai/" prefix for native API — e.g. "openai/gpt-5" → "gpt-5"
+    const nativeModel = chatModel.replace("openai/", "");
+    return {
+      url: "https://api.openai.com/v1/chat/completions",
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      model: nativeModel,
+    };
+  }
+
+  // Native Gemini via OpenAI-compatible endpoint
+  if (chatModel.startsWith("google/") && GOOGLE_AI_API_KEY) {
+    const nativeModel = chatModel.replace("google/", "");
+    return {
+      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      headers: {
+        Authorization: `Bearer ${GOOGLE_AI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      model: nativeModel,
+    };
+  }
+
+  // Fallback: Lovable AI Gateway
+  return {
+    url: "https://ai.gateway.lovable.dev/v1/chat/completions",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    model: chatModel,
+  };
+}
+
 // ── SSE helpers ─────────────────────────────────────────────────────────
 
 function sseEvent(event: string, data: any): string {
@@ -1193,9 +1244,14 @@ Deno.serve(async (req) => {
   const { messages, conversation_id, settings } = reqBody;
   const chatModel = settings?.chatModel || "google/gemini-3-flash-preview";
   
+  // Determine which API to use based on model prefix
+  const useNativeOpenAI = chatModel.startsWith("openai/") && Deno.env.get("OPENAI_API_KEY");
+  const useNativeGemini = chatModel.startsWith("google/") && Deno.env.get("GOOGLE_AI_API_KEY");
+  
+  // Fallback to Lovable gateway if no native key configured
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
+  if (!useNativeOpenAI && !useNativeGemini && !LOVABLE_API_KEY) {
+    return new Response(JSON.stringify({ error: "No AI API key configured. Add OPENAI_API_KEY, GOOGLE_AI_API_KEY, or LOVABLE_API_KEY." }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -1222,15 +1278,14 @@ Deno.serve(async (req) => {
         // ── Tool-calling loop (non-streaming) ──
         push("status", { phase: "thinking", message: "Analyzing your request..." });
 
+        const llmConfig = getLLMConfig(chatModel);
+
         while (toolCallCount < MAX_TOOL_CALLS) {
-          const llmRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          const llmRes = await fetch(llmConfig.url, {
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
-              "Content-Type": "application/json",
-            },
+            headers: llmConfig.headers,
             body: JSON.stringify({
-              model: chatModel,
+              model: llmConfig.model,
               messages: llmMessages,
               tools: TOOLS,
               stream: false,
@@ -1321,14 +1376,11 @@ Deno.serve(async (req) => {
           llmMessages.pop();
         }
 
-        const streamRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const streamRes = await fetch(llmConfig.url, {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
+          headers: llmConfig.headers,
           body: JSON.stringify({
-            model: chatModel,
+            model: llmConfig.model,
             messages: llmMessages,
             tools: TOOLS,
             stream: true,
