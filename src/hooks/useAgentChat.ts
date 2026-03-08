@@ -331,7 +331,7 @@ export function useAgentChat() {
       setStatusMessage(null);
       setIsGenerating(false);
     }
-  }, [user, activeConversationId, isGenerating, qc, consumeSSE]);
+  }, [user, activeConversationId, conversations, isGenerating, qc, consumeSSE, agentSettings, setActiveConv]);
 
   return {
     conversations,
