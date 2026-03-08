@@ -1,7 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic, Crown, Puzzle, Users, Bot, Target, Brain, Timer,
+  Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic, Crown, Puzzle, Users, Bot,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -70,7 +70,7 @@ export function AppSidebar() {
   const enabledModules: string[] = Array.isArray(moduleSettings?.enabled_modules) ? moduleSettings.enabled_modules : [];
   const soundAgentEnabled = enabledModules.includes("sound-agent");
 
-  // Build admin nav — SoundAgent chat is grouped with tools, agentic module is separate
+  // Build admin nav — SoundAgent is a single consolidated entry
   const adminNav = [
     ...adminNavStatic.slice(0, 2), // Dashboard, AI Studio
     ...(soundAgentEnabled ? [
@@ -78,13 +78,6 @@ export function AppSidebar() {
     ] : []),
     ...adminNavStatic.slice(2), // rest
   ];
-
-  // Agentic module sub-pages (only shown when SoundAgent is enabled)
-  const agenticNav = soundAgentEnabled ? [
-    { title: "Objectives", url: "/admin/objectives", icon: Target },
-    { title: "Skills & Memory", url: "/admin/skills", icon: Brain },
-    { title: "Automation", url: "/admin/automation", icon: Timer },
-  ] : [];
 
   // Fetch user profile for avatar & display name
   const { data: profile } = useQuery({
@@ -167,27 +160,6 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {isAdmin && agenticNav.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground">
-              Agentic Module
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {agenticNav.map((item) => (
-                  <SidebarMenuItem key={item.url}>
-                    <SidebarMenuButton asChild isActive={location.pathname === item.url}>
-                      <NavLink to={item.url} end>
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.title}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
 
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground">

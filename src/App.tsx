@@ -24,9 +24,6 @@ import AdminSettings from "@/pages/AdminSettings";
 import AdminModules from "@/pages/AdminModules";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminAgent from "@/pages/AdminAgent";
-import AdminObjectives from "@/pages/AdminObjectives";
-import AdminSkillsMemories from "@/pages/AdminSkillsMemories";
-import AdminAutomation from "@/pages/AdminAutomation";
 import MyPlaylists from "@/pages/MyPlaylists";
 import MyPlaylistDetail from "@/pages/MyPlaylistDetail";
 import NotFound from "@/pages/NotFound";
@@ -36,22 +33,9 @@ const queryClient = new QueryClient();
 
 function ProtectedRoutes() {
   const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
-    );
-  }
-
+  if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="animate-pulse text-muted-foreground">Loading...</div></div>;
   if (!user) return <Navigate to="/auth" replace />;
-
-  return (
-    <PlayerProvider>
-      <AppLayout />
-    </PlayerProvider>
-  );
+  return <PlayerProvider><AppLayout /></PlayerProvider>;
 }
 
 function AuthGuard() {
@@ -76,12 +60,9 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            {/* Public routes */}
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<AuthGuard />} />
             <Route path="/onboarding" element={<OnboardingGuard />} />
-            
-            {/* Protected app routes */}
             <Route element={<ProtectedRoutes />}>
               <Route path="/app" element={<HomePage />} />
               <Route path="/playlists" element={<PlaylistsPage />} />
@@ -101,9 +82,10 @@ const App = () => (
               <Route path="/admin/plugins" element={<AdminModules />} />
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/agent" element={<AdminAgent />} />
-              <Route path="/admin/objectives" element={<AdminObjectives />} />
-              <Route path="/admin/skills" element={<AdminSkillsMemories />} />
-              <Route path="/admin/automation" element={<AdminAutomation />} />
+              {/* Legacy routes redirect to consolidated agent page */}
+              <Route path="/admin/objectives" element={<Navigate to="/admin/agent" replace />} />
+              <Route path="/admin/skills" element={<Navigate to="/admin/agent" replace />} />
+              <Route path="/admin/automation" element={<Navigate to="/admin/agent" replace />} />
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
