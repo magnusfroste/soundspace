@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PlayerProvider } from "@/contexts/PlayerContext";
 import { AppLayout } from "@/components/AppLayout";
@@ -64,47 +65,49 @@ function OnboardingGuard() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<AuthGuard />} />
-            <Route path="/onboarding" element={<OnboardingGuard />} />
-            <Route element={<ProtectedRoutes />}>
-              <Route path="/app" element={<HomePage />} />
-              <Route path="/playlists" element={<PlaylistsPage />} />
-              <Route path="/playlists/:id" element={<PlaylistDetail />} />
-              <Route path="/schedule" element={<SchedulePage />} />
-              <Route path="/now-playing" element={<NowPlaying />} />
-              <Route path="/announcements" element={<AnnouncementsPage />} />
-              <Route path="/my-playlists" element={<MyPlaylists />} />
-              <Route path="/my-playlists/:id" element={<MyPlaylistDetail />} />
-              <Route path="/admin" element={<Suspense fallback={<LazyFallback />}><AdminDashboard /></Suspense>} />
-              <Route path="/admin/studio" element={<Suspense fallback={<LazyFallback />}><AdminAIStudio /></Suspense>} />
-              <Route path="/admin/library" element={<Suspense fallback={<LazyFallback />}><AdminLibrary /></Suspense>} />
-              <Route path="/admin/playlists" element={<Suspense fallback={<LazyFallback />}><AdminPlaylists /></Suspense>} />
-              <Route path="/admin/integrations" element={<Suspense fallback={<LazyFallback />}><AdminIntegrations /></Suspense>} />
-              <Route path="/admin/settings" element={<Suspense fallback={<LazyFallback />}><AdminSettings /></Suspense>} />
-              <Route path="/admin/modules" element={<Suspense fallback={<LazyFallback />}><AdminModules /></Suspense>} />
-              <Route path="/admin/plugins" element={<Suspense fallback={<LazyFallback />}><AdminModules /></Suspense>} />
-              <Route path="/admin/users" element={<Suspense fallback={<LazyFallback />}><AdminUsers /></Suspense>} />
-              <Route path="/admin/agent" element={<Suspense fallback={<LazyFallback />}><AdminAgent /></Suspense>} />
-              {/* Legacy routes redirect to consolidated agent page */}
-              <Route path="/admin/objectives" element={<Navigate to="/admin/agent" replace />} />
-              <Route path="/admin/skills" element={<Navigate to="/admin/agent" replace />} />
-              <Route path="/admin/automation" element={<Navigate to="/admin/agent" replace />} />
-              <Route path="/profile" element={<ProfilePage />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ThemeProvider attribute="class" defaultTheme="dark" storageKey="soundspace-theme">
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<AuthGuard />} />
+              <Route path="/onboarding" element={<OnboardingGuard />} />
+              <Route element={<ProtectedRoutes />}>
+                <Route path="/app" element={<HomePage />} />
+                <Route path="/playlists" element={<PlaylistsPage />} />
+                <Route path="/playlists/:id" element={<PlaylistDetail />} />
+                <Route path="/schedule" element={<SchedulePage />} />
+                <Route path="/now-playing" element={<NowPlaying />} />
+                <Route path="/announcements" element={<AnnouncementsPage />} />
+                <Route path="/my-playlists" element={<MyPlaylists />} />
+                <Route path="/my-playlists/:id" element={<MyPlaylistDetail />} />
+                <Route path="/admin" element={<Suspense fallback={<LazyFallback />}><AdminDashboard /></Suspense>} />
+                <Route path="/admin/studio" element={<Suspense fallback={<LazyFallback />}><AdminAIStudio /></Suspense>} />
+                <Route path="/admin/library" element={<Suspense fallback={<LazyFallback />}><AdminLibrary /></Suspense>} />
+                <Route path="/admin/playlists" element={<Suspense fallback={<LazyFallback />}><AdminPlaylists /></Suspense>} />
+                <Route path="/admin/integrations" element={<Suspense fallback={<LazyFallback />}><AdminIntegrations /></Suspense>} />
+                <Route path="/admin/settings" element={<Suspense fallback={<LazyFallback />}><AdminSettings /></Suspense>} />
+                <Route path="/admin/modules" element={<Suspense fallback={<LazyFallback />}><AdminModules /></Suspense>} />
+                <Route path="/admin/plugins" element={<Suspense fallback={<LazyFallback />}><AdminModules /></Suspense>} />
+                <Route path="/admin/users" element={<Suspense fallback={<LazyFallback />}><AdminUsers /></Suspense>} />
+                <Route path="/admin/agent" element={<Suspense fallback={<LazyFallback />}><AdminAgent /></Suspense>} />
+                {/* Legacy routes redirect to consolidated agent page */}
+                <Route path="/admin/objectives" element={<Navigate to="/admin/agent" replace />} />
+                <Route path="/admin/skills" element={<Navigate to="/admin/agent" replace />} />
+                <Route path="/admin/automation" element={<Navigate to="/admin/agent" replace />} />
+                <Route path="/profile" element={<ProfilePage />} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;
