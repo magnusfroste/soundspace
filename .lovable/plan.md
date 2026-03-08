@@ -27,7 +27,7 @@
 - **Natural Back-and-Forth:** Each turn feels conversational — agent acknowledges answers, asks natural follow-ups
 - **Constraint:** ONE question per turn. Never list multiple questions. Builds brief organically through dialogue
 
-### Tools (18 total)
+### Tools (19 total)
 | Tool | Category | Description |
 |------|----------|-------------|
 | `research_music_style` | Knowledge | Venue-specific music recommendations |
