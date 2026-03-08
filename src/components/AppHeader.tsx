@@ -1,4 +1,4 @@
-import { LayoutDashboard, MessageSquare, Music2 } from "lucide-react";
+import { LayoutDashboard, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
