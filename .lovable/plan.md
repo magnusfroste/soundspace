@@ -65,3 +65,16 @@ All config in `site_settings` (database) or module registry (code). Model select
 ### Potential Enhancement: Audio-conditioned generation
 - Would require sending the song's `file_url` as reference audio to ACE-Step's "Cover" or "Reference Audio" mode
 - Would produce musically closer variations but with heavier bandwidth usage
+
+---
+
+# Self-Critique Quality Loop
+
+## Status: ✅ Implemented
+
+### Architecture
+- **System prompt** enforces a structured 6-step workflow: Research → Generate → Analyze → Compare → Retry/Accept → Save
+- **Quality thresholds**: BPM ±15%, key match, genre match via caption analysis
+- **Max retries**: 3 attempts per track, with feedback from previous attempt injected into next prompt
+- **Scorecard**: Agent outputs a structured pass/fail report after each analysis
+- **Tool call budget**: Increased from 10 → 25 to accommodate retry loops (generate+analyze ×3 + save ≈ 10 calls per track)
