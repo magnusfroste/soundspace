@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Download, Save, Loader2, ListMusic, Type, ChevronDown, ChevronUp, Music2, Key, Clock3, Mic } from "lucide-react";
+import { Play, Pause, Download, Save, Loader2, ListMusic, Type, ChevronDown, ChevronUp, Music2, Key, Clock3, Mic, Scissors } from "lucide-react";
+import { TrimEditor } from "./TrimEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
