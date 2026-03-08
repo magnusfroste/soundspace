@@ -77,20 +77,17 @@ export function ChatSidebar({
                 onClick={() => onSelectConversation(c.id)}
               >
                 <MessageSquare className="h-4 w-4 flex-shrink-0" />
-                <span className="truncate flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+                <span className="truncate flex-1 min-w-0 group-data-[collapsible=icon]:hidden text-xs">
                   {c.title}
                 </span>
                 <button
-                  className={cn(
-                    "transition-opacity p-1 rounded hover:bg-destructive/10 flex-shrink-0 group-data-[collapsible=icon]:hidden",
-                    c.id === activeConversationId ? "opacity-100" : "opacity-0 group-hover/conv:opacity-100"
-                  )}
+                  className="opacity-0 group-hover/conv:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 flex-shrink-0 group-data-[collapsible=icon]:hidden"
                   onClick={(e) => {
                     e.stopPropagation();
                     onDeleteConversation(c.id);
                   }}
                 >
-                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                  <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
                 </button>
               </div>
             ))}
