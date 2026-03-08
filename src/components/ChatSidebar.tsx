@@ -77,9 +77,6 @@ export function ChatSidebar({
                 onClick={() => onSelectConversation(c.id)}
               >
                 
-                <span className="truncate flex-1 min-w-0 group-data-[collapsible=icon]:hidden text-xs pr-1">
-                  {c.title}
-                </span>
                 <button
                   className="opacity-70 hover:opacity-100 transition-opacity p-1 rounded hover:bg-destructive/10 flex-shrink-0 group-data-[collapsible=icon]:hidden"
                   onClick={(e) => {
@@ -91,6 +88,9 @@ export function ChatSidebar({
                 >
                   <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
                 </button>
+                <span className="truncate flex-1 min-w-0 group-data-[collapsible=icon]:hidden text-xs pl-1">
+                  {c.title}
+                </span>
               </div>
             ))}
             {conversations.length === 0 && (
