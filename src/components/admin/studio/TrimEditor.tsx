@@ -218,11 +218,19 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
             gain *= Math.sin(fadePos * Math.PI * 0.5);
           }
 
-          targetData[i] = sourceData[startSample + i] * gain;
-        }
-      }
+           targetData[i] = sourceData[startSample + i] * gain;
+         }
+       }
 
-      const mp3Blob = await audioBufferToMp3(trimmedBuffer);
+       // Normalize audio if enabled
+       let finalBuffer = trimmedBuffer;
+       if (normalizeAudio) {
+         const { normalizedBuffer, peakDb } = analyzeAndNormalize(trimmedBuffer);
+         finalBuffer = normalizedBuffer;
+         setPeakLevel(peakDb);
+       }
+
+       const mp3Blob = await audioBufferToMp3(finalBuffer);
 
       const fileName = `ai-gen/trimmed-${crypto.randomUUID()}.mp3`;
       const { error: uploadError } = await supabase.storage
