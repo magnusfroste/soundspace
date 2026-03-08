@@ -19,18 +19,7 @@ export function AppHeader({ viewMode, onViewModeChange, showChatToggle }: AppHea
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
-  const { data: profile } = useQuery({
-    queryKey: ["header-profile", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("display_name, avatar_url")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-      return data;
-    },
-  });
+  const { data: profile } = useProfile(user?.id);
 
   return (
     <header className="h-12 flex items-center justify-between border-b border-border bg-background/95 backdrop-blur-sm px-4 flex-shrink-0">
