@@ -11,7 +11,37 @@ function getServiceClient(supabaseUrl: string) {
   return createClient(supabaseUrl, serviceKey);
 }
 
-const SYSTEM_PROMPT = `You are SoundAgent — a creative music consultant and production partner for background music in commercial spaces.
+// ── System prompt builder ───────────────────────────────────────────────
+
+function buildSystemPrompt(context: { objectives?: any[]; skills?: any[]; memories?: any[] }): string {
+  let contextBlock = "";
+
+  if (context.objectives?.length) {
+    contextBlock += "\n\n## ACTIVE OBJECTIVES\nThese are the user's current goals. Reference them when relevant and proactively suggest actions that advance them.\n";
+    for (const obj of context.objectives) {
+      const progress = obj.progress ? JSON.stringify(obj.progress) : "no progress tracked yet";
+      contextBlock += `- **${obj.title}** (${obj.status}): ${obj.description || "No description"}\n  Progress: ${progress}\n`;
+    }
+  }
+
+  if (context.skills?.length) {
+    contextBlock += "\n\n## LEARNED SKILLS\nThese are patterns you've discovered that work well. Use them when relevant — they represent proven recipes.\n";
+    for (const skill of context.skills) {
+      contextBlock += `- **${skill.name}** [${skill.category}] (used ${skill.use_count}×): ${skill.content}\n`;
+    }
+  }
+
+  if (context.memories?.length) {
+    contextBlock += "\n\n## MEMORIES\nCross-session context about this user and their preferences. Always respect these.\n";
+    for (const mem of context.memories) {
+      contextBlock += `- [${mem.category}, importance:${mem.importance}] ${mem.content}\n`;
+    }
+  }
+
+  return BASE_SYSTEM_PROMPT + contextBlock + SYSTEM_PROMPT_FOOTER;
+}
+
+const BASE_SYSTEM_PROMPT = `You are SoundAgent — a creative music consultant and production partner for background music in commercial spaces.
 
 You think out loud, reason through musical choices, and collaborate with the user to craft the perfect sound. You are NOT a rigid pipeline — you are a musical thinker.
 
@@ -98,6 +128,15 @@ You can also help with:
 - **Library maintenance**: Find songs missing lyrics/covers/tags and fix them systematically
 - **Single track requests**: For quick jobs, you can skip the planning phase and go straight to execution
 
+## LEARNING & MEMORY
+
+You have access to persistent memory across sessions:
+- **Skills**: When you discover a recipe/pattern that works (e.g. "lounge jazz: BPM 90-100, Dm/Gm, piano+bass works great"), save it as a skill via save_skill. Reference saved skills in future sessions.
+- **Memories**: When the user shares preferences, context, or feedback (e.g. "I don't like synth-heavy tracks", "my bar is in Stockholm"), save it via save_memory. Always respect memories.
+- **Objectives**: The user can set persistent goals. Check active objectives and suggest actions that advance them. After completing work, update objective progress.
+
+**IMPORTANT**: Proactively save skills after successful generations. Save memories when the user shares new context. Update objectives when you make progress toward them.
+
 ## CONVERSATION STYLE
 
 - Think out loud — share your musical reasoning
@@ -105,7 +144,9 @@ You can also help with:
 - Be opinionated but flexible — suggest strong choices, accept user preferences
 - Use markdown formatting for briefs and scorecards
 - Keep it concise but substantive — no filler
-- For lyrics, use structural tags like [Verse], [Chorus], [Bridge], [Outro]
+- For lyrics, use structural tags like [Verse], [Chorus], [Bridge], [Outro]`;
+
+const SYSTEM_PROMPT_FOOTER = `
 
 ## CRITICAL RULES
 
@@ -114,26 +155,24 @@ You can also help with:
 - After execution, ALWAYS save tracks via save_to_library — every generated track must end up in the library
 - After saving, report: 🎵 **Listen:** [audio_url]
 - NEVER skip analyze_track — this is your quality control
-- After ALL tracks in a set are saved, ALWAYS call create_playlist to bundle them`;
+- After ALL tracks in a set are saved, ALWAYS call create_playlist to bundle them
+- After successful generation, ALWAYS save_skill with the recipe that worked
+- When user shares preferences/context, ALWAYS save_memory`;
 
+
+// ── Tools definition ────────────────────────────────────────────────────
 
 const TOOLS = [
   {
     type: "function",
     function: {
       name: "research_music_style",
-      description: "Get curated knowledge about what background music works best for a specific venue type. Returns recommended BPM ranges, keys, genres, moods, and instrumentation.",
+      description: "Get curated knowledge about what background music works best for a specific venue type.",
       parameters: {
         type: "object",
         properties: {
-          venue_type: {
-            type: "string",
-            description: "Type of venue, e.g. 'restaurant', 'hotel_lobby', 'cafe', 'spa', 'retail', 'bar', 'gym', 'office'"
-          },
-          atmosphere: {
-            type: "string",
-            description: "Desired atmosphere, e.g. 'relaxed', 'upscale', 'energetic', 'intimate'"
-          }
+          venue_type: { type: "string", description: "Type of venue, e.g. 'restaurant', 'hotel_lobby', 'cafe', 'spa', 'retail', 'bar', 'gym', 'office'" },
+          atmosphere: { type: "string", description: "Desired atmosphere, e.g. 'relaxed', 'upscale', 'energetic', 'intimate'" }
         },
         required: ["venue_type"],
         additionalProperties: false
@@ -144,7 +183,7 @@ const TOOLS = [
     type: "function",
     function: {
       name: "generate_track",
-      description: "Generate a music track using ACE-Step AI. Returns audio URL when complete. This is async — it submits the task, polls for completion, then returns the result.",
+      description: "Generate a music track using ACE-Step AI. Returns audio URL when complete.",
       parameters: {
         type: "object",
         properties: {
@@ -152,8 +191,8 @@ const TOOLS = [
           lyrics: { type: "string", description: "Optional lyrics with structural tags like [Verse], [Chorus]" },
           duration: { type: "number", description: "Track duration in seconds (30-180)" },
           bpm: { type: "number", description: "Beats per minute (60-200)" },
-          key_scale: { type: "string", description: "Musical key, e.g. 'C major', 'A minor', 'Bb major'" },
-          time_signature: { type: "string", description: "Time signature, e.g. '4/4', '3/4', '6/8'" }
+          key_scale: { type: "string", description: "Musical key, e.g. 'C major', 'A minor'" },
+          time_signature: { type: "string", description: "Time signature, e.g. '4/4', '3/4'" }
         },
         required: ["prompt", "duration"],
         additionalProperties: false
@@ -164,7 +203,7 @@ const TOOLS = [
     type: "function",
     function: {
       name: "analyze_track",
-      description: "Analyze an audio file to extract BPM, key, caption, and lyrics. Use after generation to verify quality.",
+      description: "Analyze an audio file to extract BPM, key, caption, and lyrics.",
       parameters: {
         type: "object",
         properties: {
@@ -179,21 +218,14 @@ const TOOLS = [
     type: "function",
     function: {
       name: "save_to_library",
-      description: "Save a generated track to the song library for use in playlists.",
+      description: "Save a generated track to the song library.",
       parameters: {
         type: "object",
         properties: {
-          title: { type: "string", description: "Song title" },
-          audio_url: { type: "string", description: "URL of the audio file" },
-          genre: { type: "string", description: "Genre tag" },
-          mood: { type: "string", description: "Mood tag" },
-          bpm: { type: "number", description: "BPM value" },
-          key_scale: { type: "string", description: "Musical key" },
-          time_signature: { type: "string", description: "Time signature" },
-          duration: { type: "number", description: "Duration in seconds" },
-          lyrics: { type: "string", description: "Lyrics if any" },
-          prompt: { type: "string", description: "The prompt used for generation" },
-          quality_score: { type: "number", description: "Quality score 0-100 from the self-critique loop (percentage of checks passed)" }
+          title: { type: "string" }, audio_url: { type: "string" }, genre: { type: "string" },
+          mood: { type: "string" }, bpm: { type: "number" }, key_scale: { type: "string" },
+          time_signature: { type: "string" }, duration: { type: "number" }, lyrics: { type: "string" },
+          prompt: { type: "string" }, quality_score: { type: "number" }
         },
         required: ["title", "audio_url", "duration"],
         additionalProperties: false
@@ -204,13 +236,11 @@ const TOOLS = [
     type: "function",
     function: {
       name: "list_library",
-      description: "Query existing songs in the library. Use to check what's already available.",
+      description: "Query existing songs in the library.",
       parameters: {
         type: "object",
         properties: {
-          genre: { type: "string", description: "Filter by genre" },
-          mood: { type: "string", description: "Filter by mood" },
-          limit: { type: "number", description: "Max results (default 20)" }
+          genre: { type: "string" }, mood: { type: "string" }, limit: { type: "number" }
         },
         additionalProperties: false
       }
@@ -220,17 +250,12 @@ const TOOLS = [
     type: "function",
     function: {
       name: "create_playlist",
-      description: "Create a new playlist and add songs to it in order. Use after generating a cohesive set of tracks to bundle them together.",
+      description: "Create a new playlist and add songs to it in order.",
       parameters: {
         type: "object",
         properties: {
-          title: { type: "string", description: "Playlist title" },
-          description: { type: "string", description: "Playlist description" },
-          song_ids: {
-            type: "array",
-            items: { type: "string" },
-            description: "Array of song IDs (from save_to_library results) in desired playback order"
-          }
+          title: { type: "string" }, description: { type: "string" },
+          song_ids: { type: "array", items: { type: "string" } }
         },
         required: ["title", "song_ids"],
         additionalProperties: false
@@ -241,24 +266,18 @@ const TOOLS = [
     type: "function",
     function: {
       name: "analyze_library",
-      description: "Analyze the entire song library to get distribution stats for genre, mood, BPM ranges, and key signatures. Returns counts per category and identifies gaps. Use when the user asks about their collection, what's missing, or wants recommendations for what to generate next.",
-      parameters: {
-        type: "object",
-        properties: {},
-        additionalProperties: false
-      }
+      description: "Analyze library distribution: genre, mood, BPM, key. Identifies gaps.",
+      parameters: { type: "object", properties: {}, additionalProperties: false }
     }
   },
   {
     type: "function",
     function: {
       name: "read_schedule",
-      description: "Read the weekly music schedule. Returns all time slots with their assigned playlists, song counts, and total music duration per slot. Identifies slots where music coverage is insufficient (playlist duration < slot duration). Use when the user wants to check schedule gaps or auto-fill time slots.",
+      description: "Read the weekly music schedule with gap analysis.",
       parameters: {
         type: "object",
-        properties: {
-          profile_id: { type: "string", description: "Profile ID to read schedule for. If not provided, reads all schedules." }
-        },
+        properties: { profile_id: { type: "string" } },
         additionalProperties: false
       }
     }
@@ -267,12 +286,10 @@ const TOOLS = [
     type: "function",
     function: {
       name: "analyze_playlist_flow",
-      description: "Analyze a playlist's musical flow: key transitions, BPM progression, and mood arc. Returns the current order with transition quality scores and a suggested optimal reorder. Use when the user wants to optimize a playlist for smoother listening.",
+      description: "Analyze a playlist's key/BPM flow and suggest optimal reorder.",
       parameters: {
         type: "object",
-        properties: {
-          playlist_id: { type: "string", description: "ID of the playlist to analyze" }
-        },
+        properties: { playlist_id: { type: "string" } },
         required: ["playlist_id"],
         additionalProperties: false
       }
@@ -282,16 +299,12 @@ const TOOLS = [
     type: "function",
     function: {
       name: "reorder_playlist",
-      description: "Apply a new song order to an existing playlist. Use after analyze_playlist_flow when the user approves the suggested reorder.",
+      description: "Apply a new song order to an existing playlist.",
       parameters: {
         type: "object",
         properties: {
-          playlist_id: { type: "string", description: "ID of the playlist" },
-          song_ids: {
-            type: "array",
-            items: { type: "string" },
-            description: "Song IDs in the new desired order"
-          }
+          playlist_id: { type: "string" },
+          song_ids: { type: "array", items: { type: "string" } }
         },
         required: ["playlist_id", "song_ids"],
         additionalProperties: false
@@ -302,12 +315,10 @@ const TOOLS = [
     type: "function",
     function: {
       name: "find_incomplete_songs",
-      description: "Scan the library for songs with missing metadata (lyrics, cover image, genre, mood, BPM). Returns a list of songs that need attention, grouped by what's missing. Use for library maintenance.",
+      description: "Scan library for songs with missing metadata.",
       parameters: {
         type: "object",
-        properties: {
-          limit: { type: "number", description: "Max songs to return (default 50)" }
-        },
+        properties: { limit: { type: "number" } },
         additionalProperties: false
       }
     }
@@ -316,12 +327,11 @@ const TOOLS = [
     type: "function",
     function: {
       name: "transcribe_song",
-      description: "Transcribe lyrics from a song's audio using speech-to-text. Updates the song record with detected lyrics. Use for songs missing lyrics.",
+      description: "Transcribe lyrics from audio using speech-to-text.",
       parameters: {
         type: "object",
         properties: {
-          song_id: { type: "string", description: "ID of the song to transcribe" },
-          audio_url: { type: "string", description: "URL of the audio file" }
+          song_id: { type: "string" }, audio_url: { type: "string" }
         },
         required: ["song_id", "audio_url"],
         additionalProperties: false
@@ -332,21 +342,79 @@ const TOOLS = [
     type: "function",
     function: {
       name: "generate_song_cover",
-      description: "Generate a cover image for a song based on its metadata (title, genre, mood, prompt). Uploads the image and updates the song record. Use for songs missing cover art.",
+      description: "Generate a cover image for a song.",
       parameters: {
         type: "object",
         properties: {
-          song_id: { type: "string", description: "ID of the song" },
-          title: { type: "string", description: "Song title for prompt context" },
-          genre: { type: "string", description: "Genre for visual style" },
-          mood: { type: "string", description: "Mood for color/atmosphere" },
-          prompt: { type: "string", description: "Original generation prompt if available" }
+          song_id: { type: "string" }, title: { type: "string" },
+          genre: { type: "string" }, mood: { type: "string" }, prompt: { type: "string" }
         },
         required: ["song_id", "title"],
         additionalProperties: false
       }
     }
-  }
+  },
+  // ── Persistence tools ──
+  {
+    type: "function",
+    function: {
+      name: "save_skill",
+      description: "Save a learned pattern/recipe that worked well. Use after successful generation to remember what works.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: { type: "string", description: "Short name, e.g. 'Cocktail Bar Jazz Recipe'" },
+          category: { type: "string", description: "Category: generation, mixing, venue, genre, production" },
+          content: { type: "string", description: "The recipe/pattern details. Be specific: BPM, key, instruments, what made it work." },
+          metadata: { type: "object", description: "Optional structured data (bpm_range, genres, keys, etc.)" }
+        },
+        required: ["name", "category", "content"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "save_memory",
+      description: "Save a cross-session memory about the user's preferences or context.",
+      parameters: {
+        type: "object",
+        properties: {
+          category: { type: "string", description: "Category: preference, context, feedback, venue, style" },
+          content: { type: "string", description: "What to remember" },
+          importance: { type: "number", description: "1-10, how important this memory is (default 5)" }
+        },
+        required: ["category", "content"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_objectives",
+      description: "List the user's active objectives/goals.",
+      parameters: { type: "object", properties: {}, additionalProperties: false }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_objective_progress",
+      description: "Update progress on an objective after completing relevant work.",
+      parameters: {
+        type: "object",
+        properties: {
+          objective_id: { type: "string", description: "ID of the objective" },
+          progress_update: { type: "object", description: "Progress data to merge (e.g. {tracks_created: 4, genres_covered: ['jazz', 'ambient']})" },
+          status: { type: "string", description: "Optionally change status: active, paused, completed" }
+        },
+        required: ["objective_id", "progress_update"],
+        additionalProperties: false
+      }
+    }
+  },
 ];
 
 // ── Knowledge base ──────────────────────────────────────────────────────
@@ -396,11 +464,7 @@ function executeResearch(args: { venue_type: string; atmosphere?: string }) {
 
 async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) {
   const acestepProxy = `${supabaseUrl}/functions/v1/acestep-proxy`;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${anonKey}`,
-  };
-
+  const headers: Record<string, string> = { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` };
   const caption = args.prompt;
   const lyrics = args.lyrics || "[Instrumental]";
   const bpm = args.bpm || 100;
@@ -408,236 +472,103 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) 
   const timeSig = args.time_signature || "4/4";
   const duration = Math.min(Math.max(args.duration || 60, 30), 180);
 
-  // Submit generation task
   const releaseRes = await fetch(acestepProxy, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      endpoint: "/release_task",
-      method: "POST",
-      body: {
-        task_type: "text2music",
-        caption,
-        lyrics,
-        audio_duration: duration,
-        bpm,
-        keyscale: keyScale,
-        timesignature: timeSig,
-        batch_size: 1,
-        inference_steps: 100,
-        thinking: true,
-      }
-    })
+    method: "POST", headers,
+    body: JSON.stringify({ endpoint: "/release_task", method: "POST", body: {
+      task_type: "text2music", caption, lyrics, audio_duration: duration,
+      bpm, keyscale: keyScale, timesignature: timeSig, batch_size: 1, inference_steps: 100, thinking: true,
+    }})
   });
 
-  if (!releaseRes.ok) {
-    const err = await releaseRes.text();
-    return { error: `Failed to submit generation task: ${err}` };
-  }
+  if (!releaseRes.ok) { const err = await releaseRes.text(); return { error: `Failed to submit generation task: ${err}` }; }
 
   const releaseData = await releaseRes.json();
   console.log("ACE-Step release_task response:", JSON.stringify(releaseData));
-
-  // Unwrap envelope: ACE-Step wraps in {code, data, error, timestamp}
-  const unwrapped = (releaseData && typeof releaseData === "object" && "code" in releaseData && "data" in releaseData)
-    ? releaseData.data
-    : releaseData;
-
+  const unwrapped = (releaseData && typeof releaseData === "object" && "code" in releaseData && "data" in releaseData) ? releaseData.data : releaseData;
   const taskId = unwrapped?.task_id || unwrapped?.taskId || unwrapped?.id;
   if (!taskId) return { error: `No task_id returned. Response: ${JSON.stringify(releaseData).slice(0, 300)}` };
 
-  // Poll for result using POST /query_result with task_id_list (matching frontend approach)
   let resultData: any = null;
   for (let i = 0; i < 120; i++) {
     await new Promise(r => setTimeout(r, 3000));
-
-    const pollRes = await fetch(acestepProxy, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        endpoint: "/query_result",
-        method: "POST",
-        body: { task_id_list: [taskId] }
-      })
-    });
-
+    const pollRes = await fetch(acestepProxy, { method: "POST", headers, body: JSON.stringify({ endpoint: "/query_result", method: "POST", body: { task_id_list: [taskId] } }) });
     if (!pollRes.ok) continue;
-
     let pollData = await pollRes.json();
-    // Unwrap envelope
-    if (pollData && typeof pollData === "object" && "code" in pollData && "data" in pollData) {
-      pollData = pollData.data;
-    }
-
+    if (pollData && typeof pollData === "object" && "code" in pollData && "data" in pollData) pollData = pollData.data;
     const tasks = Array.isArray(pollData) ? pollData : pollData?.data || [pollData];
     const task = Array.isArray(tasks) ? tasks[0] : tasks;
     if (!task) continue;
-
     console.log(`Poll ${i}: status=${task.status}`);
-
-    if (task.status === 1) {
-      // Success — extract result
-      resultData = typeof task.result === "string" ? JSON.parse(task.result) : task.result;
-      break;
-    }
-    if (task.status === 2) {
-      return { error: "ACE-Step generation failed" };
-    }
+    if (task.status === 1) { resultData = typeof task.result === "string" ? JSON.parse(task.result) : task.result; break; }
+    if (task.status === 2) return { error: "ACE-Step generation failed" };
   }
 
   if (!resultData) return { error: "Generation timed out after 360 seconds" };
 
-  // Get audio path from result
   const resultItems = Array.isArray(resultData) ? resultData : [resultData];
   const firstItem = resultItems[0];
   const audioPath = firstItem?.url || firstItem?.file;
   if (!audioPath) return { error: `No audio path in result: ${JSON.stringify(resultData).slice(0, 300)}` };
 
   console.log("Fetching audio from path:", audioPath);
-
-  // Download audio via proxy
-  const audioRes = await fetch(acestepProxy, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      endpoint: audioPath,
-      method: "GET",
-    })
-  });
-
-  if (!audioRes.ok) {
-    const errText = await audioRes.text();
-    console.log("Audio fetch failed:", audioRes.status, errText);
-    return { error: `Failed to download audio (${audioRes.status})` };
-  }
+  const audioRes = await fetch(acestepProxy, { method: "POST", headers, body: JSON.stringify({ endpoint: audioPath, method: "GET" }) });
+  if (!audioRes.ok) { console.log("Audio fetch failed:", audioRes.status); return { error: `Failed to download audio (${audioRes.status})` }; }
 
   const audioBlob = await audioRes.arrayBuffer();
   console.log(`Audio downloaded: ${audioBlob.byteLength} bytes`);
+  if (audioBlob.byteLength < 1000) return { error: `Audio too small (${audioBlob.byteLength} bytes)` };
 
-  if (audioBlob.byteLength < 1000) {
-    return { error: `Audio too small (${audioBlob.byteLength} bytes)` };
-  }
-
-  // Upload to storage
   const sb = getServiceClient(supabaseUrl);
-
   const fileName = `agent/${crypto.randomUUID()}.wav`;
-  const { error: uploadErr } = await sb.storage
-    .from("songs")
-    .upload(fileName, new Uint8Array(audioBlob), { contentType: "audio/wav", upsert: true });
-
+  const { error: uploadErr } = await sb.storage.from("songs").upload(fileName, new Uint8Array(audioBlob), { contentType: "audio/wav", upsert: true });
   if (uploadErr) return { error: `Upload failed: ${uploadErr.message}` };
 
   const { data: urlData } = sb.storage.from("songs").getPublicUrl(fileName);
   console.log("Track uploaded:", urlData.publicUrl);
 
-  return {
-    success: true,
-    audio_url: urlData.publicUrl,
-    task_id: taskId,
-    duration,
-    bpm,
-    key_scale: keyScale,
-    time_signature: timeSig,
-    prompt: caption,
-  };
+  return { success: true, audio_url: urlData.publicUrl, task_id: taskId, duration, bpm, key_scale: keyScale, time_signature: timeSig, prompt: caption };
 }
 
 async function executeAnalyze(args: { audio_url: string }, supabaseUrl: string, anonKey: string) {
   const acestepProxy = `${supabaseUrl}/functions/v1/acestep-proxy`;
-
-  // Download audio
-  const audioRes = await fetch(args.audio_url);
-  if (!audioRes.ok) return { error: "Cannot fetch audio for analysis" };
-
-  // Use ACE-Step extract
   const extractRes = await fetch(acestepProxy, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${anonKey}`,
-    },
-    body: JSON.stringify({
-      endpoint: "/release_task",
-      method: "POST",
-      body: {
-        task_type: "extract",
-        audio_url: args.audio_url,
-        audio_duration: 60,
-        batch_size: 1,
-        inference_steps: 100,
-      }
-    })
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` },
+    body: JSON.stringify({ endpoint: "/release_task", method: "POST", body: { task_type: "extract", audio_url: args.audio_url, audio_duration: 60, batch_size: 1, inference_steps: 100 } })
   });
-
-  if (!extractRes.ok) {
-    return { error: "Extract submission failed", note: "Analysis unavailable — ACE-Step extract may not be configured" };
-  }
-
+  if (!extractRes.ok) return { error: "Extract submission failed", note: "Analysis unavailable" };
   const extractData = await extractRes.json();
   return { analysis: extractData, note: "Check BPM, key, and caption fields for quality verification." };
 }
 
 async function executeSave(args: any, supabaseUrl: string) {
   const sb = getServiceClient(supabaseUrl);
-
   const { data, error } = await sb.from("songs").insert({
-    title: args.title,
-    file_url: args.audio_url,
-    genre: args.genre || null,
-    mood: args.mood || null,
-    bpm: args.bpm ? Math.round(args.bpm) : null,
-    key_scale: args.key_scale || null,
-    time_signature: args.time_signature || null,
-    duration: Math.round(args.duration || 60),
-    lyrics: args.lyrics || null,
-    prompt: args.prompt || null,
-    quality_score: args.quality_score ?? null,
-    artist: "SoundAgent AI",
-    origin_source: "sound_agent",
+    title: args.title, file_url: args.audio_url, genre: args.genre || null, mood: args.mood || null,
+    bpm: args.bpm ? Math.round(args.bpm) : null, key_scale: args.key_scale || null,
+    time_signature: args.time_signature || null, duration: Math.round(args.duration || 60),
+    lyrics: args.lyrics || null, prompt: args.prompt || null, quality_score: args.quality_score ?? null,
+    artist: "SoundAgent AI", origin_source: "sound_agent",
   }).select("id").single();
-
   if (error) return { error: `Save failed: ${error.message}` };
   return { success: true, song_id: data.id, title: args.title, message: `"${args.title}" saved to song library.` };
 }
 
 async function executeCreatePlaylist(args: { title: string; description?: string; song_ids: string[] }, supabaseUrl: string) {
   const sb = getServiceClient(supabaseUrl);
-
-  // Create playlist
-  const { data: playlist, error: plErr } = await sb.from("playlists").insert({
-    title: args.title,
-    description: args.description || null,
-  }).select("id").single();
-
+  const { data: playlist, error: plErr } = await sb.from("playlists").insert({ title: args.title, description: args.description || null }).select("id").single();
   if (plErr) return { error: `Playlist creation failed: ${plErr.message}` };
-
-  // Add songs in order
-  const songEntries = args.song_ids.map((songId, i) => ({
-    playlist_id: playlist.id,
-    song_id: songId,
-    position: i,
-  }));
-
+  const songEntries = args.song_ids.map((songId, i) => ({ playlist_id: playlist.id, song_id: songId, position: i }));
   const { error: songsErr } = await sb.from("playlist_songs").insert(songEntries);
-  if (songsErr) return { error: `Failed to add songs to playlist: ${songsErr.message}`, playlist_id: playlist.id };
-
-  return {
-    success: true,
-    playlist_id: playlist.id,
-    title: args.title,
-    track_count: args.song_ids.length,
-    message: `Playlist "${args.title}" created with ${args.song_ids.length} tracks.`
-  };
+  if (songsErr) return { error: `Failed to add songs: ${songsErr.message}`, playlist_id: playlist.id };
+  return { success: true, playlist_id: playlist.id, title: args.title, track_count: args.song_ids.length, message: `Playlist "${args.title}" created with ${args.song_ids.length} tracks.` };
 }
 
 async function executeListLibrary(args: any, supabaseUrl: string) {
   const sb = getServiceClient(supabaseUrl);
-
   let query = sb.from("songs").select("id, title, artist, genre, mood, bpm, key_scale, duration").order("created_at", { ascending: false }).limit(args.limit || 20);
   if (args.genre) query = query.ilike("genre", `%${args.genre}%`);
   if (args.mood) query = query.ilike("mood", `%${args.mood}%`);
-
   const { data, error } = await query;
   if (error) return { error: error.message };
   return { songs: data, count: data?.length || 0 };
@@ -645,31 +576,21 @@ async function executeListLibrary(args: any, supabaseUrl: string) {
 
 async function executeAnalyzeLibrary(supabaseUrl: string) {
   const sb = getServiceClient(supabaseUrl);
-
-  const { data, error } = await sb.from("songs")
-    .select("genre, mood, bpm, key_scale, quality_score, duration");
-
+  const { data, error } = await sb.from("songs").select("genre, mood, bpm, key_scale, quality_score, duration");
   if (error) return { error: error.message };
-  if (!data || data.length === 0) return { total: 0, message: "Library is empty. No songs to analyze." };
+  if (!data || data.length === 0) return { total: 0, message: "Library is empty." };
 
-  // Genre distribution
   const genreCounts: Record<string, number> = {};
   const moodCounts: Record<string, number> = {};
   const keyCounts: Record<string, number> = {};
   const bpmBuckets = { "60-85 (Calm)": 0, "85-100 (Focus)": 0, "100-125 (Upbeat)": 0, "125-160 (Energy)": 0, "other": 0 };
-  let totalDuration = 0;
-  let withBpm = 0;
-  let qualityScores: number[] = [];
+  let totalDuration = 0, withBpm = 0;
+  const qualityScores: number[] = [];
 
   for (const song of data) {
-    const genre = song.genre || "Untagged";
-    genreCounts[genre] = (genreCounts[genre] || 0) + 1;
-
-    const mood = song.mood || "Untagged";
-    moodCounts[mood] = (moodCounts[mood] || 0) + 1;
-
+    genreCounts[song.genre || "Untagged"] = (genreCounts[song.genre || "Untagged"] || 0) + 1;
+    moodCounts[song.mood || "Untagged"] = (moodCounts[song.mood || "Untagged"] || 0) + 1;
     if (song.key_scale) keyCounts[song.key_scale] = (keyCounts[song.key_scale] || 0) + 1;
-
     if (song.bpm) {
       withBpm++;
       if (song.bpm >= 60 && song.bpm < 85) bpmBuckets["60-85 (Calm)"]++;
@@ -678,40 +599,26 @@ async function executeAnalyzeLibrary(supabaseUrl: string) {
       else if (song.bpm >= 125 && song.bpm <= 160) bpmBuckets["125-160 (Energy)"]++;
       else bpmBuckets["other"]++;
     }
-
     if (song.quality_score != null) qualityScores.push(Number(song.quality_score));
     totalDuration += song.duration || 0;
   }
 
-  // Identify gaps
   const expectedGenres = ["Jazz", "Ambient", "Acoustic", "Electronic", "Classical", "Lo-Fi", "World"];
   const missingGenres = expectedGenres.filter(g => !Object.keys(genreCounts).some(k => k.toLowerCase().includes(g.toLowerCase())));
-
   const expectedMoods = ["Relaxed", "Energetic", "Focused", "Uplifting", "Calm", "Romantic"];
   const missingMoods = expectedMoods.filter(m => !Object.keys(moodCounts).some(k => k.toLowerCase().includes(m.toLowerCase())));
-
   const emptyBpmRanges = Object.entries(bpmBuckets).filter(([k, v]) => v === 0 && k !== "other").map(([k]) => k);
-
-  const avgQuality = qualityScores.length > 0
-    ? Math.round(qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length)
-    : null;
+  const avgQuality = qualityScores.length > 0 ? Math.round(qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length) : null;
 
   return {
-    total_tracks: data.length,
-    total_duration_minutes: Math.round(totalDuration / 60),
-    genre_distribution: genreCounts,
-    mood_distribution: moodCounts,
-    bpm_distribution: bpmBuckets,
-    key_distribution: keyCounts,
+    total_tracks: data.length, total_duration_minutes: Math.round(totalDuration / 60),
+    genre_distribution: genreCounts, mood_distribution: moodCounts,
+    bpm_distribution: bpmBuckets, key_distribution: keyCounts,
     average_quality_score: avgQuality,
-    gaps: {
-      missing_genres: missingGenres,
-      missing_moods: missingMoods,
-      empty_bpm_ranges: emptyBpmRanges,
-    },
+    gaps: { missing_genres: missingGenres, missing_moods: missingMoods, empty_bpm_ranges: emptyBpmRanges },
     recommendations: missingGenres.length > 0 || missingMoods.length > 0 || emptyBpmRanges.length > 0
-      ? `Gaps found: ${missingGenres.length} missing genres, ${missingMoods.length} missing moods, ${emptyBpmRanges.length} empty BPM ranges. Consider generating tracks to fill these.`
-      : "Library is well-balanced across genres, moods, and BPM ranges.",
+      ? `Gaps found: ${missingGenres.length} missing genres, ${missingMoods.length} missing moods, ${emptyBpmRanges.length} empty BPM ranges.`
+      : "Library is well-balanced.",
   };
 }
 
@@ -719,40 +626,20 @@ const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 
 async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: string) {
   const sb = getServiceClient(supabaseUrl);
-
-  // Get schedule entries with playlist info
-  let query = sb.from("schedule_entries")
-    .select("id, day_of_week, start_time, end_time, is_active, playlist_id, color")
-    .order("day_of_week")
-    .order("start_time");
-
+  let query = sb.from("schedule_entries").select("id, day_of_week, start_time, end_time, is_active, playlist_id, color").order("day_of_week").order("start_time");
   if (args.profile_id) query = query.eq("profile_id", args.profile_id);
-
   const { data: entries, error } = await query;
   if (error) return { error: error.message };
-  if (!entries || entries.length === 0) return { total_slots: 0, message: "No schedule entries found. The schedule is empty." };
+  if (!entries || entries.length === 0) return { total_slots: 0, message: "No schedule entries found." };
 
-  // Get playlist details + song counts for all referenced playlists
   const playlistIds = [...new Set(entries.map(e => e.playlist_id))];
-  const { data: playlists } = await sb.from("playlists")
-    .select("id, title")
-    .in("id", playlistIds);
-
+  const { data: playlists } = await sb.from("playlists").select("id, title").in("id", playlistIds);
   const playlistMap = new Map((playlists || []).map(p => [p.id, p]));
-
-  // Get song counts and total duration per playlist
-  const { data: playlistSongs } = await sb.from("playlist_songs")
-    .select("playlist_id, song_id")
-    .in("playlist_id", playlistIds);
-
+  const { data: playlistSongs } = await sb.from("playlist_songs").select("playlist_id, song_id").in("playlist_id", playlistIds);
   const songIds = [...new Set((playlistSongs || []).map(ps => ps.song_id))];
-  const { data: songs } = await sb.from("songs")
-    .select("id, duration")
-    .in("id", songIds.length > 0 ? songIds : ["none"]);
-
+  const { data: songs } = await sb.from("songs").select("id, duration").in("id", songIds.length > 0 ? songIds : ["none"]);
   const songDurationMap = new Map((songs || []).map(s => [s.id, s.duration || 0]));
 
-  // Calculate per-playlist stats
   const playlistStats: Record<string, { song_count: number; total_duration_min: number }> = {};
   for (const pid of playlistIds) {
     const pSongs = (playlistSongs || []).filter(ps => ps.playlist_id === pid);
@@ -760,147 +647,95 @@ async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: s
     playlistStats[pid] = { song_count: pSongs.length, total_duration_min: Math.round(totalDur / 60) };
   }
 
-  // Build schedule view with gap analysis
   const slots = entries.map(e => {
     const playlist = playlistMap.get(e.playlist_id);
     const stats = playlistStats[e.playlist_id] || { song_count: 0, total_duration_min: 0 };
-
-    // Calculate slot duration in minutes
     const [sh, sm] = e.start_time.split(":").map(Number);
     const [eh, em] = e.end_time.split(":").map(Number);
     const slotMinutes = (eh * 60 + em) - (sh * 60 + sm);
-
     const coveragePercent = slotMinutes > 0 ? Math.round((stats.total_duration_min / slotMinutes) * 100) : 0;
-    const needsMoreMusic = coveragePercent < 80;
-
     return {
       day: DAY_NAMES[e.day_of_week] || `Day ${e.day_of_week}`,
       time: `${e.start_time.slice(0, 5)}-${e.end_time.slice(0, 5)}`,
-      slot_duration_min: slotMinutes,
-      playlist_title: playlist?.title || "Unknown",
-      playlist_id: e.playlist_id,
-      song_count: stats.song_count,
-      music_duration_min: stats.total_duration_min,
-      coverage_percent: coveragePercent,
-      needs_more_music: needsMoreMusic,
-      is_active: e.is_active,
+      slot_duration_min: slotMinutes, playlist_title: playlist?.title || "Unknown",
+      playlist_id: e.playlist_id, song_count: stats.song_count,
+      music_duration_min: stats.total_duration_min, coverage_percent: coveragePercent,
+      needs_more_music: coveragePercent < 80, is_active: e.is_active,
     };
   });
 
   const underCovered = slots.filter(s => s.needs_more_music && s.is_active);
-
   return {
-    total_slots: slots.length,
-    active_slots: slots.filter(s => s.is_active).length,
-    schedule: slots,
-    under_covered_slots: underCovered.length,
+    total_slots: slots.length, active_slots: slots.filter(s => s.is_active).length,
+    schedule: slots, under_covered_slots: underCovered.length,
     summary: underCovered.length > 0
-      ? `${underCovered.length} active slot(s) have less than 80% music coverage. These need more tracks.`
+      ? `${underCovered.length} active slot(s) have less than 80% music coverage.`
       : "All active slots have sufficient music coverage (≥80%).",
   };
 }
 
-// Circle of Fifths distance for transition scoring
 const KEY_ORDER = ["C", "G", "D", "A", "E", "B", "F#", "Db", "Ab", "Eb", "Bb", "F"];
 
 function keyDistance(a: string, b: string): number {
-  if (!a || !b) return 6; // unknown = neutral
+  if (!a || !b) return 6;
   const normalizeKey = (k: string) => k.replace(/ (major|minor)$/i, "").replace("♯", "#").replace("♭", "b");
   const isMinor = (k: string) => /minor/i.test(k);
-  // Convert minor to relative major for comparison
   const minorToMajor: Record<string, string> = { "A": "C", "E": "G", "B": "D", "F#": "A", "C#": "E", "G#": "B", "D#": "F#", "Bb": "Db", "F": "Ab", "C": "Eb", "G": "Bb", "D": "F" };
-  
-  let ka = normalizeKey(a);
-  let kb = normalizeKey(b);
+  let ka = normalizeKey(a); let kb = normalizeKey(b);
   if (isMinor(a) && minorToMajor[ka]) ka = minorToMajor[ka];
   if (isMinor(b) && minorToMajor[kb]) kb = minorToMajor[kb];
-  
-  const ia = KEY_ORDER.indexOf(ka);
-  const ib = KEY_ORDER.indexOf(kb);
+  const ia = KEY_ORDER.indexOf(ka); const ib = KEY_ORDER.indexOf(kb);
   if (ia === -1 || ib === -1) return 3;
   const dist = Math.abs(ia - ib);
   return Math.min(dist, 12 - dist);
 }
 
 function transitionScore(keyDist: number, bpmDiff: number): { score: number; label: string } {
-  // Key: 0-1 steps = great, 2 = ok, 3+ = rough
-  // BPM: <8 = great, 8-15 = ok, 15+ = rough
   const keyScore = keyDist <= 1 ? 3 : keyDist <= 2 ? 2 : 1;
   const bpmScore = bpmDiff <= 8 ? 3 : bpmDiff <= 15 ? 2 : 1;
-  const total = keyScore + bpmScore; // 2-6
+  const total = keyScore + bpmScore;
   const label = total >= 5 ? "smooth" : total >= 3 ? "acceptable" : "rough";
   return { score: total, label };
 }
 
 async function executeAnalyzePlaylistFlow(args: { playlist_id: string }, supabaseUrl: string) {
   const sb = getServiceClient(supabaseUrl);
-
-  // Get playlist info
   const { data: playlist } = await sb.from("playlists").select("id, title").eq("id", args.playlist_id).single();
   if (!playlist) return { error: "Playlist not found" };
-
-  // Get songs in order
-  const { data: entries } = await sb.from("playlist_songs")
-    .select("song_id, position")
-    .eq("playlist_id", args.playlist_id)
-    .order("position");
-
+  const { data: entries } = await sb.from("playlist_songs").select("song_id, position").eq("playlist_id", args.playlist_id).order("position");
   if (!entries || entries.length === 0) return { error: "Playlist is empty" };
-
   const songIds = entries.map(e => e.song_id);
-  const { data: songs } = await sb.from("songs")
-    .select("id, title, bpm, key_scale, mood, genre")
-    .in("id", songIds);
-
+  const { data: songs } = await sb.from("songs").select("id, title, bpm, key_scale, mood, genre").in("id", songIds);
   if (!songs) return { error: "Could not fetch song details" };
-
   const songMap = new Map(songs.map(s => [s.id, s]));
   const ordered = songIds.map(id => songMap.get(id)).filter(Boolean) as any[];
 
-  // Analyze current flow
   const transitions: any[] = [];
   let totalScore = 0;
   for (let i = 0; i < ordered.length - 1; i++) {
-    const a = ordered[i];
-    const b = ordered[i + 1];
+    const a = ordered[i], b = ordered[i + 1];
     const kd = keyDistance(a.key_scale || "", b.key_scale || "");
     const bd = Math.abs((a.bpm || 0) - (b.bpm || 0));
     const ts = transitionScore(kd, bd);
     totalScore += ts.score;
-    transitions.push({
-      from: a.title,
-      to: b.title,
-      key_from: a.key_scale || "?",
-      key_to: b.key_scale || "?",
-      bpm_from: a.bpm || "?",
-      bpm_to: b.bpm || "?",
-      key_distance: kd,
-      bpm_diff: bd,
-      quality: ts.label,
-      score: ts.score,
-    });
+    transitions.push({ from: a.title, to: b.title, key_from: a.key_scale || "?", key_to: b.key_scale || "?", bpm_from: a.bpm || "?", bpm_to: b.bpm || "?", key_distance: kd, bpm_diff: bd, quality: ts.label, score: ts.score });
   }
-
   const avgScore = transitions.length > 0 ? Math.round((totalScore / (transitions.length * 6)) * 100) : 100;
-  const roughTransitions = transitions.filter(t => t.quality === "rough").length;
 
-  // Generate optimized order using nearest-neighbor on Circle of Fifths + BPM
   const optimized = [ordered[0]];
   const remaining = ordered.slice(1);
   while (remaining.length > 0) {
     const last = optimized[optimized.length - 1];
-    let bestIdx = 0;
-    let bestCost = Infinity;
+    let bestIdx = 0, bestCost = Infinity;
     for (let i = 0; i < remaining.length; i++) {
       const kd = keyDistance(last.key_scale || "", remaining[i].key_scale || "");
       const bd = Math.abs((last.bpm || 0) - (remaining[i].bpm || 0));
-      const cost = kd * 3 + bd * 0.2; // Weight key transitions more
+      const cost = kd * 3 + bd * 0.2;
       if (cost < bestCost) { bestCost = cost; bestIdx = i; }
     }
     optimized.push(remaining.splice(bestIdx, 1)[0]);
   }
 
-  // Score optimized order
   let optScore = 0;
   for (let i = 0; i < optimized.length - 1; i++) {
     const kd = keyDistance(optimized[i].key_scale || "", optimized[i + 1].key_scale || "");
@@ -910,57 +745,28 @@ async function executeAnalyzePlaylistFlow(args: { playlist_id: string }, supabas
   const optAvgScore = optimized.length > 1 ? Math.round((optScore / ((optimized.length - 1) * 6)) * 100) : 100;
 
   return {
-    playlist_title: playlist.title,
-    track_count: ordered.length,
-    current_flow_score: avgScore,
-    rough_transitions: roughTransitions,
-    transitions,
-    optimized_flow_score: optAvgScore,
-    improvement: optAvgScore - avgScore,
-    suggested_order: optimized.map((s, i) => ({
-      position: i,
-      song_id: s.id,
-      title: s.title,
-      bpm: s.bpm,
-      key: s.key_scale,
-    })),
+    playlist_title: playlist.title, track_count: ordered.length,
+    current_flow_score: avgScore, rough_transitions: transitions.filter(t => t.quality === "rough").length,
+    transitions, optimized_flow_score: optAvgScore, improvement: optAvgScore - avgScore,
+    suggested_order: optimized.map((s, i) => ({ position: i, song_id: s.id, title: s.title, bpm: s.bpm, key: s.key_scale })),
     suggested_song_ids: optimized.map(s => s.id),
-    recommendation: optAvgScore > avgScore
-      ? `Reordering can improve flow from ${avgScore}% to ${optAvgScore}% (+${optAvgScore - avgScore}%). Use reorder_playlist to apply.`
-      : "Current order is already well-optimized.",
+    recommendation: optAvgScore > avgScore ? `Reordering can improve flow from ${avgScore}% to ${optAvgScore}%.` : "Current order is already well-optimized.",
   };
 }
 
 async function executeReorderPlaylist(args: { playlist_id: string; song_ids: string[] }, supabaseUrl: string) {
   const sb = getServiceClient(supabaseUrl);
-
-  // Delete existing entries and re-insert in new order
-  const { error: delErr } = await sb.from("playlist_songs")
-    .delete()
-    .eq("playlist_id", args.playlist_id);
-
+  const { error: delErr } = await sb.from("playlist_songs").delete().eq("playlist_id", args.playlist_id);
   if (delErr) return { error: `Failed to clear playlist: ${delErr.message}` };
-
-  const entries = args.song_ids.map((songId, i) => ({
-    playlist_id: args.playlist_id,
-    song_id: songId,
-    position: i,
-  }));
-
+  const entries = args.song_ids.map((songId, i) => ({ playlist_id: args.playlist_id, song_id: songId, position: i }));
   const { error: insErr } = await sb.from("playlist_songs").insert(entries);
   if (insErr) return { error: `Failed to reorder: ${insErr.message}` };
-
-  return { success: true, message: `Playlist reordered with ${args.song_ids.length} tracks in optimized flow.` };
+  return { success: true, message: `Playlist reordered with ${args.song_ids.length} tracks.` };
 }
 
 async function executeFindIncomplete(args: { limit?: number }, supabaseUrl: string) {
   const sb = getServiceClient(supabaseUrl);
-
-  const { data, error } = await sb.from("songs")
-    .select("id, title, artist, genre, mood, bpm, key_scale, lyrics, cover_url, file_url, origin_source")
-    .order("created_at", { ascending: false })
-    .limit(args.limit || 50);
-
+  const { data, error } = await sb.from("songs").select("id, title, artist, genre, mood, bpm, key_scale, lyrics, cover_url, file_url, origin_source").order("created_at", { ascending: false }).limit(args.limit || 50);
   if (error) return { error: error.message };
   if (!data || data.length === 0) return { total: 0, message: "Library is empty." };
 
@@ -969,12 +775,10 @@ async function executeFindIncomplete(args: { limit?: number }, supabaseUrl: stri
   const missingGenre = data.filter(s => !s.genre);
   const missingMood = data.filter(s => !s.mood);
   const missingBpm = data.filter(s => !s.bpm);
-
   const incomplete = data.filter(s => !s.lyrics || !s.cover_url || !s.genre || !s.mood || !s.bpm);
 
   return {
-    total_scanned: data.length,
-    incomplete_count: incomplete.length,
+    total_scanned: data.length, incomplete_count: incomplete.length,
     breakdown: {
       missing_lyrics: missingLyrics.map(s => ({ id: s.id, title: s.title, audio_url: s.file_url })),
       missing_cover: missingCover.map(s => ({ id: s.id, title: s.title, genre: s.genre, mood: s.mood })),
@@ -982,75 +786,37 @@ async function executeFindIncomplete(args: { limit?: number }, supabaseUrl: stri
       missing_mood: missingMood.map(s => ({ id: s.id, title: s.title })),
       missing_bpm: missingBpm.map(s => ({ id: s.id, title: s.title, audio_url: s.file_url })),
     },
-    counts: {
-      lyrics: missingLyrics.length,
-      cover: missingCover.length,
-      genre: missingGenre.length,
-      mood: missingMood.length,
-      bpm: missingBpm.length,
-    },
-    recommendation: incomplete.length > 0
-      ? `${incomplete.length} songs need attention. Prioritize: lyrics (${missingLyrics.length}), covers (${missingCover.length}), then tags.`
-      : "All songs have complete metadata! 🎉",
+    counts: { lyrics: missingLyrics.length, cover: missingCover.length, genre: missingGenre.length, mood: missingMood.length, bpm: missingBpm.length },
+    recommendation: incomplete.length > 0 ? `${incomplete.length} songs need attention.` : "All songs have complete metadata! 🎉",
   };
 }
 
 async function executeTranscribeSong(args: { song_id: string; audio_url: string }, supabaseUrl: string, anonKey: string, sttProvider: string = "elevenlabs") {
   const res = await fetch(`${supabaseUrl}/functions/v1/transcribe-lyrics`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${anonKey}`,
-    },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` },
     body: JSON.stringify({ song_id: args.song_id, audio_url: args.audio_url, provider: sttProvider }),
   });
-
   const data = await res.json();
-  if (!res.ok || !data.success) {
-    return { error: data.error || `Transcription failed (${res.status})` };
-  }
-
-  return {
-    success: true,
-    song_id: args.song_id,
-    lyrics: data.lyrics || "[Instrumental]",
-    message: data.lyrics ? `Transcribed ${data.lyrics.length} characters of lyrics via ${sttProvider}.` : "No vocals detected — marked as instrumental.",
-  };
+  if (!res.ok || !data.success) return { error: data.error || `Transcription failed (${res.status})` };
+  return { success: true, song_id: args.song_id, lyrics: data.lyrics || "[Instrumental]", message: data.lyrics ? `Transcribed ${data.lyrics.length} characters.` : "No vocals detected." };
 }
 
 async function executeGenerateSongCover(args: { song_id: string; title: string; genre?: string; mood?: string; prompt?: string }, supabaseUrl: string) {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) return { error: "LOVABLE_API_KEY not configured" };
-
-  const coverPrompt = [
-    args.title,
-    args.genre && `${args.genre} music`,
-    args.mood && `${args.mood} atmosphere`,
-    args.prompt,
-  ].filter(Boolean).join(", ");
-
-  // Call generate-cover edge function
+  const coverPrompt = [args.title, args.genre && `${args.genre} music`, args.mood && `${args.mood} atmosphere`, args.prompt].filter(Boolean).join(", ");
   const res = await fetch(`${supabaseUrl}/functions/v1/generate-cover`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
-    },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}` },
     body: JSON.stringify({ prompt: coverPrompt, style: "modern abstract" }),
   });
-
   const data = await res.json();
-  if (!res.ok || data.error) {
-    return { error: data.error || `Cover generation failed (${res.status})` };
-  }
-
+  if (!res.ok || data.error) return { error: data.error || `Cover generation failed (${res.status})` };
   const imageUrl = data.imageUrl;
-  if (!imageUrl) return { error: "No image returned from generator" };
+  if (!imageUrl) return { error: "No image returned" };
 
-  // Download and upload to storage
   const sb = getServiceClient(supabaseUrl);
-
-  // imageUrl is base64 data URL — convert to blob
   let imageBlob: Uint8Array;
   if (imageUrl.startsWith("data:")) {
     const base64 = imageUrl.split(",")[1];
@@ -1058,85 +824,108 @@ async function executeGenerateSongCover(args: { song_id: string; title: string; 
     imageBlob = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) imageBlob[i] = binary.charCodeAt(i);
   } else {
-    // It's a URL — fetch it
     const imgRes = await fetch(imageUrl);
     imageBlob = new Uint8Array(await imgRes.arrayBuffer());
   }
-
   const fileName = `covers/${args.song_id}.png`;
-  const { error: uploadErr } = await sb.storage
-    .from("songs")
-    .upload(fileName, imageBlob, { contentType: "image/png", upsert: true });
-
+  const { error: uploadErr } = await sb.storage.from("songs").upload(fileName, imageBlob, { contentType: "image/png", upsert: true });
   if (uploadErr) return { error: `Upload failed: ${uploadErr.message}` };
-
   const { data: urlData } = sb.storage.from("songs").getPublicUrl(fileName);
-
-  // Update song record
-  const { error: updateErr } = await sb.from("songs")
-    .update({ cover_url: urlData.publicUrl })
-    .eq("id", args.song_id);
-
+  const { error: updateErr } = await sb.from("songs").update({ cover_url: urlData.publicUrl }).eq("id", args.song_id);
   if (updateErr) return { error: `Saved image but failed to update song: ${updateErr.message}` };
+  return { success: true, song_id: args.song_id, cover_url: urlData.publicUrl, message: `Cover art generated for "${args.title}".` };
+}
+
+// ── Persistence tool executors ──────────────────────────────────────────
+
+async function executeSaveSkill(args: { name: string; category: string; content: string; metadata?: any }, supabaseUrl: string, userId: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const { data, error } = await sb.from("agent_skills").insert({
+    user_id: userId, name: args.name, category: args.category,
+    content: args.content, metadata: args.metadata || {},
+  }).select("id").single();
+  if (error) return { error: `Failed to save skill: ${error.message}` };
+  return { success: true, skill_id: data.id, message: `Skill "${args.name}" saved.` };
+}
+
+async function executeSaveMemory(args: { category: string; content: string; importance?: number }, supabaseUrl: string, userId: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const { data, error } = await sb.from("agent_memories").insert({
+    user_id: userId, category: args.category,
+    content: args.content, importance: args.importance || 5,
+  }).select("id").single();
+  if (error) return { error: `Failed to save memory: ${error.message}` };
+  return { success: true, memory_id: data.id, message: `Memory saved: "${args.content.slice(0, 60)}..."` };
+}
+
+async function executeListObjectives(supabaseUrl: string, userId: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const { data, error } = await sb.from("agent_objectives")
+    .select("id, title, description, status, progress, auto_execute, created_at")
+    .eq("user_id", userId)
+    .in("status", ["active", "paused"])
+    .order("created_at", { ascending: false });
+  if (error) return { error: error.message };
+  return { objectives: data || [], count: data?.length || 0 };
+}
+
+async function executeUpdateObjectiveProgress(args: { objective_id: string; progress_update: any; status?: string }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  // Fetch current progress
+  const { data: obj, error: fetchErr } = await sb.from("agent_objectives").select("progress").eq("id", args.objective_id).single();
+  if (fetchErr) return { error: `Objective not found: ${fetchErr.message}` };
+
+  const currentProgress = (obj.progress as Record<string, any>) || {};
+  const mergedProgress = { ...currentProgress, ...args.progress_update, last_updated: new Date().toISOString() };
+
+  const updateData: any = { progress: mergedProgress, updated_at: new Date().toISOString() };
+  if (args.status) updateData.status = args.status;
+
+  const { error } = await sb.from("agent_objectives").update(updateData).eq("id", args.objective_id);
+  if (error) return { error: `Failed to update: ${error.message}` };
+  return { success: true, message: `Objective progress updated.${args.status ? ` Status → ${args.status}` : ""}` };
+}
+
+// ── Fetch agent context ─────────────────────────────────────────────────
+
+async function fetchAgentContext(supabaseUrl: string, userId: string) {
+  const sb = getServiceClient(supabaseUrl);
+
+  const [objRes, skillRes, memRes] = await Promise.all([
+    sb.from("agent_objectives").select("title, description, status, progress")
+      .eq("user_id", userId).in("status", ["active", "paused"]).order("created_at", { ascending: false }).limit(10),
+    sb.from("agent_skills").select("name, category, content, use_count")
+      .eq("user_id", userId).order("use_count", { ascending: false }).limit(20),
+    sb.from("agent_memories").select("category, content, importance")
+      .eq("user_id", userId).order("importance", { ascending: false }).limit(30),
+  ]);
 
   return {
-    success: true,
-    song_id: args.song_id,
-    cover_url: urlData.publicUrl,
-    message: `Cover art generated and saved for "${args.title}".`,
+    objectives: objRes.data || [],
+    skills: skillRes.data || [],
+    memories: memRes.data || [],
   };
 }
 
 // ── LLM routing helpers ─────────────────────────────────────────────────
 
-interface LLMConfig {
-  url: string;
-  headers: Record<string, string>;
-  model: string;
-}
+interface LLMConfig { url: string; headers: Record<string, string>; model: string; }
 
 function getLLMConfig(chatModel: string): LLMConfig {
   const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
   const GOOGLE_AI_API_KEY = Deno.env.get("GOOGLE_AI_API_KEY");
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-  // Explicit native prefix — e.g. "native:openai/gpt-5" or "native:google/gemini-2.5-flash"
   const isNative = chatModel.startsWith("native:");
   const resolvedModel = isNative ? chatModel.replace("native:", "") : chatModel;
 
-  // Native OpenAI
   if (isNative && resolvedModel.startsWith("openai/") && OPENAI_API_KEY) {
-    return {
-      url: "https://api.openai.com/v1/chat/completions",
-      headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      model: resolvedModel.replace("openai/", ""),
-    };
+    return { url: "https://api.openai.com/v1/chat/completions", headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" }, model: resolvedModel.replace("openai/", "") };
   }
-
-  // Native Gemini via OpenAI-compatible endpoint
   if (isNative && resolvedModel.startsWith("google/") && GOOGLE_AI_API_KEY) {
-    return {
-      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      headers: {
-        Authorization: `Bearer ${GOOGLE_AI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      model: resolvedModel.replace("google/", ""),
-    };
+    return { url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", headers: { Authorization: `Bearer ${GOOGLE_AI_API_KEY}`, "Content-Type": "application/json" }, model: resolvedModel.replace("google/", "") };
   }
-
-  // Lovable AI Gateway (default for non-native models)
-  return {
-    url: "https://ai.gateway.lovable.dev/v1/chat/completions",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    model: resolvedModel,
-  };
+  return { url: "https://ai.gateway.lovable.dev/v1/chat/completions", headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" }, model: resolvedModel };
 }
 
 // ── SSE helpers ─────────────────────────────────────────────────────────
@@ -1148,39 +937,40 @@ function sseEvent(event: string, data: any): string {
 // ── Main handler ────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // Use a ReadableStream to push SSE events as work progresses
   const encoder = new TextEncoder();
-
   let reqBody: any;
-  try {
-    reqBody = await req.json();
-  } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
-      status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  try { reqBody = await req.json(); } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
-  const { messages, conversation_id, settings } = reqBody;
+  const { messages, conversation_id, settings, user_id: bodyUserId } = reqBody;
   const chatModel = settings?.chatModel || "google/gemini-3-flash-preview";
   const sttProvider = settings?.sttProvider || "elevenlabs";
 
-  console.log(`[sound-agent] Request: model=${chatModel}, messages=${messages?.length || 0}, conv=${conversation_id}`);
-  
-  // Determine which API to use based on model prefix
+  // Resolve user_id: from body (cron) or from auth header
+  let userId = bodyUserId || null;
+  if (!userId) {
+    // Try to extract from JWT
+    const authHeader = req.headers.get("authorization") || "";
+    if (authHeader.startsWith("Bearer ")) {
+      try {
+        const token = authHeader.replace("Bearer ", "");
+        const sb = createClient(Deno.env.get("SUPABASE_URL")!, token);
+        const { data: { user } } = await sb.auth.getUser();
+        userId = user?.id;
+      } catch { /* anon key — no user */ }
+    }
+  }
+
+  console.log(`[sound-agent] Request: model=${chatModel}, messages=${messages?.length || 0}, conv=${conversation_id}, user=${userId}`);
+
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   const useNativeOpenAI = chatModel.startsWith("openai/") && Deno.env.get("OPENAI_API_KEY");
   const useNativeGemini = chatModel.startsWith("google/") && Deno.env.get("GOOGLE_AI_API_KEY");
-  
-  // Fallback to Lovable gateway if no native key configured
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!useNativeOpenAI && !useNativeGemini && !LOVABLE_API_KEY) {
-    console.error("[sound-agent] No AI API key configured");
-    return new Response(JSON.stringify({ error: "No AI API key configured. Add OPENAI_API_KEY, GOOGLE_AI_API_KEY, or LOVABLE_API_KEY." }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return new Response(JSON.stringify({ error: "No AI API key configured." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -1188,35 +978,25 @@ Deno.serve(async (req) => {
 
   const stream = new ReadableStream({
     async start(controller) {
-      const push = (event: string, data: any) => {
-        controller.enqueue(encoder.encode(sseEvent(event, data)));
-      };
+      const push = (event: string, data: any) => { controller.enqueue(encoder.encode(sseEvent(event, data))); };
 
       try {
-        const llmMessages: any[] = [
-          { role: "system", content: SYSTEM_PROMPT },
-          ...messages,
-        ];
+        // Fetch persistent context
+        const context = userId ? await fetchAgentContext(supabaseUrl, userId) : { objectives: [], skills: [], memories: [] };
+        const systemPrompt = buildSystemPrompt(context);
 
+        const llmMessages: any[] = [{ role: "system", content: systemPrompt }, ...messages];
         const collectedAudioUrls: string[] = [];
         const MAX_TOOL_CALLS = 25;
         let toolCallCount = 0;
 
-        // ── Tool-calling loop (non-streaming) ──
         push("status", { phase: "thinking", message: "Analyzing your request..." });
-
         const llmConfig = getLLMConfig(chatModel);
 
         while (toolCallCount < MAX_TOOL_CALLS) {
           const llmRes = await fetch(llmConfig.url, {
-            method: "POST",
-            headers: llmConfig.headers,
-            body: JSON.stringify({
-              model: llmConfig.model,
-              messages: llmMessages,
-              tools: TOOLS,
-              stream: false,
-            }),
+            method: "POST", headers: llmConfig.headers,
+            body: JSON.stringify({ model: llmConfig.model, messages: llmMessages, tools: TOOLS, stream: false }),
           });
 
           if (!llmRes.ok) {
@@ -1224,31 +1004,25 @@ Deno.serve(async (req) => {
             const text = await llmRes.text();
             console.error(`[sound-agent] LLM error ${status}:`, text.slice(0, 500));
             if (status === 429) { push("error", { error: "Rate limit exceeded. Please try again shortly." }); break; }
-            if (status === 402) { push("error", { error: "AI credits exhausted. Please add credits." }); break; }
-            push("error", { error: `AI gateway error ${status}` });
-            break;
+            if (status === 402) { push("error", { error: "AI credits exhausted." }); break; }
+            push("error", { error: `AI gateway error ${status}` }); break;
           }
 
           const llmData = await llmRes.json();
           const choice = llmData.choices?.[0];
-          if (!choice) { console.error("[sound-agent] No choice in LLM response:", JSON.stringify(llmData).slice(0, 300)); push("error", { error: "No response from AI" }); break; }
+          if (!choice) { push("error", { error: "No response from AI" }); break; }
 
           const msg = choice.message;
           llmMessages.push(msg);
 
-          // No tool calls → break to stream final response
-          if (!msg.tool_calls || msg.tool_calls.length === 0) {
-            break;
-          }
+          if (!msg.tool_calls || msg.tool_calls.length === 0) break;
 
-          // Execute tool calls with status updates
           for (const tc of msg.tool_calls) {
             toolCallCount++;
             const fn = tc.function.name;
             const args = JSON.parse(tc.function.arguments || "{}");
             let result: any;
 
-            // Push status for each tool
             const toolLabels: Record<string, string> = {
               research_music_style: "Researching music style...",
               generate_track: "Generating track via ACE-Step...",
@@ -1263,16 +1037,17 @@ Deno.serve(async (req) => {
               find_incomplete_songs: "Scanning for incomplete metadata...",
               transcribe_song: "Transcribing lyrics...",
               generate_song_cover: "Generating cover art...",
+              save_skill: "Saving learned skill...",
+              save_memory: "Saving memory...",
+              list_objectives: "Checking objectives...",
+              update_objective_progress: "Updating objective progress...",
             };
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
             try {
               switch (fn) {
                 case "research_music_style": result = executeResearch(args); break;
-                case "generate_track":
-                  result = await executeGenerate(args, supabaseUrl, anonKey);
-                  if (result.audio_url) collectedAudioUrls.push(result.audio_url);
-                  break;
+                case "generate_track": result = await executeGenerate(args, supabaseUrl, anonKey); if (result.audio_url) collectedAudioUrls.push(result.audio_url); break;
                 case "analyze_track": result = await executeAnalyze(args, supabaseUrl, anonKey); break;
                 case "save_to_library": result = await executeSave(args, supabaseUrl); break;
                 case "list_library": result = await executeListLibrary(args, supabaseUrl); break;
@@ -1284,21 +1059,21 @@ Deno.serve(async (req) => {
                 case "find_incomplete_songs": result = await executeFindIncomplete(args, supabaseUrl); break;
                 case "transcribe_song": result = await executeTranscribeSong(args, supabaseUrl, anonKey, sttProvider); break;
                 case "generate_song_cover": result = await executeGenerateSongCover(args, supabaseUrl); break;
+                case "save_skill": result = userId ? await executeSaveSkill(args, supabaseUrl, userId) : { error: "No user context" }; break;
+                case "save_memory": result = userId ? await executeSaveMemory(args, supabaseUrl, userId) : { error: "No user context" }; break;
+                case "list_objectives": result = userId ? await executeListObjectives(supabaseUrl, userId) : { objectives: [], count: 0 }; break;
+                case "update_objective_progress": result = await executeUpdateObjectiveProgress(args, supabaseUrl); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
-            } catch (e) {
-              result = { error: `Tool error: ${e.message}` };
-            }
+            } catch (e) { result = { error: `Tool error: ${e.message}` }; }
 
             llmMessages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
           }
         }
 
-        // ── Stream final response ──
+        // Stream final response
         push("status", { phase: "responding", message: "Composing response..." });
 
-        // If the last message already has assistant text (from the non-streaming loop),
-        // just emit it directly instead of re-requesting
         const lastMsg = llmMessages[llmMessages.length - 1];
         if (lastMsg.role === "assistant" && lastMsg.content && (!lastMsg.tool_calls || lastMsg.tool_calls.length === 0)) {
           console.log(`[sound-agent] Emitting cached assistant response (${lastMsg.content.length} chars)`);
@@ -1308,16 +1083,10 @@ Deno.serve(async (req) => {
           return;
         }
 
-        // Otherwise request a streaming response WITHOUT tools (final text only)
         console.log("[sound-agent] Requesting streaming final response");
         const streamRes = await fetch(llmConfig.url, {
-          method: "POST",
-          headers: llmConfig.headers,
-          body: JSON.stringify({
-            model: llmConfig.model,
-            messages: llmMessages,
-            stream: true,
-          }),
+          method: "POST", headers: llmConfig.headers,
+          body: JSON.stringify({ model: llmConfig.model, messages: llmMessages, stream: true }),
         });
 
         if (!streamRes.ok || !streamRes.body) {
@@ -1329,7 +1098,6 @@ Deno.serve(async (req) => {
           return;
         }
 
-        // Parse SSE from upstream and re-emit as token events
         const reader = streamRes.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
@@ -1338,7 +1106,6 @@ Deno.serve(async (req) => {
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-
           let nlIdx: number;
           while ((nlIdx = buffer.indexOf("\n")) !== -1) {
             let line = buffer.slice(0, nlIdx);
@@ -1351,7 +1118,7 @@ Deno.serve(async (req) => {
               const parsed = JSON.parse(jsonStr);
               const content = parsed.choices?.[0]?.delta?.content;
               if (content) push("token", { content });
-            } catch { /* partial JSON, skip */ }
+            } catch { /* partial JSON */ }
           }
         }
 
@@ -1367,11 +1134,6 @@ Deno.serve(async (req) => {
   });
 
   return new Response(stream, {
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
-    },
+    headers: { ...corsHeaders, "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
   });
 });
