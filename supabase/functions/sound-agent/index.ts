@@ -181,7 +181,6 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) 
     "Authorization": `Bearer ${anonKey}`,
   };
 
-  // Build caption from prompt
   const caption = args.prompt;
   const lyrics = args.lyrics || "[Instrumental]";
   const bpm = args.bpm || 100;
@@ -218,54 +217,70 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) 
 
   const releaseData = await releaseRes.json();
   console.log("ACE-Step release_task response:", JSON.stringify(releaseData));
-  
-  // Handle various response formats from ACE-Step
-  const taskId = releaseData.task_id || releaseData.taskId || releaseData.id || (releaseData.data && (releaseData.data.task_id || releaseData.data.taskId || releaseData.data.id));
-  if (!taskId) return { error: `No task_id returned from ACE-Step. Response: ${JSON.stringify(releaseData).slice(0, 300)}` };
 
-  // Helper to check if status means "done"
-  const isDone = (s: string) => ["completed", "success", "succeeded"].includes(s?.toLowerCase?.() || "");
-  const isFailed = (s: string) => ["failed", "error"].includes(s?.toLowerCase?.() || "");
+  // Unwrap envelope: ACE-Step wraps in {code, data, error, timestamp}
+  const unwrapped = (releaseData && typeof releaseData === "object" && "code" in releaseData && "data" in releaseData)
+    ? releaseData.data
+    : releaseData;
 
-  // Check if already completed in release response
-  const releaseStatus = releaseData.data?.status || releaseData.status;
-  if (isDone(releaseStatus)) {
-    console.log("Task completed immediately, fetching audio...");
-  } else {
-    // Poll for result (max 120s)
-    let pollDone = false;
-    for (let i = 0; i < 60; i++) {
-      await new Promise(r => setTimeout(r, 2000));
+  const taskId = unwrapped?.task_id || unwrapped?.taskId || unwrapped?.id;
+  if (!taskId) return { error: `No task_id returned. Response: ${JSON.stringify(releaseData).slice(0, 300)}` };
 
-      const pollRes = await fetch(acestepProxy, {
+  // Poll for result using POST /query_result with task_id_list (matching frontend approach)
+  let resultData: any = null;
+  for (let i = 0; i < 120; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+
+    const pollRes = await fetch(acestepProxy, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        endpoint: "/query_result",
         method: "POST",
-        headers,
-        body: JSON.stringify({
-          endpoint: `/query_result?task_id=${taskId}`,
-          method: "GET",
-        })
-      });
+        body: { task_id_list: [taskId] }
+      })
+    });
 
-      if (!pollRes.ok) continue;
+    if (!pollRes.ok) continue;
 
-      const pollData = await pollRes.json();
-      const status = pollData.data?.status || pollData.status || "";
-      console.log(`Poll ${i}: status=${status}`);
-
-      if (isDone(status)) { pollDone = true; break; }
-      if (isFailed(status)) {
-        return { error: `Generation failed: ${pollData.data?.error || pollData.error || "unknown"}` };
-      }
+    let pollData = await pollRes.json();
+    // Unwrap envelope
+    if (pollData && typeof pollData === "object" && "code" in pollData && "data" in pollData) {
+      pollData = pollData.data;
     }
-    if (!pollDone) return { error: "Generation timed out after 120 seconds" };
+
+    const tasks = Array.isArray(pollData) ? pollData : pollData?.data || [pollData];
+    const task = Array.isArray(tasks) ? tasks[0] : tasks;
+    if (!task) continue;
+
+    console.log(`Poll ${i}: status=${task.status}`);
+
+    if (task.status === 1) {
+      // Success — extract result
+      resultData = typeof task.result === "string" ? JSON.parse(task.result) : task.result;
+      break;
+    }
+    if (task.status === 2) {
+      return { error: "ACE-Step generation failed" };
+    }
   }
 
-  // Fetch generated audio
+  if (!resultData) return { error: "Generation timed out after 360 seconds" };
+
+  // Get audio path from result
+  const resultItems = Array.isArray(resultData) ? resultData : [resultData];
+  const firstItem = resultItems[0];
+  const audioPath = firstItem?.url || firstItem?.file;
+  if (!audioPath) return { error: `No audio path in result: ${JSON.stringify(resultData).slice(0, 300)}` };
+
+  console.log("Fetching audio from path:", audioPath);
+
+  // Download audio via proxy
   const audioRes = await fetch(acestepProxy, {
     method: "POST",
     headers,
     body: JSON.stringify({
-      endpoint: `/v1/audio/tasks/${taskId}/result?index=0`,
+      endpoint: audioPath,
       method: "GET",
     })
   });
@@ -273,14 +288,14 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) 
   if (!audioRes.ok) {
     const errText = await audioRes.text();
     console.log("Audio fetch failed:", audioRes.status, errText);
-    return { error: `Failed to download generated audio (${audioRes.status})` };
+    return { error: `Failed to download audio (${audioRes.status})` };
   }
 
   const audioBlob = await audioRes.arrayBuffer();
   console.log(`Audio downloaded: ${audioBlob.byteLength} bytes`);
 
   if (audioBlob.byteLength < 1000) {
-    return { error: `Audio too small (${audioBlob.byteLength} bytes) — generation may have failed silently` };
+    return { error: `Audio too small (${audioBlob.byteLength} bytes)` };
   }
 
   // Upload to storage
@@ -308,8 +323,6 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) 
     time_signature: timeSig,
     prompt: caption,
   };
-
-  return { error: "Generation timed out after 120 seconds" };
 }
 
 async function executeAnalyze(args: { audio_url: string }, supabaseUrl: string, anonKey: string) {
