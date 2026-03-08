@@ -8,6 +8,7 @@ import { PlayerBar } from "@/components/PlayerBar";
 import { MobileNav } from "@/components/MobileNav";
 import { AppHeader } from "@/components/AppHeader";
 import { AgentChat } from "@/components/agent/AgentChat";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgentChat } from "@/hooks/useAgentChat";
