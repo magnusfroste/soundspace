@@ -91,11 +91,18 @@ export function OutputPreview({
 
   const handleDownload = () => {
     const link = document.createElement("a");
-    link.href = item.audioUrl;
+    link.href = currentAudioUrl;
     link.download = `${title || "generated-music"}-${Date.now()}.mp3`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleTrimmed = (newUrl: string) => {
+    setCurrentAudioUrl(newUrl);
+    setShowTrimEditor(false);
+    // Update the item's audioUrl for saving
+    item.audioUrl = newUrl;
   };
 
   const handleSave = () => {
