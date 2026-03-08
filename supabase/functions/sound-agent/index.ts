@@ -1096,6 +1096,7 @@ Deno.serve(async (req) => {
               find_incomplete_songs: "Scanning for incomplete metadata...",
               transcribe_song: "Transcribing lyrics...",
               generate_song_cover: "Generating cover art...",
+              update_song: "Updating song metadata...",
               save_skill: "Saving learned skill...",
               save_memory: "Saving memory...",
               list_objectives: "Checking objectives...",
