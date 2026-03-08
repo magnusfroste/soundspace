@@ -3,6 +3,7 @@ import { Music2, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -37,6 +38,7 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-3">
+            <ThemeToggle />
             <Button 
               variant="ghost" 
               className="text-sm"
