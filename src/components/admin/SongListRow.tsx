@@ -266,14 +266,14 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
       {/* Prompt (read-only) */}
       <div className="w-48 flex-shrink-0 hidden xl:block">
         {song.prompt ? (
-          <Tooltip>
+          <Tooltip delayDuration={100}>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-1 text-xs text-muted-foreground cursor-help">
                 <Sparkles className="h-3 w-3 text-primary flex-shrink-0" />
                 <span className="truncate">{song.prompt}</span>
               </div>
             </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-sm">
+            <TooltipContent side="top" className="max-w-sm pointer-events-auto">
               <p className="text-xs">{song.prompt}</p>
             </TooltipContent>
           </Tooltip>
@@ -285,22 +285,22 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
       {/* Lyrics indicator */}
       <div className="w-8 flex-shrink-0 hidden xl:flex justify-center">
         {song.lyrics ? (
-          <Popover>
-            <PopoverTrigger asChild>
-              <button className="text-primary/70 hover:text-primary transition-colors" title="View lyrics">
+          <Tooltip delayDuration={100}>
+            <TooltipTrigger asChild>
+              <div className="text-primary/70 hover:text-primary transition-colors cursor-help" title="View lyrics">
                 <Type className="h-3.5 w-3.5" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="left" className="w-80 p-0 max-h-[350px] flex flex-col">
-              <div className="px-4 py-3 border-b border-border flex-shrink-0">
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="w-80 p-0 max-h-[350px] flex flex-col pointer-events-auto">
+              <div className="px-4 py-3 border-b border-border flex-shrink-0 bg-muted/30">
                 <p className="text-sm font-medium">{song.title}</p>
                 <p className="text-xs text-muted-foreground">{song.artist}</p>
               </div>
-              <ScrollArea className="flex-1 min-h-0">
+              <ScrollArea className="flex-1 min-h-0 max-h-[250px]">
                 <pre className="text-xs whitespace-pre-wrap font-sans px-4 py-3 leading-relaxed">{song.lyrics}</pre>
               </ScrollArea>
-            </PopoverContent>
-          </Popover>
+            </TooltipContent>
+          </Tooltip>
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>
