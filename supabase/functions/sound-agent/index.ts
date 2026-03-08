@@ -1262,6 +1262,9 @@ Deno.serve(async (req) => {
               read_schedule: "Reading weekly schedule...",
               analyze_playlist_flow: "Analyzing playlist flow...",
               reorder_playlist: "Reordering playlist...",
+              find_incomplete_songs: "Scanning for incomplete metadata...",
+              transcribe_song: "Transcribing lyrics...",
+              generate_song_cover: "Generating cover art...",
             };
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
@@ -1280,6 +1283,9 @@ Deno.serve(async (req) => {
                 case "read_schedule": result = await executeReadSchedule(args, supabaseUrl); break;
                 case "analyze_playlist_flow": result = await executeAnalyzePlaylistFlow(args, supabaseUrl); break;
                 case "reorder_playlist": result = await executeReorderPlaylist(args, supabaseUrl); break;
+                case "find_incomplete_songs": result = await executeFindIncomplete(args, supabaseUrl); break;
+                case "transcribe_song": result = await executeTranscribeSong(args, supabaseUrl, anonKey); break;
+                case "generate_song_cover": result = await executeGenerateSongCover(args, supabaseUrl); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) {
