@@ -258,7 +258,7 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
     } finally {
       setIsTrimming(false);
     }
-  }, [audioUrl, regionStart, regionEnd, fadeIn, fadeOut, trimmedDuration, onTrimmed]);
+  }, [audioUrl, regionStart, regionEnd, fadeIn, fadeOut, trimmedDuration, onTrimmed, normalizeAudio, analyzeAndNormalize]);
 
   const removedDuration = duration - trimmedDuration;
 
