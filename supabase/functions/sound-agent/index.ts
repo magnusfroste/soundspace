@@ -1071,14 +1071,14 @@ async function executeFindIncomplete(args: { limit?: number }, supabaseUrl: stri
   };
 }
 
-async function executeTranscribeSong(args: { song_id: string; audio_url: string }, supabaseUrl: string, anonKey: string) {
+async function executeTranscribeSong(args: { song_id: string; audio_url: string }, supabaseUrl: string, anonKey: string, sttProvider: string = "elevenlabs") {
   const res = await fetch(`${supabaseUrl}/functions/v1/transcribe-lyrics`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${anonKey}`,
     },
-    body: JSON.stringify({ song_id: args.song_id, audio_url: args.audio_url }),
+    body: JSON.stringify({ song_id: args.song_id, audio_url: args.audio_url, provider: sttProvider }),
   });
 
   const data = await res.json();
@@ -1090,7 +1090,7 @@ async function executeTranscribeSong(args: { song_id: string; audio_url: string 
     success: true,
     song_id: args.song_id,
     lyrics: data.lyrics || "[Instrumental]",
-    message: data.lyrics ? `Transcribed ${data.lyrics.length} characters of lyrics.` : "No vocals detected — marked as instrumental.",
+    message: data.lyrics ? `Transcribed ${data.lyrics.length} characters of lyrics via ${sttProvider}.` : "No vocals detected — marked as instrumental.",
   };
 }
 
@@ -1244,6 +1244,7 @@ Deno.serve(async (req) => {
 
   const { messages, conversation_id, settings } = reqBody;
   const chatModel = settings?.chatModel || "google/gemini-3-flash-preview";
+  const sttProvider = settings?.sttProvider || "elevenlabs";
   
   // Determine which API to use based on model prefix
   const useNativeOpenAI = chatModel.startsWith("openai/") && Deno.env.get("OPENAI_API_KEY");
@@ -1355,7 +1356,7 @@ Deno.serve(async (req) => {
                 case "analyze_playlist_flow": result = await executeAnalyzePlaylistFlow(args, supabaseUrl); break;
                 case "reorder_playlist": result = await executeReorderPlaylist(args, supabaseUrl); break;
                 case "find_incomplete_songs": result = await executeFindIncomplete(args, supabaseUrl); break;
-                case "transcribe_song": result = await executeTranscribeSong(args, supabaseUrl, anonKey); break;
+                case "transcribe_song": result = await executeTranscribeSong(args, supabaseUrl, anonKey, sttProvider); break;
                 case "generate_song_cover": result = await executeGenerateSongCover(args, supabaseUrl); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
