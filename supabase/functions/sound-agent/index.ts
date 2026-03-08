@@ -1296,26 +1296,32 @@ Deno.serve(async (req) => {
         // ── Stream final response ──
         push("status", { phase: "responding", message: "Composing response..." });
 
-        // If last message is already assistant text (from non-tool break), stream it token-by-token via a new streaming call
-        // Remove the last assistant message from history to re-request with streaming
+        // If the last message already has assistant text (from the non-streaming loop),
+        // just emit it directly instead of re-requesting
         const lastMsg = llmMessages[llmMessages.length - 1];
-        if (lastMsg.role === "assistant" && lastMsg.content && !lastMsg.tool_calls?.length) {
-          llmMessages.pop();
+        if (lastMsg.role === "assistant" && lastMsg.content && (!lastMsg.tool_calls || lastMsg.tool_calls.length === 0)) {
+          console.log(`[sound-agent] Emitting cached assistant response (${lastMsg.content.length} chars)`);
+          push("token", { content: lastMsg.content });
+          push("done", { audio_urls: collectedAudioUrls, tool_call_count: toolCallCount });
+          controller.close();
+          return;
         }
 
+        // Otherwise request a streaming response WITHOUT tools (final text only)
+        console.log("[sound-agent] Requesting streaming final response");
         const streamRes = await fetch(llmConfig.url, {
           method: "POST",
           headers: llmConfig.headers,
           body: JSON.stringify({
             model: llmConfig.model,
             messages: llmMessages,
-            tools: TOOLS,
             stream: true,
           }),
         });
 
         if (!streamRes.ok || !streamRes.body) {
           const text = await streamRes.text();
+          console.error(`[sound-agent] Streaming failed: ${streamRes.status}`, text.slice(0, 300));
           push("error", { error: `Streaming failed: ${streamRes.status}` });
           push("done", { audio_urls: collectedAudioUrls });
           controller.close();
@@ -1348,9 +1354,11 @@ Deno.serve(async (req) => {
           }
         }
 
+        console.log(`[sound-agent] Done. Tool calls: ${toolCallCount}, audio urls: ${collectedAudioUrls.length}`);
         push("done", { audio_urls: collectedAudioUrls, tool_call_count: toolCallCount });
         controller.close();
       } catch (e) {
+        console.error("[sound-agent] Fatal error:", e instanceof Error ? e.message : e);
         push("error", { error: e instanceof Error ? e.message : "Unknown error" });
         controller.close();
       }
