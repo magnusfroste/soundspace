@@ -494,7 +494,7 @@ Deno.serve(async (req) => {
         ];
 
         const collectedAudioUrls: string[] = [];
-        const MAX_TOOL_CALLS = 10;
+        const MAX_TOOL_CALLS = 25;
         let toolCallCount = 0;
 
         // ── Tool-calling loop (non-streaming) ──
