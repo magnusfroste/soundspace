@@ -4,10 +4,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { usePlayer } from "@/contexts/PlayerContext";
-import { Music, Play, ListMusic, Sparkles, ChevronRight } from "lucide-react";
+import { Music, Play, ListMusic, Sparkles, ChevronRight, Headphones } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { Tables } from "@/integrations/supabase/types";
 
 interface Profile {
