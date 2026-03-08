@@ -112,7 +112,7 @@ export default function AdminAgent() {
               <div
                 key={c.id}
                 className={cn(
-                  "group flex items-center gap-2 rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors",
+                  "group flex items-center gap-2 rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors min-w-0",
                   c.id === activeConversationId
                     ? "bg-primary/10 text-primary"
                     : "hover:bg-muted/50 text-muted-foreground"
@@ -120,10 +120,10 @@ export default function AdminAgent() {
                 onClick={() => setActiveConversationId(c.id)}
               >
                 <MessageSquare className="h-4 w-4 flex-shrink-0" />
-                <span className="truncate flex-1">{c.title}</span>
+                <span className="truncate flex-1 min-w-0">{c.title}</span>
                 <button
                   className={cn(
-                    "transition-opacity p-1 rounded hover:bg-destructive/10",
+                    "transition-opacity p-1 rounded hover:bg-destructive/10 flex-shrink-0",
                     c.id === activeConversationId ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                   )}
                   onClick={(e) => { e.stopPropagation(); deleteConversation.mutate(c.id); }}
