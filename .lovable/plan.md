@@ -1,82 +1,45 @@
 
-# SoundAgent v2 — Reasoning Agent with Persistent Intelligence
 
-## Status: ✅ Implemented
+# Make SoundAgent More Interactive (Conversational Turn-Taking)
 
-### Architecture
-- **Edge Function:** `sound-agent` — LLM tool-calling loop with context injection (objectives, skills, memories)
-- **Edge Function:** `agent-cron` — Nightly automated objective execution via pg_cron
-- **Database:**
-  - `agent_conversations` + `agent_messages` — Chat persistence (RLS: user-scoped)
-  - `agent_objectives` — Persistent goals with progress tracking + auto-execute flag
-  - `agent_skills` — Learned patterns/recipes (genre, BPM, key recipes that work)
-  - `agent_memories` — Cross-session context (user preferences, venue info, feedback)
-- **Frontend:**
-  - `/admin/agent` — Chat UI with markdown rendering, conversation history
-  - `/admin/objectives` — Objective management (create, pause, resume, complete, delete, auto-execute toggle)
-- **Sidebar:** "SoundAgent" + "Objectives" entries conditionally shown when module is enabled
+## Problem
+When the user asks an open-ended question like "What would work for a minimalist Scandinavian café?", the agent dumps 8-10 questions at once. This is overwhelming and hard to respond to. The interaction should feel more like a natural conversation: ask 1-2 questions → get answers → ask follow-ups.
 
-### Three-Phase Workflow
-1. **Explore & Reason** — Open-ended musical thinking, brainstorming
-2. **The Brief** — Structured production spec, user approves before execution
-3. **Execute** — Tool execution with self-critique quality loop (max 3 retries)
+## Solution
+Update the system prompt in the `sound-agent` edge function to enforce a **conversational turn-taking** style during Phase 1 (Explore & Reason).
 
-### Tools (18 total)
-| Tool | Category | Description |
-|------|----------|-------------|
-| `research_music_style` | Knowledge | Venue-specific music recommendations |
-| `generate_track` | Production | ACE-Step generation → storage upload |
-| `analyze_track` | QA | Audio feature extraction (BPM, key, caption) |
-| `save_to_library` | Storage | Persist tracks to songs table |
-| `list_library` | Query | Search existing library |
-| `create_playlist` | Storage | Bundle tracks into playlist |
-| `analyze_library` | Analytics | Genre/mood/BPM distribution + gap analysis |
-| `read_schedule` | Query | Weekly schedule with coverage analysis |
-| `analyze_playlist_flow` | Analytics | Key/BPM transition scoring |
-| `reorder_playlist` | Action | Apply optimized song order |
-| `find_incomplete_songs` | Maintenance | Scan for missing metadata |
-| `transcribe_song` | Maintenance | STT lyrics transcription |
-| `generate_song_cover` | Maintenance | AI cover art generation |
-| `save_skill` | Learning | Save discovered recipe/pattern |
-| `save_memory` | Learning | Save user preference/context |
-| `list_objectives` | Goals | Check active objectives |
-| `update_objective_progress` | Goals | Track progress toward objectives |
+## Changes
 
-### Persistent Intelligence
-- **Objectives:** User-set goals injected into system prompt. Agent references them and updates progress.
-- **Skills:** Auto-saved after successful generation. Ranked by use_count, top 20 injected.
-- **Memories:** Auto-saved from user context. Ranked by importance, top 30 injected.
-- Context fetched in parallel on each request via `fetchAgentContext()`.
+### 1. Update system prompt — `supabase/functions/sound-agent/index.ts`
 
-### Automation
-- **Cron:** `agent-objectives-nightly` runs at 03:00 UTC daily
-- Fetches all objectives with `auto_execute=true` and `status=active`
-- Calls `sound-agent` with a structured prompt for each objective
-- Agent has full tool access in automated mode
+In the `CONVERSATION STYLE` section and `Phase 1: Explore & Reason`, add explicit instructions:
 
-### Quality Gate
-- Max 25 tool calls per turn
-- Self-critique loop: generate → analyze → compare to brief → retry (max 3)
-- Quality thresholds: BPM ±15%, key family match, genre match
+**Phase 1 update:**
+```
+### Phase 1: Explore & Reason (default)
+When a user describes what they need:
+- Start with a SHORT observation or insight (2-3 sentences max) showing you understand the vibe
+- Then ask ONE focused question (max two if tightly related)
+- Wait for the answer before going deeper
+- Build understanding progressively over 3-5 turns, not all at once
+- Each turn should feel like a natural back-and-forth, not an interview
 
----
+DO NOT dump multiple questions at once. One turn = one insight + one question.
+```
 
-# Module System
+**Conversation style update — add:**
+```
+- ONE question per turn. Never list multiple questions. Build understanding iteratively.
+- Start each reply with a brief creative observation before asking
+- If the user gives a short answer, acknowledge it and ask the natural follow-up
+```
 
-## Status: ✅ Implemented
+### 2. Redeploy edge function
+The edge function will auto-deploy on save.
 
-### Registered Modules
-| Module | Category | Configurable |
-|--------|----------|-------------|
-| Udio Importer | import | — |
-| Suno Importer | import | — |
-| SoundAgent | ai-agent | Chat model, generation/analysis/STT provider |
+## Impact
+- No database changes
+- No frontend changes
+- Single file edit: `supabase/functions/sound-agent/index.ts` (system prompt only)
+- The agent will naturally converge on a brief after 3-5 interactive turns instead of one overwhelming response
 
----
-
-# Automated Library Maintenance
-
-## Status: ✅ Implemented
-- Daily 03:00 UTC cron via pg_cron + pg_net
-- Triggers SoundAgent with maintenance prompt
-- Fixes missing lyrics, covers, genre/mood/BPM tags
