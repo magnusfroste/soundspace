@@ -21,6 +21,12 @@
 2. **The Brief** — Structured production spec, user approves before execution
 3. **Execute** — Tool execution with self-critique quality loop (max 3 retries)
 
+### Conversation Style (Interactive Turn-Taking)
+- **Phase 1 Interaction:** Agent starts with a short creative observation (2–3 sentences) showing understanding, then asks **ONE focused question** (max two if tightly related)
+- **Progressive Discovery:** Understanding built iteratively over 3–5 turns instead of dumping multiple questions at once
+- **Natural Back-and-Forth:** Each turn feels conversational — agent acknowledges answers, asks natural follow-ups
+- **Constraint:** ONE question per turn. Never list multiple questions. Builds brief organically through dialogue
+
 ### Tools (18 total)
 | Tool | Category | Description |
 |------|----------|-------------|
