@@ -73,7 +73,7 @@ Analyze what's needed, take concrete actions (generate tracks, fix metadata, fil
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${anonKey}`,
+          "Authorization": `Bearer ${serviceKey}`,
         },
         body: JSON.stringify({
           messages: [{ role: "user", content: prompt }],

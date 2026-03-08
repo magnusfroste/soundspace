@@ -265,11 +265,15 @@ export function useAgentChat() {
     setStatusMessage("Connecting...");
 
     try {
+      // Get the user's JWT session token for authenticated requests
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
       const response = await fetch(AGENT_URL, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
           messages: llmMessages,

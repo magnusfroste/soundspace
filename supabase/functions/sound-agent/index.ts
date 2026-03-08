@@ -954,19 +954,29 @@ Deno.serve(async (req) => {
   const chatModel = settings?.chatModel || "google/gemini-3-flash-preview";
   const sttProvider = settings?.sttProvider || "elevenlabs";
 
-  // Resolve user_id: from body (cron) or from auth header
-  let userId = bodyUserId || null;
-  if (!userId) {
-    // Try to extract from JWT
-    const authHeader = req.headers.get("authorization") || "";
-    if (authHeader.startsWith("Bearer ")) {
+  // Resolve user_id securely:
+  // 1. Try JWT auth first (normal user requests)
+  // 2. Only allow body user_id if caller authenticates with service role key (cron jobs)
+  let userId: string | null = null;
+  const authHeader = req.headers.get("authorization") || "";
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const anonKeyVal = Deno.env.get("SUPABASE_ANON_KEY");
+
+  if (authHeader.startsWith("Bearer ")) {
+    const token = authHeader.replace("Bearer ", "");
+
+    // Check if caller is using service role key — trusted internal caller (cron)
+    if (token === serviceRoleKey && bodyUserId) {
+      userId = bodyUserId;
+    } else if (token !== anonKeyVal) {
+      // Regular user JWT — extract user_id from token
       try {
-        const token = authHeader.replace("Bearer ", "");
         const sb = createClient(Deno.env.get("SUPABASE_URL")!, token);
         const { data: { user } } = await sb.auth.getUser();
-        userId = user?.id;
-      } catch { /* anon key — no user */ }
+        userId = user?.id || null;
+      } catch { /* invalid token */ }
     }
+    // If token === anonKey and no valid JWT, userId stays null (anonymous)
   }
 
   console.log(`[sound-agent] Request: model=${chatModel}, messages=${messages?.length || 0}, conv=${conversation_id}, user=${userId}`);
