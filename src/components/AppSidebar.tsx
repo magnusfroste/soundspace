@@ -31,14 +31,13 @@ const baseBusinessNav = [
   { title: "Now Playing", url: "/now-playing", icon: Radio },
 ];
 
-const adminNav = [
+const adminNavStatic = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
   { title: "AI Studio", url: "/admin/studio", icon: Sparkles },
-  { title: "SoundAgent", url: "/admin/agent", icon: Bot },
   { title: "Song Library", url: "/admin/library", icon: Library },
   { title: "Manage Playlists", url: "/admin/playlists", icon: ListMusic },
   { title: "Integrations", url: "/admin/integrations", icon: Plug },
-  { title: "Plugins", url: "/admin/plugins", icon: Puzzle },
+  { title: "Modules", url: "/admin/modules", icon: Puzzle },
   { title: "Users", url: "/admin/users", icon: Users },
   { title: "Site Settings", url: "/admin/settings", icon: Settings },
 ];
@@ -47,6 +46,33 @@ export function AppSidebar() {
   const { role, signOut, user } = useAuth();
   const location = useLocation();
   const isAdmin = role === "admin";
+
+  // Fetch enabled modules to conditionally show SoundAgent
+  const { data: moduleSettings } = useQuery({
+    queryKey: ["site-settings", "modules"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("site_settings")
+        .select("*")
+        .in("key", ["modules", "plugins"]);
+      if (error) throw error;
+      const modulesRow = data?.find((r) => r.key === "modules");
+      if (modulesRow) return (modulesRow.value as any)?.enabled_modules || [];
+      const pluginsRow = data?.find((r) => r.key === "plugins");
+      if (pluginsRow) return (pluginsRow.value as any)?.enabled_plugins || [];
+      return [];
+    },
+  });
+
+  const enabledModules: string[] = moduleSettings || [];
+  const soundAgentEnabled = enabledModules.includes("sound-agent");
+
+  // Build admin nav with conditional SoundAgent
+  const adminNav = [
+    ...adminNavStatic.slice(0, 2), // Dashboard, AI Studio
+    ...(soundAgentEnabled ? [{ title: "SoundAgent", url: "/admin/agent", icon: Bot }] : []),
+    ...adminNavStatic.slice(2), // rest
+  ];
 
   // Fetch user profile for avatar & display name
   const { data: profile } = useQuery({

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import type { ModuleSettings } from "@/lib/modules";
 
 export interface AgentMessage {
   id: string;
@@ -31,6 +32,24 @@ export function useAgentChat() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [streamingContent, setStreamingContent] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  // Read SoundAgent module settings
+  const { data: agentSettings } = useQuery({
+    queryKey: ["site-settings", "module:sound-agent"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("site_settings")
+        .select("*")
+        .eq("key", "module:sound-agent")
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.value as unknown as ModuleSettings) || {
+        chatModel: "google/gemini-3-flash-preview",
+        analysisProvider: "acestep",
+        generationProvider: "acestep",
+      };
+    },
+  });
 
   // Fetch conversations
   const { data: conversations = [] } = useQuery({
@@ -220,7 +239,11 @@ export function useAgentChat() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ messages: llmMessages, conversation_id: convId }),
+        body: JSON.stringify({
+          messages: llmMessages,
+          conversation_id: convId,
+          settings: agentSettings || undefined,
+        }),
       });
 
       if (!response.ok || !response.body) {

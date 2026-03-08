@@ -1,94 +1,67 @@
 
+# SoundAgent v1 — Implementation Status
 
-# Refactor SoundAgent to a Module
+## Status: ✅ Implemented
 
-## Concept
+### Architecture
+- **Edge Function:** `sound-agent` — LLM tool-calling loop using Lovable AI Gateway (configurable model)
+- **Database:** `agent_conversations` + `agent_messages` tables with RLS (user-scoped)
+- **Frontend:** `/admin/agent` — Chat UI with markdown rendering, audio players, conversation history
+- **Sidebar:** "SoundAgent" entry conditionally shown when module is enabled
 
-Rename "Plugins" to **Modules** across the app. SoundAgent becomes a module that can be enabled/disabled like Udio/Suno importers. When enabled, it appears in the sidebar and its settings become configurable (which AI model for chat, analysis, research).
+### Tools Available to Agent
+| Tool | Description |
+|------|------------|
+| `research_music_style` | Venue-specific music knowledge (BPM, keys, genres, instrumentation) |
+| `generate_track` | ACE-Step generation via acestep-proxy → uploads to storage |
+| `analyze_track` | Audio feature extraction (BPM, key, caption) |
+| `save_to_library` | Persist tracks to songs table |
+| `list_library` | Query existing library |
 
-## Current State
+### Quality Gate
+- Agent system prompt instructs analysis after generation
+- Max 10 tool calls per turn to prevent runaway loops
+- Generated audio stored in `songs` bucket under `agent/` prefix
 
-- SoundAgent is hardcoded in sidebar (`AppSidebar.tsx` line 37) and routes (`App.tsx` line 99)
-- Plugin system uses `site_settings` table with key `"plugins"` storing `{ enabled_plugins: ["udio-importer", ...] }`
-- Plugin registry in `src/lib/plugins/registry.ts` defines available plugins
-- Edge function `sound-agent` hardcodes Gemini model and ACE-Step as provider
+---
 
-## Architecture
+# Module System
 
-```text
-src/lib/plugins/registry.ts    →  src/lib/modules/registry.ts
-  ├── udio-importer (import)
-  ├── suno-importer (import)
-  └── sound-agent   (NEW — category: "ai-agent")
-       └── settings: { chatModel, analysisModel, generationProvider }
+## Status: ✅ Implemented
 
-AdminPlugins.tsx  →  AdminModules.tsx
-  └── When sound-agent enabled → show in sidebar
-  └── When sound-agent active  → show settings panel
+### Architecture
+- **Registry:** `src/lib/modules/registry.ts` — defines all available modules
+- **Admin UI:** `/admin/modules` (also accessible at legacy `/admin/plugins`)
+- **Settings storage:** `site_settings` table with key `"modules"` for enabled list, `"module:<id>"` for per-module settings
+- **Backward compat:** Reads legacy `"plugins"` key if `"modules"` not yet set
 
-AppSidebar.tsx
-  └── SoundAgent nav item conditional on module enabled
+### Registered Modules
+| Module | Category | Configurable |
+|--------|----------|-------------|
+| Udio Importer | import | — |
+| Suno Importer | import | — |
+| SoundAgent | ai-agent | Chat model, generation provider, analysis provider |
 
-sound-agent/index.ts
-  └── Accept optional model param from frontend
-  └── Default to current gemini-3-flash-preview
-```
+### SoundAgent Settings
+- **Chat Model** — selectable from Lovable AI supported models (Gemini, GPT-5 variants)
+- **Generation Provider** — ACE-Step (extensible)
+- **Analysis Provider** — ACE-Step Extract (extensible)
+- Settings passed from frontend → edge function via `settings` object in POST body
 
-## Changes
+### Self-hosting Readiness
+All config in `site_settings` (database) or module registry (code). Model selection makes it easy to swap to local LLM endpoint.
 
-### 1. Rename Plugins → Modules
-- `src/lib/plugins/` → `src/lib/modules/` (registry.ts, index.ts)
-- `AdminPlugins.tsx` → `AdminModules.tsx`
-- Update sidebar label "Plugins" → "Modules"
-- Update route `/admin/plugins` → `/admin/modules`
-- Update `site_settings` key from `"plugins"` to `"modules"` (keep backward compat by reading both)
+---
 
-### 2. Register SoundAgent as a Module
-Add to registry:
-```typescript
-{
-  id: "sound-agent",
-  name: "SoundAgent",
-  description: "Autonomous music production assistant. Researches, generates, analyzes, and saves tracks.",
-  icon: "Bot",
-  category: "ai-agent",
-  version: "1.0.0",
-  settings: {
-    chatModel: "google/gemini-3-flash-preview",
-    analysisProvider: "acestep",
-    generationProvider: "acestep",
-  }
-}
-```
+# "Generate Similar" - Feature Analysis
 
-### 3. Conditional Sidebar Entry
-In `AppSidebar.tsx`, read enabled modules from `site_settings` and only show SoundAgent nav item if `"sound-agent"` is enabled.
+## Status: ✅ Documented
 
-### 4. Module Settings Panel
-When SoundAgent module is opened in AdminModules, render a settings form:
-- **Chat Model** — dropdown of supported Lovable AI models (gemini-3-flash, gpt-5-mini, etc.)
-- **Generation Provider** — dropdown of enabled integrations (ACE-Step, ElevenLabs, etc.)
-- **Analysis Provider** — dropdown (ACE-Step extract, etc.)
+### Current Approach: Metadata-driven variation
+- Passes `prompt`, `genre`, `mood`, `bpm`, `lyrics`, `key_scale`, `time_signature` via URL params to Studio
+- ACE-Step receives text-based data only (caption, lyrics, musical params)
+- Original audio file is **not** sent — lighter and faster
 
-Settings stored in `site_settings` under `"module:sound-agent"` key.
-
-### 5. Edge Function: Read Settings
-`sound-agent/index.ts` accepts optional `settings` object from frontend. The hook `useAgentChat.ts` reads module settings from `site_settings` and passes them in the POST body. The edge function uses the specified model for the LLM call.
-
-### 6. Self-hosting Readiness
-All config lives in `site_settings` (database) or module registry (code). No hardcoded cloud dependencies — model selection makes it easy to swap to a local LLM endpoint later.
-
-## Files to Create/Edit
-
-| File | Action |
-|------|--------|
-| `src/lib/modules/registry.ts` | Create — module definitions including sound-agent |
-| `src/lib/modules/index.ts` | Create — exports |
-| `src/pages/AdminModules.tsx` | Create — renamed from AdminPlugins with SoundAgent settings panel |
-| `src/components/modules/SoundAgentSettings.tsx` | Create — settings form for model/provider selection |
-| `src/components/AppSidebar.tsx` | Edit — conditional SoundAgent nav, rename Plugins→Modules |
-| `src/App.tsx` | Edit — route `/admin/modules`, keep `/admin/plugins` redirect |
-| `src/hooks/useAgentChat.ts` | Edit — read module settings, pass to edge function |
-| `supabase/functions/sound-agent/index.ts` | Edit — accept model param, use dynamic model |
-| `src/lib/plugins/` | Keep as alias or remove after migration |
-
+### Potential Enhancement: Audio-conditioned generation
+- Would require sending the song's `file_url` as reference audio to ACE-Step's "Cover" or "Reference Audio" mode
+- Would produce musically closer variations but with heavier bandwidth usage
