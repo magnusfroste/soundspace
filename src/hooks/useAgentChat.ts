@@ -201,6 +201,12 @@ export function useAgentChat() {
 
     let convId = activeConversationId;
 
+    // Guard against stale session conversation IDs (e.g. deleted/foreign IDs)
+    if (convId && !conversations.some((c) => c.id === convId)) {
+      convId = null;
+      setActiveConv(null);
+    }
+
     // Create conversation if none active
     if (!convId) {
       const { data, error } = await supabase
