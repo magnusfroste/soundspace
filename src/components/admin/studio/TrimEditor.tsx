@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Scissors, Play, Pause, RotateCcw, Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -30,6 +32,8 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
   const [duration, setDuration] = useState(0);
   const [regionStart, setRegionStart] = useState(0);
   const [regionEnd, setRegionEnd] = useState(0);
+  const [fadeIn, setFadeIn] = useState(0);
+  const [fadeOut, setFadeOut] = useState(0);
 
   // Initialize wavesurfer
   useEffect(() => {
@@ -70,7 +74,6 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
         setRegionStart(0);
         setRegionEnd(dur);
 
-        // Add a region spanning the full duration
         const region = regions.addRegion({
           start: 0,
           end: dur,
@@ -114,7 +117,6 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
     if (isPlaying) {
       ws.pause();
     } else {
-      // Play only the selected region
       region.play();
     }
   }, [isPlaying]);
@@ -125,7 +127,12 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
     region.setOptions({ start: 0, end: duration });
     setRegionStart(0);
     setRegionEnd(duration);
+    setFadeIn(0);
+    setFadeOut(0);
   }, [duration]);
+
+  const trimmedDuration = regionEnd - regionStart;
+  const maxFade = Math.floor(trimmedDuration / 2 * 10) / 10; // max half of selection
 
   const handleTrim = useCallback(async () => {
     const ws = wavesurferRef.current;
@@ -134,15 +141,12 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
     setIsTrimming(true);
 
     try {
-      // Fetch the original audio as ArrayBuffer
       const response = await fetch(audioUrl);
       const arrayBuffer = await response.arrayBuffer();
 
-      // Decode audio
       const audioContext = new AudioContext();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-      // Calculate sample positions
       const sampleRate = audioBuffer.sampleRate;
       const startSample = Math.floor(regionStart * sampleRate);
       const endSample = Math.floor(regionEnd * sampleRate);
@@ -154,25 +158,38 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
         return;
       }
 
-      // Create trimmed buffer
       const trimmedBuffer = audioContext.createBuffer(
         audioBuffer.numberOfChannels,
         newLength,
         sampleRate
       );
 
+      const fadeInSamples = Math.floor(fadeIn * sampleRate);
+      const fadeOutSamples = Math.floor(fadeOut * sampleRate);
+
       for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
         const sourceData = audioBuffer.getChannelData(ch);
         const targetData = trimmedBuffer.getChannelData(ch);
         for (let i = 0; i < newLength; i++) {
-          targetData[i] = sourceData[startSample + i];
+          let gain = 1;
+
+          // Apply fade in (equal-power / cosine curve)
+          if (fadeInSamples > 0 && i < fadeInSamples) {
+            gain = Math.sin((i / fadeInSamples) * Math.PI * 0.5);
+          }
+
+          // Apply fade out
+          if (fadeOutSamples > 0 && i >= newLength - fadeOutSamples) {
+            const fadePos = (newLength - 1 - i) / fadeOutSamples;
+            gain *= Math.sin(fadePos * Math.PI * 0.5);
+          }
+
+          targetData[i] = sourceData[startSample + i] * gain;
         }
       }
 
-      // Encode to WAV
       const wavBlob = audioBufferToWav(trimmedBuffer);
 
-      // Upload trimmed file to storage
       const fileName = `ai-gen/trimmed-${crypto.randomUUID()}.wav`;
       const { error: uploadError } = await supabase.storage
         .from("songs")
@@ -186,9 +203,12 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
 
       await audioContext.close();
 
-      toast.success(
-        `Trimmed to ${formatTime(regionEnd - regionStart)} (${formatTime(regionStart)} → ${formatTime(regionEnd)})`
-      );
+      const parts: string[] = [];
+      parts.push(`Trimmed to ${formatTime(trimmedDuration)}`);
+      if (fadeIn > 0) parts.push(`fade in ${fadeIn}s`);
+      if (fadeOut > 0) parts.push(`fade out ${fadeOut}s`);
+      toast.success(parts.join(" · "));
+
       onTrimmed(urlData.publicUrl);
     } catch (err: any) {
       console.error("Trim error:", err);
@@ -196,9 +216,8 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
     } finally {
       setIsTrimming(false);
     }
-  }, [audioUrl, regionStart, regionEnd, onTrimmed]);
+  }, [audioUrl, regionStart, regionEnd, fadeIn, fadeOut, trimmedDuration, onTrimmed]);
 
-  const trimmedDuration = regionEnd - regionStart;
   const removedDuration = duration - trimmedDuration;
 
   return (
@@ -248,6 +267,40 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
         </div>
       )}
 
+      {/* Fade controls */}
+      {isReady && (
+        <div className="grid grid-cols-2 gap-4 p-3 rounded-md border bg-muted/20">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Fade In</Label>
+              <span className="text-xs font-mono text-muted-foreground">{fadeIn.toFixed(1)}s</span>
+            </div>
+            <Slider
+              value={[fadeIn]}
+              onValueChange={([v]) => setFadeIn(Math.round(v * 10) / 10)}
+              min={0}
+              max={Math.min(maxFade, 10)}
+              step={0.1}
+              className="w-full"
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Fade Out</Label>
+              <span className="text-xs font-mono text-muted-foreground">{fadeOut.toFixed(1)}s</span>
+            </div>
+            <Slider
+              value={[fadeOut]}
+              onValueChange={([v]) => setFadeOut(Math.round(v * 10) / 10)}
+              min={0}
+              max={Math.min(maxFade, 10)}
+              step={0.1}
+              className="w-full"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Controls */}
       <div className="flex items-center gap-2">
         <Button
@@ -277,12 +330,12 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
         <Button
           size="sm"
           onClick={handleTrim}
-          disabled={!isReady || isTrimming || removedDuration < 0.1}
+          disabled={!isReady || isTrimming || (removedDuration < 0.1 && fadeIn === 0 && fadeOut === 0)}
         >
           {isTrimming ? (
-            <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Trimming...</>
+            <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Processing...</>
           ) : (
-            <><Check className="h-3.5 w-3.5 mr-1" /> Apply Trim</>
+            <><Check className="h-3.5 w-3.5 mr-1" /> Apply</>
           )}
         </Button>
       </div>
@@ -290,13 +343,11 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
   );
 }
 
-/**
- * Encode an AudioBuffer to a WAV Blob.
- */
+/** Encode an AudioBuffer to a WAV Blob. */
 function audioBufferToWav(buffer: AudioBuffer): Blob {
   const numChannels = buffer.numberOfChannels;
   const sampleRate = buffer.sampleRate;
-  const format = 1; // PCM
+  const format = 1;
   const bitDepth = 16;
 
   const bytesPerSample = bitDepth / 8;
@@ -306,12 +357,9 @@ function audioBufferToWav(buffer: AudioBuffer): Blob {
   const arrayBuffer = new ArrayBuffer(headerSize + dataSize);
   const view = new DataView(arrayBuffer);
 
-  // RIFF header
   writeString(view, 0, "RIFF");
   view.setUint32(4, 36 + dataSize, true);
   writeString(view, 8, "WAVE");
-
-  // fmt chunk
   writeString(view, 12, "fmt ");
   view.setUint32(16, 16, true);
   view.setUint16(20, format, true);
@@ -320,12 +368,9 @@ function audioBufferToWav(buffer: AudioBuffer): Blob {
   view.setUint32(28, sampleRate * blockAlign, true);
   view.setUint16(32, blockAlign, true);
   view.setUint16(34, bitDepth, true);
-
-  // data chunk
   writeString(view, 36, "data");
   view.setUint32(40, dataSize, true);
 
-  // Interleave samples
   let offset = 44;
   const channels: Float32Array[] = [];
   for (let ch = 0; ch < numChannels; ch++) {
