@@ -70,16 +70,21 @@ export function AppSidebar() {
   const enabledModules: string[] = Array.isArray(moduleSettings?.enabled_modules) ? moduleSettings.enabled_modules : [];
   const soundAgentEnabled = enabledModules.includes("sound-agent");
 
-  // Build admin nav with conditional SoundAgent
+  // Build admin nav — SoundAgent chat is grouped with tools, agentic module is separate
   const adminNav = [
     ...adminNavStatic.slice(0, 2), // Dashboard, AI Studio
     ...(soundAgentEnabled ? [
       { title: "SoundAgent", url: "/admin/agent", icon: Bot },
-      { title: "Objectives", url: "/admin/objectives", icon: Target },
-      { title: "Skills & Memory", url: "/admin/skills", icon: Brain },
     ] : []),
     ...adminNavStatic.slice(2), // rest
   ];
+
+  // Agentic module sub-pages (only shown when SoundAgent is enabled)
+  const agenticNav = soundAgentEnabled ? [
+    { title: "Objectives", url: "/admin/objectives", icon: Target },
+    { title: "Skills & Memory", url: "/admin/skills", icon: Brain },
+    { title: "Automation", url: "/admin/automation", icon: Timer },
+  ] : [];
 
   // Fetch user profile for avatar & display name
   const { data: profile } = useQuery({
