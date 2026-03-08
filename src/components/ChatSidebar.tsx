@@ -68,7 +68,7 @@ export function ChatSidebar({
               <div
                 key={c.id}
                 className={cn(
-                  "group flex items-center gap-2 rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors min-w-0",
+                  "group/conv flex items-center gap-2 rounded-lg px-3 py-2 text-sm cursor-pointer transition-colors min-w-0",
                   "group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2",
                   c.id === activeConversationId
                     ? "bg-sidebar-accent text-sidebar-accent-foreground"
@@ -83,7 +83,7 @@ export function ChatSidebar({
                 <button
                   className={cn(
                     "transition-opacity p-1 rounded hover:bg-destructive/10 flex-shrink-0 group-data-[collapsible=icon]:hidden",
-                    c.id === activeConversationId ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    c.id === activeConversationId ? "opacity-100" : "opacity-0 group-hover/conv:opacity-100"
                   )}
                   onClick={(e) => {
                     e.stopPropagation();
