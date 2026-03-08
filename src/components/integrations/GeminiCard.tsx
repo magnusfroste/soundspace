@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Sparkles, CheckCircle, XCircle, Loader2, Settings } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { isIntegrationEnabled, setIntegrationEnabled } from "@/lib/integrations-state";
@@ -22,15 +23,24 @@ const GEMINI_MODELS = [
   { id: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
 ];
 
-const STORAGE_KEY = "somhonesto_gemini_configured";
-
 export function GeminiCard() {
   const [enabled, setEnabled] = useState(() => isIntegrationEnabled("gemini"));
   const [open, setOpen] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [isTesting, setIsTesting] = useState(false);
-  const [status, setStatus] = useState<"idle" | "connected" | "failed">("idle");
-  const [isConfigured] = useState(() => localStorage.getItem(STORAGE_KEY) === "true");
+  const [testStatus, setTestStatus] = useState<"idle" | "connected" | "failed">("idle");
+
+  const { data: keyStatus } = useQuery({
+    queryKey: ["ai-key-status"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("check-ai-keys");
+      if (error) throw error;
+      return data as Record<string, boolean>;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const isConfigured = keyStatus?.gemini ?? false;
 
   const handleToggle = (checked: boolean) => {
     setEnabled(checked);
@@ -39,20 +49,20 @@ export function GeminiCard() {
 
   const handleTest = async () => {
     setIsTesting(true);
-    setStatus("idle");
+    setTestStatus("idle");
     try {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
       );
       if (res.ok) {
-        setStatus("connected");
+        setTestStatus("connected");
         toast.success("Gemini API key is valid");
       } else {
-        setStatus("failed");
+        setTestStatus("failed");
         toast.error("Invalid API key");
       }
     } catch {
-      setStatus("failed");
+      setTestStatus("failed");
       toast.error("Connection failed");
     } finally {
       setIsTesting(false);
@@ -60,17 +70,7 @@ export function GeminiCard() {
   };
 
   const handleSave = async () => {
-    const { error } = await supabase
-      .from("site_settings")
-      .upsert({ key: "secret:gemini_api_key", value: JSON.stringify({ hint: apiKey.slice(-4) }) }, { onConflict: "key" });
-
-    if (error) {
-      toast.error("Failed to save");
-      return;
-    }
-
-    localStorage.setItem(STORAGE_KEY, "true");
-    toast.success("Gemini API key saved. Add the key as a backend secret named GOOGLE_AI_API_KEY.");
+    toast.success("Use the backend secrets manager to update GOOGLE_AI_API_KEY.");
     setOpen(false);
   };
 
@@ -88,7 +88,7 @@ export function GeminiCard() {
                 {isConfigured ? (
                   <Badge variant="outline" className="text-green-600 border-green-600/30 bg-green-500/10">
                     <CheckCircle className="h-3 w-3 mr-1" />
-                    Configured
+                    Connected
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30">
@@ -146,10 +146,10 @@ export function GeminiCard() {
                 <Button variant="outline" onClick={handleTest} disabled={isTesting || !apiKey}>
                   {isTesting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Testing...</> : "Test Connection"}
                 </Button>
-                {status === "connected" && (
+                {testStatus === "connected" && (
                   <Badge variant="default" className="gap-1"><CheckCircle className="h-3 w-3" />Valid</Badge>
                 )}
-                {status === "failed" && (
+                {testStatus === "failed" && (
                   <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />Failed</Badge>
                 )}
               </div>
