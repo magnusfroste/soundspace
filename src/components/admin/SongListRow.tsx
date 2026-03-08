@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Play, Pause, Music2, Sparkles, Plus, Trash2, Type, Loader2, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +40,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import type { ModuleSettings } from "@/lib/modules";
 
 interface SongListRowProps {
   song: SongWithPlaylists;
@@ -155,10 +157,25 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
   const queryClient = useQueryClient();
   const isCurrentSong = currentSong?.id === song.id;
 
+  // Read STT provider from module settings
+  const { data: agentSettings } = useQuery({
+    queryKey: ["site-settings", "module:sound-agent"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("site_settings")
+        .select("*")
+        .eq("key", "module:sound-agent")
+        .maybeSingle();
+      if (error) throw error;
+      return (data?.value as unknown as ModuleSettings) || { sttProvider: "elevenlabs" };
+    },
+    staleTime: 1000 * 60 * 10,
+  });
+
   const extractLyrics = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("transcribe-lyrics", {
-        body: { song_id: song.id, audio_url: song.file_url },
+        body: { song_id: song.id, audio_url: song.file_url, provider: agentSettings?.sttProvider || "elevenlabs" },
       });
       if (error) throw new Error(error.message);
       if (!data?.success) throw new Error(data?.error || "Transcription failed");
