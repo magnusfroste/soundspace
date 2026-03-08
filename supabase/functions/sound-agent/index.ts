@@ -359,6 +359,30 @@ const TOOLS = [
       }
     }
   },
+  {
+    type: "function",
+    function: {
+      name: "update_song",
+      description: "Update metadata on an existing song in the library (genre, mood, BPM, key, lyrics, etc.).",
+      parameters: {
+        type: "object",
+        properties: {
+          song_id: { type: "string", description: "ID of the song to update" },
+          title: { type: "string" },
+          artist: { type: "string" },
+          genre: { type: "string" },
+          mood: { type: "string" },
+          bpm: { type: "number" },
+          key_scale: { type: "string" },
+          time_signature: { type: "string" },
+          lyrics: { type: "string" },
+          quality_score: { type: "number" },
+        },
+        required: ["song_id"],
+        additionalProperties: false
+      }
+    }
+  },
   // ── Persistence tools ──
   {
     type: "function",
@@ -557,6 +581,26 @@ async function executeSave(args: any, supabaseUrl: string) {
   }).select("id").single();
   if (error) return { error: `Save failed: ${error.message}` };
   return { success: true, song_id: data.id, title: args.title, message: `"${args.title}" saved to song library.` };
+}
+
+async function executeUpdateSong(args: any, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const updates: Record<string, any> = {};
+  if (args.title !== undefined) updates.title = args.title;
+  if (args.artist !== undefined) updates.artist = args.artist;
+  if (args.genre !== undefined) updates.genre = args.genre;
+  if (args.mood !== undefined) updates.mood = args.mood;
+  if (args.bpm !== undefined) updates.bpm = Math.round(args.bpm);
+  if (args.key_scale !== undefined) updates.key_scale = args.key_scale;
+  if (args.time_signature !== undefined) updates.time_signature = args.time_signature;
+  if (args.lyrics !== undefined) updates.lyrics = args.lyrics;
+  if (args.quality_score !== undefined) updates.quality_score = args.quality_score;
+
+  if (Object.keys(updates).length === 0) return { error: "No fields to update" };
+
+  const { error } = await sb.from("songs").update(updates).eq("id", args.song_id);
+  if (error) return { error: `Update failed: ${error.message}` };
+  return { success: true, song_id: args.song_id, updated_fields: Object.keys(updates), message: `Song updated: ${Object.keys(updates).join(", ")}` };
 }
 
 async function executeCreatePlaylist(args: { title: string; description?: string; song_ids: string[] }, supabaseUrl: string) {
@@ -1052,6 +1096,7 @@ Deno.serve(async (req) => {
               find_incomplete_songs: "Scanning for incomplete metadata...",
               transcribe_song: "Transcribing lyrics...",
               generate_song_cover: "Generating cover art...",
+              update_song: "Updating song metadata...",
               save_skill: "Saving learned skill...",
               save_memory: "Saving memory...",
               list_objectives: "Checking objectives...",
@@ -1074,6 +1119,7 @@ Deno.serve(async (req) => {
                 case "find_incomplete_songs": result = await executeFindIncomplete(args, supabaseUrl); break;
                 case "transcribe_song": result = await executeTranscribeSong(args, supabaseUrl, anonKey, sttProvider); break;
                 case "generate_song_cover": result = await executeGenerateSongCover(args, supabaseUrl); break;
+                case "update_song": result = await executeUpdateSong(args, supabaseUrl); break;
                 case "save_skill": result = userId ? await executeSaveSkill(args, supabaseUrl, userId) : { error: "No user context" }; break;
                 case "save_memory": result = userId ? await executeSaveMemory(args, supabaseUrl, userId) : { error: "No user context" }; break;
                 case "list_objectives": result = userId ? await executeListObjectives(supabaseUrl, userId) : { objectives: [], count: 0 }; break;
