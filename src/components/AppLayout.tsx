@@ -10,9 +10,8 @@ import { AppHeader } from "@/components/AppHeader";
 import { AgentChat } from "@/components/agent/AgentChat";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAgentChat } from "@/hooks/useAgentChat";
+import { useModuleSettings } from "@/hooks/useModuleSettings";
 
 export function AppLayout() {
   const isMobile = useIsMobile();
