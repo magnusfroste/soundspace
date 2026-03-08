@@ -296,12 +296,16 @@ export function useAgentChat() {
 
       // Save assistant message
       if (fullContent) {
-        await supabase.from("agent_messages").insert({
+        const { error: assistantMessageError } = await supabase.from("agent_messages").insert({
           conversation_id: convId,
           role: "assistant",
           content: fullContent,
           audio_urls: audioUrls.length ? audioUrls : null,
         });
+
+        if (assistantMessageError) {
+          toast.error("Failed to save assistant response");
+        }
       }
 
       // Update conversation
