@@ -135,19 +135,39 @@ export function OutputPreview({
               <Play className="h-4 w-4" />
             )}
           </Button>
+          {!item.savedToLibrary && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowTrimEditor(!showTrimEditor)}
+              title="Trim audio"
+            >
+              <Scissors className="h-4 w-4" />
+            </Button>
+          )}
           <Button variant="outline" size="icon" onClick={handleDownload}>
             <Download className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      <audio
-        ref={audioRef}
-        src={item.audioUrl}
-        onEnded={() => setIsPlaying(false)}
-        className="w-full"
-        controls
-      />
+      {showTrimEditor && (
+        <TrimEditor
+          audioUrl={currentAudioUrl}
+          onTrimmed={handleTrimmed}
+          onCancel={() => setShowTrimEditor(false)}
+        />
+      )}
+
+      {!showTrimEditor && (
+        <audio
+          ref={audioRef}
+          src={currentAudioUrl}
+          onEnded={() => setIsPlaying(false)}
+          className="w-full"
+          controls
+        />
+      )}
 
       {(item.bpm || item.keyScale || item.timeSignature || item.vocalLanguage) && (
         <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground">
