@@ -359,6 +359,30 @@ const TOOLS = [
       }
     }
   },
+  {
+    type: "function",
+    function: {
+      name: "update_song",
+      description: "Update metadata on an existing song in the library (genre, mood, BPM, key, lyrics, etc.).",
+      parameters: {
+        type: "object",
+        properties: {
+          song_id: { type: "string", description: "ID of the song to update" },
+          title: { type: "string" },
+          artist: { type: "string" },
+          genre: { type: "string" },
+          mood: { type: "string" },
+          bpm: { type: "number" },
+          key_scale: { type: "string" },
+          time_signature: { type: "string" },
+          lyrics: { type: "string" },
+          quality_score: { type: "number" },
+        },
+        required: ["song_id"],
+        additionalProperties: false
+      }
+    }
+  },
   // ── Persistence tools ──
   {
     type: "function",
