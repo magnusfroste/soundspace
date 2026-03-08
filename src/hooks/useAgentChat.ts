@@ -221,11 +221,17 @@ export function useAgentChat() {
     }
 
     // Save user message
-    await supabase.from("agent_messages").insert({
+    const { error: userMessageError } = await supabase.from("agent_messages").insert({
       conversation_id: convId,
       role: "user",
       content,
     });
+
+    if (userMessageError) {
+      toast.error("Failed to save your message");
+      return;
+    }
+
     qc.invalidateQueries({ queryKey: ["agent-messages", convId] });
 
     // Build message history for LLM
