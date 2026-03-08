@@ -117,7 +117,7 @@ export function AgentChat({ fullWidth, agentChat: externalChat }: AgentChatProps
                 )}
                 onClick={() => setActiveConversationId(c.id)}
               >
-                <MessageSquare className="h-4 w-4 flex-shrink-0" />
+                <Music className="h-4 w-4 flex-shrink-0" />
                 <span className="truncate flex-1 min-w-0">{c.title}</span>
                 <button
                   className={cn("transition-opacity p-1 rounded hover:bg-destructive/10 flex-shrink-0", c.id === activeConversationId ? "opacity-100" : "opacity-0 group-hover:opacity-100")}
