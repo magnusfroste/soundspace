@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LocalAICard, MubertCard, MusicgenCard, AceStepCard } from "@/components/integrations";
+import { LocalAICard, MubertCard, MusicgenCard, AceStepCard, OpenAICard, GeminiCard } from "@/components/integrations";
 
 interface ElevenLabsStatus {
   connected: boolean;
@@ -249,6 +249,8 @@ export default function AdminIntegrations() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <ElevenLabsCard />
+        <OpenAICard />
+        <GeminiCard />
         <AceStepCard />
         <MubertCard />
         <MusicgenCard />
