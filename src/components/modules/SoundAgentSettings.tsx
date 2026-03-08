@@ -87,9 +87,9 @@ export function SoundAgentSettings() {
   };
 
   const CHAT_MODELS = ALL_CHAT_MODELS.filter((m) => {
-    if (m.source === "gateway") return true; // Lovable AI always available
-    if (m.source === "native" && m.provider === "openai") return keyStatus?.openai === true;
-    if (m.source === "native" && m.provider === "gemini") return keyStatus?.gemini === true;
+    if (m.source === "gateway") return isIntegrationEnabled("lovable");
+    if (m.source === "native" && m.provider === "openai") return isIntegrationEnabled("openai") && keyStatus?.openai === true;
+    if (m.source === "native" && m.provider === "gemini") return isIntegrationEnabled("gemini") && keyStatus?.gemini === true;
     return false;
   });
 
