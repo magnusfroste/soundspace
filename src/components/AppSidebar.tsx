@@ -1,5 +1,4 @@
 import { useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import {
   Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic, Crown, Puzzle, Users, Bot,
 } from "lucide-react";
@@ -7,6 +6,7 @@ import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useModuleSettings } from "@/hooks/useModuleSettings";
+import { useProfile } from "@/hooks/useProfile";
 import {
   Sidebar,
   SidebarContent,
