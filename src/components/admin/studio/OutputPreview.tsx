@@ -65,6 +65,8 @@ export function OutputPreview({
   const [isPlaying, setIsPlaying] = useState(false);
   const [title, setTitle] = useState("");
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string>("");
+  const [showTrimEditor, setShowTrimEditor] = useState(false);
+  const [currentAudioUrl, setCurrentAudioUrl] = useState(item.audioUrl);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
@@ -72,7 +74,9 @@ export function OutputPreview({
     setIsPlaying(false);
     setTitle("");
     setSelectedPlaylistId("");
-  }, [item.id]);
+    setShowTrimEditor(false);
+    setCurrentAudioUrl(item.audioUrl);
+  }, [item.id, item.audioUrl]);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
