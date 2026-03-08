@@ -235,6 +235,18 @@ const TOOLS = [
         additionalProperties: false
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "analyze_library",
+      description: "Analyze the entire song library to get distribution stats for genre, mood, BPM ranges, and key signatures. Returns counts per category and identifies gaps. Use when the user asks about their collection, what's missing, or wants recommendations for what to generate next.",
+      parameters: {
+        type: "object",
+        properties: {},
+        additionalProperties: false
+      }
+    }
   }
 ];
 
