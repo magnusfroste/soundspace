@@ -104,9 +104,20 @@ export function SoundAgentSettings() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {CHAT_MODELS.map((m) => (
+            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Lovable AI Gateway</div>
+            {CHAT_MODELS.filter(m => m.source === "gateway").map((m) => (
               <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
             ))}
+            {CHAT_MODELS.some(m => m.source === "native") && (
+              <>
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground mt-1 border-t border-border pt-2">Native API</div>
+                {CHAT_MODELS.filter(m => m.source === "native").map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </>
+            )}
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">LLM used for reasoning, tool orchestration and conversation.</p>
