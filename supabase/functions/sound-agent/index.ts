@@ -410,7 +410,9 @@ Deno.serve(async (req) => {
     });
   }
 
-  const { messages, conversation_id } = reqBody;
+  const { messages, conversation_id, settings } = reqBody;
+  const chatModel = settings?.chatModel || "google/gemini-3-flash-preview";
+  
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!LOVABLE_API_KEY) {
     return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
@@ -448,7 +450,7 @@ Deno.serve(async (req) => {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "google/gemini-3-flash-preview",
+              model: chatModel,
               messages: llmMessages,
               tools: TOOLS,
               stream: false,
@@ -530,7 +532,7 @@ Deno.serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "google/gemini-3-flash-preview",
+            model: chatModel,
             messages: llmMessages,
             tools: TOOLS,
             stream: true,
