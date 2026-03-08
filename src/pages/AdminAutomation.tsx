@@ -29,6 +29,20 @@ export default function AdminAutomation() {
     },
   });
 
+  const { data: logs = [] } = useQuery({
+    queryKey: ["cron-logs"],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agent_cron_logs" as any)
+        .select("id, objective_title, status, error, created_at")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
   const triggerCron = async () => {
     setRunning(true);
     try {
