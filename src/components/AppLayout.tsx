@@ -10,9 +10,8 @@ import { AppHeader } from "@/components/AppHeader";
 import { AgentChat } from "@/components/agent/AgentChat";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAgentChat } from "@/hooks/useAgentChat";
+import { useModuleSettings } from "@/hooks/useModuleSettings";
 
 export function AppLayout() {
   const isMobile = useIsMobile();
@@ -20,24 +19,7 @@ export function AppLayout() {
   const [viewMode, setViewMode] = useState<"dashboard" | "chat">("dashboard");
 
   // Check if SoundAgent module is enabled
-  const { data: moduleSettings } = useQuery({
-    queryKey: ["site-settings", "modules"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("site_settings")
-        .select("*")
-        .in("key", ["modules", "plugins"]);
-      if (error) throw error;
-      const modulesRow = data?.find((r) => r.key === "modules");
-      if (modulesRow) return (modulesRow.value as any) || { enabled_modules: [] };
-      const pluginsRow = data?.find((r) => r.key === "plugins");
-      if (pluginsRow) {
-        const legacy = pluginsRow.value as any;
-        return { enabled_modules: legacy?.enabled_plugins || [] };
-      }
-      return { enabled_modules: [] };
-    },
-  });
+  const { data: moduleSettings } = useModuleSettings();
 
   const enabledModules: string[] = Array.isArray(moduleSettings?.enabled_modules) ? moduleSettings.enabled_modules : [];
   const showChatToggle = role === "admin" && enabledModules.includes("sound-agent");
