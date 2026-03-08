@@ -130,7 +130,7 @@ export function AppSidebar() {
             <h1 className="text-sm font-bold tracking-tight truncate" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                 SoundSpace
               </h1>
-              <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Your Sound, Your Space</p>
+              
             </div>
           </div>
           <SidebarTrigger className="h-7 w-7 flex-shrink-0" />
