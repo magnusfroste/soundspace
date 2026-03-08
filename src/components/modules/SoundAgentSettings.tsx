@@ -43,6 +43,11 @@ const GENERATION_PROVIDERS = [
   { value: "acestep", label: "ACE-Step" },
 ];
 
+const STT_PROVIDERS = [
+  { value: "elevenlabs", label: "ElevenLabs Scribe v2", integration: "elevenlabs" as const },
+  { value: "openai", label: "OpenAI Whisper", integration: "openai" as const },
+];
+
 const ANALYSIS_PROVIDERS = [
   { value: "acestep", label: "ACE-Step Extract" },
 ];
@@ -72,6 +77,7 @@ export function SoundAgentSettings() {
       return (data?.value as unknown as ModuleSettings) || {
         chatProvider: "lovable",
         chatModel: "google/gemini-3-flash-preview",
+        sttProvider: "elevenlabs",
         analysisProvider: "acestep",
         generationProvider: "acestep",
       };
