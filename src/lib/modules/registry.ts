@@ -47,6 +47,7 @@ export const moduleRegistry: Module[] = [
     category: "ai-agent",
     version: "1.0.0",
     defaultSettings: {
+      chatProvider: "lovable",
       chatModel: "google/gemini-3-flash-preview",
       analysisProvider: "acestep",
       generationProvider: "acestep",
