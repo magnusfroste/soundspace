@@ -5,27 +5,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import type { ModuleSettings } from "@/lib/modules";
 import { isIntegrationEnabled } from "@/lib/integrations-state";
-import { Badge } from "@/components/ui/badge";
 
 const SETTINGS_KEY = "module:sound-agent";
 
-const ALL_CHAT_MODELS = [
-  // Lovable AI Gateway models (always available)
-  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash (fast)", provider: "lovable" as const, source: "gateway" },
-  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "lovable" as const, source: "gateway" },
-  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro (strongest)", provider: "lovable" as const, source: "gateway" },
-  { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", provider: "lovable" as const, source: "gateway" },
-  { value: "openai/gpt-5-mini", label: "GPT-5 Mini", provider: "lovable" as const, source: "gateway" },
-  { value: "openai/gpt-5", label: "GPT-5", provider: "lovable" as const, source: "gateway" },
-  { value: "openai/gpt-5.2", label: "GPT-5.2 (latest)", provider: "lovable" as const, source: "gateway" },
-  // Native API models (shown when keys are configured)
-  { value: "native:google/gemini-3-flash-preview", label: "Gemini 3 Flash (Native)", provider: "gemini" as const, source: "native" },
-  { value: "native:google/gemini-2.5-flash", label: "Gemini 2.5 Flash (Native)", provider: "gemini" as const, source: "native" },
-  { value: "native:google/gemini-2.5-pro", label: "Gemini 2.5 Pro (Native)", provider: "gemini" as const, source: "native" },
-  { value: "native:openai/gpt-5-mini", label: "GPT-5 Mini (Native)", provider: "openai" as const, source: "native" },
-  { value: "native:openai/gpt-5", label: "GPT-5 (Native)", provider: "openai" as const, source: "native" },
-  { value: "native:openai/gpt-5.2", label: "GPT-5.2 (Native)", provider: "openai" as const, source: "native" },
+type ChatProvider = "lovable" | "openai" | "gemini";
+
+const CHAT_PROVIDERS: { value: ChatProvider; label: string; integration: "lovable" | "openai" | "gemini" }[] = [
+  { value: "lovable", label: "Lovable AI Gateway", integration: "lovable" },
+  { value: "openai", label: "OpenAI (Native)", integration: "openai" },
+  { value: "gemini", label: "Google Gemini (Native)", integration: "gemini" },
 ];
+
+const MODELS_BY_PROVIDER: Record<ChatProvider, { value: string; label: string }[]> = {
+  lovable: [
+    { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash (fast)" },
+    { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+    { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro (strongest)" },
+    { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
+    { value: "openai/gpt-5-mini", label: "GPT-5 Mini" },
+    { value: "openai/gpt-5", label: "GPT-5" },
+    { value: "openai/gpt-5.2", label: "GPT-5.2 (latest)" },
+  ],
+  openai: [
+    { value: "native:openai/gpt-5-mini", label: "GPT-5 Mini" },
+    { value: "native:openai/gpt-5", label: "GPT-5" },
+    { value: "native:openai/gpt-5.2", label: "GPT-5.2" },
+  ],
+  gemini: [
+    { value: "native:google/gemini-3-flash-preview", label: "Gemini 3 Flash" },
+    { value: "native:google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+    { value: "native:google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+    { value: "native:google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
+  ],
+};
 
 const GENERATION_PROVIDERS = [
   { value: "acestep", label: "ACE-Step" },
@@ -58,6 +70,7 @@ export function SoundAgentSettings() {
         .maybeSingle();
       if (error) throw error;
       return (data?.value as unknown as ModuleSettings) || {
+        chatProvider: "lovable",
         chatModel: "google/gemini-3-flash-preview",
         analysisProvider: "acestep",
         generationProvider: "acestep",
@@ -82,42 +95,61 @@ export function SoundAgentSettings() {
     onError: () => toast.error("Failed to save settings"),
   });
 
-  const update = (field: string, value: string) => {
-    mutation.mutate({ ...settings, [field]: value });
+  const update = (fields: Partial<ModuleSettings>) => {
+    mutation.mutate({ ...settings, ...fields });
   };
 
-  const CHAT_MODELS = ALL_CHAT_MODELS.filter((m) => {
-    if (m.source === "gateway") return isIntegrationEnabled("lovable");
-    if (m.source === "native" && m.provider === "openai") return isIntegrationEnabled("openai") && keyStatus?.openai === true;
-    if (m.source === "native" && m.provider === "gemini") return isIntegrationEnabled("gemini") && keyStatus?.gemini === true;
-    return false;
+  // Filter providers by enabled integrations + configured keys
+  const availableProviders = CHAT_PROVIDERS.filter((p) => {
+    if (!isIntegrationEnabled(p.integration)) return false;
+    if (p.value === "openai") return keyStatus?.openai === true;
+    if (p.value === "gemini") return keyStatus?.gemini === true;
+    return true; // lovable always available if enabled
   });
+
+  const currentProvider = (settings?.chatProvider || "lovable") as ChatProvider;
+  const currentModels = MODELS_BY_PROVIDER[currentProvider] || [];
+
+  // When provider changes, auto-select the first model of that provider
+  const handleProviderChange = (provider: string) => {
+    const models = MODELS_BY_PROVIDER[provider as ChatProvider] || [];
+    update({
+      chatProvider: provider,
+      chatModel: models[0]?.value || "",
+    });
+  };
 
   if (!settings) return null;
 
   return (
     <div className="space-y-4 pt-2">
       <div className="space-y-2">
+        <Label htmlFor="chat-provider">Chat Provider</Label>
+        <Select value={currentProvider} onValueChange={handleProviderChange}>
+          <SelectTrigger id="chat-provider">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {availableProviders.map((p) => (
+              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Which AI service to use for the agent's reasoning.
+        </p>
+      </div>
+
+      <div className="space-y-2">
         <Label htmlFor="chat-model">Chat Model</Label>
-        <Select value={settings.chatModel || "google/gemini-3-flash-preview"} onValueChange={(v) => update("chatModel", v)}>
+        <Select value={settings.chatModel || currentModels[0]?.value || ""} onValueChange={(v) => update({ chatModel: v })}>
           <SelectTrigger id="chat-model">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Lovable AI Gateway</div>
-            {CHAT_MODELS.filter(m => m.source === "gateway").map((m) => (
+            {currentModels.map((m) => (
               <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
             ))}
-            {CHAT_MODELS.some(m => m.source === "native") && (
-              <>
-                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground mt-1 border-t border-border pt-2">Native API</div>
-                {CHAT_MODELS.filter(m => m.source === "native").map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </>
-            )}
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">LLM used for reasoning, tool orchestration and conversation.</p>
@@ -125,7 +157,7 @@ export function SoundAgentSettings() {
 
       <div className="space-y-2">
         <Label htmlFor="gen-provider">Generation Provider</Label>
-        <Select value={settings.generationProvider || "acestep"} onValueChange={(v) => update("generationProvider", v)}>
+        <Select value={settings.generationProvider || "acestep"} onValueChange={(v) => update({ generationProvider: v })}>
           <SelectTrigger id="gen-provider">
             <SelectValue />
           </SelectTrigger>
@@ -140,7 +172,7 @@ export function SoundAgentSettings() {
 
       <div className="space-y-2">
         <Label htmlFor="analysis-provider">Analysis Provider</Label>
-        <Select value={settings.analysisProvider || "acestep"} onValueChange={(v) => update("analysisProvider", v)}>
+        <Select value={settings.analysisProvider || "acestep"} onValueChange={(v) => update({ analysisProvider: v })}>
           <SelectTrigger id="analysis-provider">
             <SelectValue />
           </SelectTrigger>

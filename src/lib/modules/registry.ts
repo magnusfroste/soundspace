@@ -1,6 +1,7 @@
 // Module registry — each module is a self-contained, toggleable unit of functionality
 
 export interface ModuleSettings {
+  chatProvider?: string;
   chatModel?: string;
   analysisProvider?: string;
   generationProvider?: string;
@@ -46,6 +47,7 @@ export const moduleRegistry: Module[] = [
     category: "ai-agent",
     version: "1.0.0",
     defaultSettings: {
+      chatProvider: "lovable",
       chatModel: "google/gemini-3-flash-preview",
       analysisProvider: "acestep",
       generationProvider: "acestep",
