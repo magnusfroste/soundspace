@@ -34,6 +34,8 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
   const [regionEnd, setRegionEnd] = useState(0);
   const [fadeIn, setFadeIn] = useState(0);
   const [fadeOut, setFadeOut] = useState(0);
+  const [normalizeAudio, setNormalizeAudio] = useState(true);
+  const [peakLevel, setPeakLevel] = useState<number | null>(null);
 
   // Initialize wavesurfer
   useEffect(() => {
