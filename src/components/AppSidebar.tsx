@@ -64,18 +64,7 @@ export function AppSidebar() {
   ];
 
   // Fetch user profile for avatar & display name
-  const { data: profile } = useQuery({
-    queryKey: ["sidebar-profile", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("display_name, avatar_url")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-      return data;
-    },
-  });
+  const { data: profile } = useProfile(user?.id);
 
   // Fetch premium features setting
   const { data: premiumSettings } = useQuery({
