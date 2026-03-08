@@ -188,12 +188,12 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
         }
       }
 
-      const wavBlob = audioBufferToWav(trimmedBuffer);
+      const mp3Blob = await audioBufferToMp3(trimmedBuffer);
 
-      const fileName = `ai-gen/trimmed-${crypto.randomUUID()}.wav`;
+      const fileName = `ai-gen/trimmed-${crypto.randomUUID()}.mp3`;
       const { error: uploadError } = await supabase.storage
         .from("songs")
-        .upload(fileName, wavBlob, { contentType: "audio/wav" });
+        .upload(fileName, mp3Blob, { contentType: "audio/mpeg" });
 
       if (uploadError) throw uploadError;
 
@@ -343,53 +343,41 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
   );
 }
 
-/** Encode an AudioBuffer to a WAV Blob. */
-function audioBufferToWav(buffer: AudioBuffer): Blob {
-  const numChannels = buffer.numberOfChannels;
+/** Encode an AudioBuffer to an MP3 Blob using lamejs. */
+async function audioBufferToMp3(buffer: AudioBuffer): Promise<Blob> {
+  const lamejs = await import("lamejs");
+  const Mp3Encoder = (lamejs as any).default?.Mp3Encoder ?? (lamejs as any).Mp3Encoder;
+
   const sampleRate = buffer.sampleRate;
-  const format = 1;
-  const bitDepth = 16;
+  const numChannels = buffer.numberOfChannels;
+  const kbps = 192;
+  const encoder = new Mp3Encoder(numChannels, sampleRate, kbps);
 
-  const bytesPerSample = bitDepth / 8;
-  const blockAlign = numChannels * bytesPerSample;
-  const dataSize = buffer.length * blockAlign;
-  const headerSize = 44;
-  const arrayBuffer = new ArrayBuffer(headerSize + dataSize);
-  const view = new DataView(arrayBuffer);
+  const blockSize = 1152;
+  const mp3Data: Uint8Array[] = [];
 
-  writeString(view, 0, "RIFF");
-  view.setUint32(4, 36 + dataSize, true);
-  writeString(view, 8, "WAVE");
-  writeString(view, 12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, format, true);
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * blockAlign, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitDepth, true);
-  writeString(view, 36, "data");
-  view.setUint32(40, dataSize, true);
-
-  let offset = 44;
-  const channels: Float32Array[] = [];
-  for (let ch = 0; ch < numChannels; ch++) {
-    channels.push(buffer.getChannelData(ch));
-  }
-
-  for (let i = 0; i < buffer.length; i++) {
-    for (let ch = 0; ch < numChannels; ch++) {
-      const sample = Math.max(-1, Math.min(1, channels[ch][i]));
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-      offset += 2;
+  // Convert float32 to int16
+  const toInt16 = (float32: Float32Array): Int16Array => {
+    const int16 = new Int16Array(float32.length);
+    for (let i = 0; i < float32.length; i++) {
+      const s = Math.max(-1, Math.min(1, float32[i]));
+      int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
     }
+    return int16;
+  };
+
+  const left = toInt16(buffer.getChannelData(0));
+  const right = numChannels > 1 ? toInt16(buffer.getChannelData(1)) : left;
+
+  for (let i = 0; i < left.length; i += blockSize) {
+    const leftChunk = left.subarray(i, i + blockSize);
+    const rightChunk = right.subarray(i, i + blockSize);
+    const mp3buf = encoder.encodeBuffer(leftChunk, rightChunk);
+    if (mp3buf.length > 0) mp3Data.push(new Uint8Array(mp3buf.buffer ?? mp3buf));
   }
 
-  return new Blob([arrayBuffer], { type: "audio/wav" });
-}
+  const end = encoder.flush();
+  if (end.length > 0) mp3Data.push(new Uint8Array(end.buffer ?? end));
 
-function writeString(view: DataView, offset: number, str: string) {
-  for (let i = 0; i < str.length; i++) {
-    view.setUint8(offset + i, str.charCodeAt(i));
-  }
+  return new Blob(mp3Data as BlobPart[], { type: "audio/mpeg" });
 }
