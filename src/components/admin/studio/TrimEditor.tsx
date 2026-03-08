@@ -137,6 +137,37 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
   const trimmedDuration = regionEnd - regionStart;
   const maxFade = Math.floor(trimmedDuration / 2 * 10) / 10; // max half of selection
 
+  // Analyze and normalize audio buffer
+  const analyzeAndNormalize = useCallback((buffer: AudioBuffer, targetDb: number = -3): { normalizedBuffer: AudioBuffer; peakDb: number } => {
+    let max = 0;
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const data = buffer.getChannelData(ch);
+      for (let i = 0; i < data.length; i++) {
+        max = Math.max(max, Math.abs(data[i]));
+      }
+    }
+    
+    const peakDb = 20 * Math.log10(Math.max(max, 0.0001));
+    const targetLinear = Math.pow(10, targetDb / 20);
+    const gain = max > 0 ? targetLinear / max : 1;
+    
+    const normalized = new AudioContext().createBuffer(
+      buffer.numberOfChannels,
+      buffer.length,
+      buffer.sampleRate
+    );
+    
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const src = buffer.getChannelData(ch);
+      const dst = normalized.getChannelData(ch);
+      for (let i = 0; i < src.length; i++) {
+        dst[i] = src[i] * gain;
+      }
+    }
+    
+    return { normalizedBuffer: normalized, peakDb };
+  }, []);
+
   const handleTrim = useCallback(async () => {
     const ws = wavesurferRef.current;
     if (!ws) return;
