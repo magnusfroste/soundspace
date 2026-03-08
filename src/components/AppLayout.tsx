@@ -89,6 +89,7 @@ export function AppLayout() {
               <motion.main
                 key="dashboard"
                 className="flex-1 overflow-auto p-4 md:p-6 pb-36 md:pb-6"
+                data-scroll-container
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
