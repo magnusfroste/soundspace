@@ -5,3 +5,5 @@ export { AceStepCard } from "./AceStepCard";
 export { OpenAICard } from "./OpenAICard";
 export { GeminiCard } from "./GeminiCard";
 export { LovableAICard } from "./LovableAICard";
+export { RevelatorCard } from "./RevelatorCard";
+export { FugaCard } from "./FugaCard";

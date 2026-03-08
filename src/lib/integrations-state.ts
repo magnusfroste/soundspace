@@ -1,6 +1,6 @@
 const STORAGE_KEY = "somhonesto_integrations_enabled";
 
-export type IntegrationId = "elevenlabs" | "mubert" | "musicgen" | "acestep" | "local" | "openai" | "gemini" | "lovable";
+export type IntegrationId = "elevenlabs" | "mubert" | "musicgen" | "acestep" | "local" | "openai" | "gemini" | "lovable" | "revelator" | "fuga";
 
 function load(): Record<string, boolean> {
   try {
