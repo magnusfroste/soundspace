@@ -8,6 +8,7 @@ import { PlayerBar } from "@/components/PlayerBar";
 import { MobileNav } from "@/components/MobileNav";
 import { AppHeader } from "@/components/AppHeader";
 import { AgentChat } from "@/components/agent/AgentChat";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgentChat } from "@/hooks/useAgentChat";
@@ -93,14 +94,18 @@ export function AppLayout() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2, ease: "easeInOut" }}
               >
-                <Outlet />
+                <ErrorBoundary fallbackMessage="This page encountered an error">
+                  <Outlet />
+                </ErrorBoundary>
               </motion.main>
             )}
           </AnimatePresence>
 
           {!isChat && (
             <div className="flex-shrink-0">
-              <PlayerBar />
+              <ErrorBoundary fallbackMessage="Player error" compact>
+                <PlayerBar />
+              </ErrorBoundary>
             </div>
           )}
         </div>
