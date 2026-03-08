@@ -82,6 +82,9 @@ export function useAgentChat() {
       return;
     }
 
+    // While creating a brand new conversation, keep chat window empty until new id is set
+    if (creatingConversationRef.current && !activeConversationId) return;
+
     if (!activeConversationId || !conversations.find((c) => c.id === activeConversationId)) {
       setActiveConv(conversations[0].id);
     }
@@ -113,9 +116,20 @@ export function useAgentChat() {
       if (error) throw error;
       return data as AgentConversation;
     },
+    onMutate: () => {
+      creatingConversationRef.current = true;
+      setActiveConv(null);
+      setStreamingContent(null);
+      setStatusMessage(null);
+    },
     onSuccess: (conv) => {
+      creatingConversationRef.current = false;
       setActiveConv(conv.id);
       qc.invalidateQueries({ queryKey: ["agent-conversations"] });
+    },
+    onError: () => {
+      creatingConversationRef.current = false;
+      toast.error("Failed to create conversation");
     },
   });
 
