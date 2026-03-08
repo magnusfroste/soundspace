@@ -64,7 +64,7 @@ export function AppSidebar() {
     },
   });
 
-  const enabledModules: string[] = moduleSettings || [];
+  const enabledModules: string[] = Array.isArray(moduleSettings) ? moduleSettings : [];
   const soundAgentEnabled = enabledModules.includes("sound-agent");
 
   // Build admin nav with conditional SoundAgent
