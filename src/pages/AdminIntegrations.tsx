@@ -256,6 +256,8 @@ export default function AdminIntegrations() {
         <MubertCard />
         <MusicgenCard />
         <LocalAICard />
+        <RevelatorCard />
+        <FugaCard />
       </div>
     </div>
   );
