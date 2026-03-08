@@ -78,3 +78,16 @@ All config in `site_settings` (database) or module registry (code). Model select
 - **Max retries**: 3 attempts per track, with feedback from previous attempt injected into next prompt
 - **Scorecard**: Agent outputs a structured pass/fail report after each analysis
 - **Tool call budget**: Increased from 10 → 25 to accommodate retry loops (generate+analyze ×3 + save ≈ 10 calls per track)
+
+---
+
+# Cohesive Playlist Sets
+
+## Status: ✅ Implemented
+
+### Architecture
+- **System prompt** includes Circle of Fifths key progression planning, BPM arc design, and mood arc
+- **Planning phase**: Agent presents a table of all planned tracks before generating any
+- **New tool**: `create_playlist` — creates a playlist and adds songs in order
+- **`save_to_library`** now returns `song_id` so the agent can collect IDs for playlist creation
+- **Flow**: Plan set → (generate → analyze → critique → save) × N tracks → create_playlist with all song_ids

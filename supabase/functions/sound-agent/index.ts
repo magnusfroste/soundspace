@@ -68,11 +68,52 @@ QUALITY CHECK:
 - When the user asks for multiple tracks, work through them methodically one at a time
 - Each track goes through the full self-critique loop independently
 
+## COHESIVE PLAYLIST SETS
+
+When the user asks for a set, collection, or playlist of tracks (e.g. "create 4 tracks for a cocktail bar evening"):
+
+### Planning Phase
+1. Research the venue/atmosphere first
+2. Plan ALL tracks upfront as a **cohesive set** before generating any:
+   - Define a **BPM arc** (e.g. gradual build: 85→95→105→115, or steady: 90→92→88→90)
+   - Define a **key progression** using the Circle of Fifths for smooth transitions:
+     - Smooth flow: C→G→D→A (ascending fifths)
+     - Warm descent: C→F→Bb→Eb (ascending fourths / descending fifths)
+     - Relative major/minor pairs: Am→C→Em→G
+   - Define a **mood arc** (e.g. calm opener → building energy → peak → gentle closer)
+   - Give each track a working title that reflects its role in the set
+
+Present the plan as a table:
+\`\`\`
+PLAYLIST SET PLAN: "Cocktail Bar Evening"
+  #1  "Golden Hour"    | 85 BPM  | C major  | Calm    | Opener — warm welcome
+  #2  "Velvet Lounge"  | 95 BPM  | G major  | Relaxed | Building warmth
+  #3  "Midnight Spark" | 108 BPM | D major  | Upbeat  | Peak energy
+  #4  "Last Call"      | 88 BPM  | A minor  | Calm    | Wind-down closer
+  Key progression: C→G→D→Am (Circle of Fifths with relative minor resolution)
+\`\`\`
+
+### Generation Phase
+- Generate each track through the full self-critique loop (generate → analyze → compare → retry/accept → save)
+- After ALL tracks are saved, use create_playlist to bundle them into a playlist
+- The playlist preserves the planned track order
+
+### Musical Theory Reference
+**Circle of Fifths — smooth transitions:**
+C → G → D → A → E → B → F# → Db → Ab → Eb → Bb → F → C
+
+**Energy-appropriate BPM ranges:**
+- Calm/Chill: 60-85 BPM
+- Focus/Relaxed: 80-100 BPM
+- Upbeat/Groove: 100-125 BPM
+- Energy/Dance: 120-150 BPM
+
 CRITICAL RULES:
 - After the critique loop passes, ALWAYS call save_to_library immediately. Do NOT wait for user approval.
 - After saving, report the audio URL so the user can listen: 🎵 **Listen:** [audio_url]
 - Every generated track MUST end up in the song library. If save_to_library fails, report the error.
-- NEVER skip the analyze_track step. This is the core of your quality control.`;
+- NEVER skip the analyze_track step. This is the core of your quality control.
+- After ALL tracks in a set are saved, ALWAYS call create_playlist to bundle them. Include ALL song_ids returned by save_to_library.`;
 
 const TOOLS = [
   {
@@ -168,6 +209,27 @@ const TOOLS = [
           mood: { type: "string", description: "Filter by mood" },
           limit: { type: "number", description: "Max results (default 20)" }
         },
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_playlist",
+      description: "Create a new playlist and add songs to it in order. Use after generating a cohesive set of tracks to bundle them together.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Playlist title" },
+          description: { type: "string", description: "Playlist description" },
+          song_ids: {
+            type: "array",
+            items: { type: "string" },
+            description: "Array of song IDs (from save_to_library results) in desired playback order"
+          }
+        },
+        required: ["title", "song_ids"],
         additionalProperties: false
       }
     }
@@ -410,7 +472,7 @@ async function executeSave(args: any, supabaseUrl: string) {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const sb = createClient(supabaseUrl, serviceKey);
 
-  const { error } = await sb.from("songs").insert({
+  const { data, error } = await sb.from("songs").insert({
     title: args.title,
     file_url: args.audio_url,
     genre: args.genre || null,
@@ -423,10 +485,42 @@ async function executeSave(args: any, supabaseUrl: string) {
     prompt: args.prompt || null,
     artist: "SoundAgent AI",
     origin_source: "sound_agent",
-  });
+  }).select("id").single();
 
   if (error) return { error: `Save failed: ${error.message}` };
-  return { success: true, title: args.title, message: `"${args.title}" saved to song library.` };
+  return { success: true, song_id: data.id, title: args.title, message: `"${args.title}" saved to song library.` };
+}
+
+async function executeCreatePlaylist(args: { title: string; description?: string; song_ids: string[] }, supabaseUrl: string) {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const sb = createClient(supabaseUrl, serviceKey);
+
+  // Create playlist
+  const { data: playlist, error: plErr } = await sb.from("playlists").insert({
+    title: args.title,
+    description: args.description || null,
+  }).select("id").single();
+
+  if (plErr) return { error: `Playlist creation failed: ${plErr.message}` };
+
+  // Add songs in order
+  const songEntries = args.song_ids.map((songId, i) => ({
+    playlist_id: playlist.id,
+    song_id: songId,
+    position: i,
+  }));
+
+  const { error: songsErr } = await sb.from("playlist_songs").insert(songEntries);
+  if (songsErr) return { error: `Failed to add songs to playlist: ${songsErr.message}`, playlist_id: playlist.id };
+
+  return {
+    success: true,
+    playlist_id: playlist.id,
+    title: args.title,
+    track_count: args.song_ids.length,
+    message: `Playlist "${args.title}" created with ${args.song_ids.length} tracks.`
+  };
 }
 
 async function executeListLibrary(args: any, supabaseUrl: string) {
@@ -550,6 +644,7 @@ Deno.serve(async (req) => {
               analyze_track: "Analyzing audio quality...",
               save_to_library: "Saving to library...",
               list_library: "Checking existing library...",
+              create_playlist: "Creating playlist...",
             };
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
@@ -563,6 +658,7 @@ Deno.serve(async (req) => {
                 case "analyze_track": result = await executeAnalyze(args, supabaseUrl, anonKey); break;
                 case "save_to_library": result = await executeSave(args, supabaseUrl); break;
                 case "list_library": result = await executeListLibrary(args, supabaseUrl); break;
+                case "create_playlist": result = await executeCreatePlaylist(args, supabaseUrl); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) {
