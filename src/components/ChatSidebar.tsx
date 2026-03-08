@@ -1,4 +1,4 @@
-import { Plus, Trash2, MessageSquare, Music2 } from "lucide-react";
+import { Plus, Trash2, Music2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -76,7 +76,7 @@ export function ChatSidebar({
                 )}
                 onClick={() => onSelectConversation(c.id)}
               >
-                <MessageSquare className="h-4 w-4 flex-shrink-0" />
+                
                 <span className="truncate flex-1 min-w-0 group-data-[collapsible=icon]:hidden text-xs pr-1">
                   {c.title}
                 </span>
