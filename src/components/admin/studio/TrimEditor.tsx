@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Scissors, Play, Pause, RotateCcw, Check, Loader2 } from "lucide-react";
+import { Scissors, Play, Pause, RotateCcw, Check, Loader2, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -34,6 +35,8 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
   const [regionEnd, setRegionEnd] = useState(0);
   const [fadeIn, setFadeIn] = useState(0);
   const [fadeOut, setFadeOut] = useState(0);
+  const [normalizeAudio, setNormalizeAudio] = useState(true);
+  const [peakLevel, setPeakLevel] = useState<number | null>(null);
 
   // Initialize wavesurfer
   useEffect(() => {
@@ -134,6 +137,37 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
   const trimmedDuration = regionEnd - regionStart;
   const maxFade = Math.floor(trimmedDuration / 2 * 10) / 10; // max half of selection
 
+  // Analyze and normalize audio buffer
+  const analyzeAndNormalize = useCallback((buffer: AudioBuffer, targetDb: number = -3): { normalizedBuffer: AudioBuffer; peakDb: number } => {
+    let max = 0;
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const data = buffer.getChannelData(ch);
+      for (let i = 0; i < data.length; i++) {
+        max = Math.max(max, Math.abs(data[i]));
+      }
+    }
+    
+    const peakDb = 20 * Math.log10(Math.max(max, 0.0001));
+    const targetLinear = Math.pow(10, targetDb / 20);
+    const gain = max > 0 ? targetLinear / max : 1;
+    
+    const normalized = new AudioContext().createBuffer(
+      buffer.numberOfChannels,
+      buffer.length,
+      buffer.sampleRate
+    );
+    
+    for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+      const src = buffer.getChannelData(ch);
+      const dst = normalized.getChannelData(ch);
+      for (let i = 0; i < src.length; i++) {
+        dst[i] = src[i] * gain;
+      }
+    }
+    
+    return { normalizedBuffer: normalized, peakDb };
+  }, []);
+
   const handleTrim = useCallback(async () => {
     const ws = wavesurferRef.current;
     if (!ws) return;
@@ -184,11 +218,19 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
             gain *= Math.sin(fadePos * Math.PI * 0.5);
           }
 
-          targetData[i] = sourceData[startSample + i] * gain;
-        }
-      }
+           targetData[i] = sourceData[startSample + i] * gain;
+         }
+       }
 
-      const mp3Blob = await audioBufferToMp3(trimmedBuffer);
+       // Normalize audio if enabled
+       let finalBuffer = trimmedBuffer;
+       if (normalizeAudio) {
+         const { normalizedBuffer, peakDb } = analyzeAndNormalize(trimmedBuffer);
+         finalBuffer = normalizedBuffer;
+         setPeakLevel(peakDb);
+       }
+
+       const mp3Blob = await audioBufferToMp3(finalBuffer);
 
       const fileName = `ai-gen/trimmed-${crypto.randomUUID()}.mp3`;
       const { error: uploadError } = await supabase.storage
@@ -216,7 +258,7 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
     } finally {
       setIsTrimming(false);
     }
-  }, [audioUrl, regionStart, regionEnd, fadeIn, fadeOut, trimmedDuration, onTrimmed]);
+  }, [audioUrl, regionStart, regionEnd, fadeIn, fadeOut, trimmedDuration, onTrimmed, normalizeAudio, analyzeAndNormalize]);
 
   const removedDuration = duration - trimmedDuration;
 
@@ -267,36 +309,57 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
         </div>
       )}
 
-      {/* Fade controls */}
+      {/* Fade and Normalize controls */}
       {isReady && (
-        <div className="grid grid-cols-2 gap-4 p-3 rounded-md border bg-muted/20">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Fade In</Label>
-              <span className="text-xs font-mono text-muted-foreground">{fadeIn.toFixed(1)}s</span>
+        <div className="space-y-3 p-3 rounded-md border bg-muted/20">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Fade In</Label>
+                <span className="text-xs font-mono text-muted-foreground">{fadeIn.toFixed(1)}s</span>
+              </div>
+              <Slider
+                value={[fadeIn]}
+                onValueChange={([v]) => setFadeIn(Math.round(v * 10) / 10)}
+                min={0}
+                max={Math.min(maxFade, 10)}
+                step={0.1}
+                className="w-full"
+              />
             </div>
-            <Slider
-              value={[fadeIn]}
-              onValueChange={([v]) => setFadeIn(Math.round(v * 10) / 10)}
-              min={0}
-              max={Math.min(maxFade, 10)}
-              step={0.1}
-              className="w-full"
-            />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs">Fade Out</Label>
+                <span className="text-xs font-mono text-muted-foreground">{fadeOut.toFixed(1)}s</span>
+              </div>
+              <Slider
+                value={[fadeOut]}
+                onValueChange={([v]) => setFadeOut(Math.round(v * 10) / 10)}
+                min={0}
+                max={Math.min(maxFade, 10)}
+                step={0.1}
+                className="w-full"
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Fade Out</Label>
-              <span className="text-xs font-mono text-muted-foreground">{fadeOut.toFixed(1)}s</span>
-            </div>
-            <Slider
-              value={[fadeOut]}
-              onValueChange={([v]) => setFadeOut(Math.round(v * 10) / 10)}
-              min={0}
-              max={Math.min(maxFade, 10)}
-              step={0.1}
-              className="w-full"
+          
+          {/* Normalize checkbox */}
+          <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+            <Checkbox
+              id="normalize"
+              checked={normalizeAudio}
+              onCheckedChange={(checked) => setNormalizeAudio(checked as boolean)}
+              disabled={isTrimming}
             />
+            <label htmlFor="normalize" className="flex items-center gap-2 cursor-pointer text-xs font-medium">
+              <Volume2 className="h-3.5 w-3.5 text-primary" />
+              Normalize volume to -3dB
+            </label>
+            {peakLevel !== null && (
+              <span className="text-xs text-muted-foreground ml-auto font-mono">
+                Peak: {peakLevel.toFixed(1)} dB
+              </span>
+            )}
           </div>
         </div>
       )}
