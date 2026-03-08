@@ -40,13 +40,19 @@ function MessageBubble({ message }: { message: AgentMessage | { role: string; co
 
 interface AgentChatProps {
   fullWidth?: boolean;
+  /** When used in fullWidth layout mode, chat state is lifted to parent */
+  agentChat?: ReturnType<typeof useAgentChat>;
 }
 
-export function AgentChat({ fullWidth }: AgentChatProps) {
+export function AgentChat({ fullWidth, agentChat: externalChat }: AgentChatProps) {
+  // Use external chat state (lifted) or create own (embedded mode)
+  const ownChat = useAgentChat();
+  const chat = externalChat ?? ownChat;
+
   const {
     conversations, messages, activeConversationId, setActiveConversationId,
     isGenerating, streamingContent, statusMessage, sendMessage, createConversation, deleteConversation,
-  } = useAgentChat();
+  } = chat;
 
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -66,17 +72,35 @@ export function AgentChat({ fullWidth }: AgentChatProps) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  const containerClass = fullWidth
-    ? "flex h-full overflow-hidden"
-    : "flex h-[calc(100vh-10rem)] gap-0 overflow-hidden rounded-lg border border-border";
+  // When fullWidth, sidebar is handled externally — only render chat area
+  if (fullWidth) {
+    return (
+      <div className="flex flex-col h-full">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-6">
+          <ChatContent
+            messages={messages}
+            streamingContent={streamingContent}
+            statusMessage={statusMessage}
+            onSetInput={setInput}
+          />
+        </div>
+        <ChatInput
+          input={input}
+          isGenerating={isGenerating}
+          onInputChange={setInput}
+          onKeyDown={handleKeyDown}
+          onSend={handleSend}
+          maxWidth="max-w-2xl"
+        />
+      </div>
+    );
+  }
 
+  // Embedded mode (e.g. AdminAgent tab) — includes own sidebar
   return (
-    <div className={containerClass}>
+    <div className="flex h-[calc(100vh-10rem)] gap-0 overflow-hidden rounded-lg border border-border">
       {/* Conversation sidebar */}
-      <div className={cn(
-        "border-r border-border flex flex-col bg-muted/20 flex-shrink-0",
-        fullWidth ? "w-64" : "w-56"
-      )}>
+      <div className="w-56 border-r border-border flex flex-col bg-muted/20 flex-shrink-0">
         <div className="p-3 border-b border-border">
           <Button variant="outline" size="sm" className="w-full justify-start gap-2" onClick={() => createConversation.mutate(undefined)}>
             <Plus className="h-4 w-4" /> New Chat
@@ -111,62 +135,121 @@ export function AgentChat({ fullWidth }: AgentChatProps) {
       {/* Chat area */}
       <div className="flex-1 flex flex-col min-w-0">
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-6">
-          {messages.length === 0 && !streamingContent && (
-            <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-              <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Music className="h-8 w-8 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold">SoundAgent</h3>
-                <p className="text-sm text-muted-foreground mt-1 max-w-md">
-                  Your creative music partner. Describe what you need — I'll reason through the best approach, we'll refine a brief together, and I'll produce on your go.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-2 max-w-lg justify-center">
-                {[
-                  "I need music for a high-end cocktail bar — let's plan",
-                  "What would work for a minimalist Scandinavian café?",
-                  "Check my library health and fill gaps",
-                  "Optimize playlist flow for smoother transitions",
-                ].map((s) => (
-                  <button key={s} className="text-xs px-3 py-1.5 rounded-full border border-border hover:bg-muted/50 transition-colors text-muted-foreground" onClick={() => setInput(s)}>
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {messages.map((m) => <MessageBubble key={m.id} message={m} />)}
-          {(streamingContent !== null || statusMessage) && (
-            <div className="flex gap-3 py-3 justify-start">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Bot className="h-4 w-4 text-primary" />
-              </div>
-              <div className="max-w-[75%] rounded-xl px-4 py-3 bg-muted/50">
-                {streamingContent && (
-                  <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
-                    <ReactMarkdown>{streamingContent}</ReactMarkdown>
-                  </div>
-                )}
-                {statusMessage && (
-                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    <span>{statusMessage}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          <ChatContent
+            messages={messages}
+            streamingContent={streamingContent}
+            statusMessage={statusMessage}
+            onSetInput={setInput}
+          />
         </div>
+        <ChatInput
+          input={input}
+          isGenerating={isGenerating}
+          onInputChange={setInput}
+          onKeyDown={handleKeyDown}
+          onSend={handleSend}
+          maxWidth="max-w-3xl"
+        />
+      </div>
+    </div>
+  );
+}
 
-        <div className="border-t border-border p-4 flex-shrink-0">
-          <div className={cn("flex gap-2 items-end mx-auto", fullWidth ? "max-w-2xl" : "max-w-3xl")}>
-            <Textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown} placeholder="Describe your music production task..." className="min-h-[44px] max-h-32 resize-none" rows={1} disabled={isGenerating} />
-            <Button size="icon" onClick={handleSend} disabled={!input.trim() || isGenerating} className="h-11 w-11 flex-shrink-0">
-              {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
+/* ── Extracted sub-components ── */
+
+function ChatContent({
+  messages,
+  streamingContent,
+  statusMessage,
+  onSetInput,
+}: {
+  messages: AgentMessage[];
+  streamingContent: string | null;
+  statusMessage: string | null;
+  onSetInput: (v: string) => void;
+}) {
+  return (
+    <>
+      {messages.length === 0 && !streamingContent && (
+        <div className="flex flex-col items-center justify-center h-full text-center gap-4">
+          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <Music className="h-8 w-8 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold">SoundAgent</h3>
+            <p className="text-sm text-muted-foreground mt-1 max-w-md">
+              Your creative music partner. Describe what you need — I'll reason through the best approach, we'll refine a brief together, and I'll produce on your go.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2 max-w-lg justify-center">
+            {[
+              "I need music for a high-end cocktail bar — let's plan",
+              "What would work for a minimalist Scandinavian café?",
+              "Check my library health and fill gaps",
+              "Optimize playlist flow for smoother transitions",
+            ].map((s) => (
+              <button key={s} className="text-xs px-3 py-1.5 rounded-full border border-border hover:bg-muted/50 transition-colors text-muted-foreground" onClick={() => onSetInput(s)}>
+                {s}
+              </button>
+            ))}
           </div>
         </div>
+      )}
+      {messages.map((m) => <MessageBubble key={m.id} message={m} />)}
+      {(streamingContent !== null || statusMessage) && (
+        <div className="flex gap-3 py-3 justify-start">
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <Bot className="h-4 w-4 text-primary" />
+          </div>
+          <div className="max-w-[75%] rounded-xl px-4 py-3 bg-muted/50">
+            {streamingContent && (
+              <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
+                <ReactMarkdown>{streamingContent}</ReactMarkdown>
+              </div>
+            )}
+            {statusMessage && (
+              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span>{statusMessage}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ChatInput({
+  input,
+  isGenerating,
+  onInputChange,
+  onKeyDown,
+  onSend,
+  maxWidth,
+}: {
+  input: string;
+  isGenerating: boolean;
+  onInputChange: (v: string) => void;
+  onKeyDown: (e: React.KeyboardEvent) => void;
+  onSend: () => void;
+  maxWidth: string;
+}) {
+  return (
+    <div className="border-t border-border p-4 flex-shrink-0">
+      <div className={cn("flex gap-2 items-end mx-auto", maxWidth)}>
+        <Textarea
+          value={input}
+          onChange={(e) => onInputChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Describe your music production task..."
+          className="min-h-[44px] max-h-32 resize-none"
+          rows={1}
+          disabled={isGenerating}
+        />
+        <Button size="icon" onClick={onSend} disabled={!input.trim() || isGenerating} className="h-11 w-11 flex-shrink-0">
+          {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </Button>
       </div>
     </div>
   );
