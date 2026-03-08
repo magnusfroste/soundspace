@@ -54,6 +54,7 @@ QUALITY CHECK:
 
 ### Step 6: Save (MANDATORY)
 - ALWAYS call save_to_library for the accepted track
+- Include quality_score: calculate as percentage of checks passed (e.g. 3/3=100, 2/3=67, 1/3=33)
 - After saving, report: 🎵 **Listen:** [audio_url]
 
 ## Quality Standards
