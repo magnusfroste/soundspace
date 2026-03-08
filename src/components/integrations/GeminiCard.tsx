@@ -1,15 +1,19 @@
 import { useState } from "react";
-import { Sparkles, CheckCircle2 } from "lucide-react";
+import { Sparkles, CheckCircle, XCircle, Loader2, Settings } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { isIntegrationEnabled, setIntegrationEnabled } from "@/lib/integrations-state";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
+  Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const GEMINI_MODELS = [
   { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
@@ -18,12 +22,56 @@ const GEMINI_MODELS = [
   { id: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
 ];
 
+const STORAGE_KEY = "somhonesto_gemini_configured";
+
 export function GeminiCard() {
   const [enabled, setEnabled] = useState(() => isIntegrationEnabled("gemini"));
+  const [open, setOpen] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [isTesting, setIsTesting] = useState(false);
+  const [status, setStatus] = useState<"idle" | "connected" | "failed">("idle");
+  const [isConfigured] = useState(() => localStorage.getItem(STORAGE_KEY) === "true");
 
   const handleToggle = (checked: boolean) => {
     setEnabled(checked);
     setIntegrationEnabled("gemini", checked);
+  };
+
+  const handleTest = async () => {
+    setIsTesting(true);
+    setStatus("idle");
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
+      );
+      if (res.ok) {
+        setStatus("connected");
+        toast.success("Gemini API key is valid");
+      } else {
+        setStatus("failed");
+        toast.error("Invalid API key");
+      }
+    } catch {
+      setStatus("failed");
+      toast.error("Connection failed");
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "secret:gemini_api_key", value: JSON.stringify({ hint: apiKey.slice(-4) }) }, { onConflict: "key" });
+
+    if (error) {
+      toast.error("Failed to save");
+      return;
+    }
+
+    localStorage.setItem(STORAGE_KEY, "true");
+    toast.success("Gemini API key saved. Add the key as a backend secret named GOOGLE_AI_API_KEY.");
+    setOpen(false);
   };
 
   return (
@@ -37,13 +85,19 @@ export function GeminiCard() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 Google Gemini
-                <Badge variant="outline" className="text-green-600 border-green-600/30 bg-green-500/10">
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Built-in
-                </Badge>
+                {isConfigured ? (
+                  <Badge variant="outline" className="text-green-600 border-green-600/30 bg-green-500/10">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Configured
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30">
+                    Not Configured
+                  </Badge>
+                )}
               </CardTitle>
               <CardDescription>
-                Gemini models via Lovable AI Gateway
+                Gemini models via native Google AI API
               </CardDescription>
             </div>
           </div>
@@ -52,9 +106,6 @@ export function GeminiCard() {
       </CardHeader>
 
       <CardContent className="space-y-3">
-        <p className="text-xs text-muted-foreground">
-          Available as SoundAgent chat model. No API key required.
-        </p>
         <div className="flex flex-wrap gap-1.5">
           {GEMINI_MODELS.map((m) => (
             <Badge key={m.id} variant="secondary" className="text-xs">
@@ -62,6 +113,54 @@ export function GeminiCard() {
             </Badge>
           ))}
         </div>
+
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="w-full">
+              <Settings className="h-4 w-4 mr-2" />
+              {isConfigured ? "Edit Configuration" : "Configure"}
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Google Gemini Configuration</DialogTitle>
+              <DialogDescription>
+                Enter your Google AI API key to use Gemini models directly.
+                Get your key from <a href="https://aistudio.google.com/apikey" target="_blank" className="underline">aistudio.google.com</a>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="gemini-key">API Key</Label>
+                <Input
+                  id="gemini-key"
+                  type="password"
+                  placeholder="AIza..."
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button variant="outline" onClick={handleTest} disabled={isTesting || !apiKey}>
+                  {isTesting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Testing...</> : "Test Connection"}
+                </Button>
+                {status === "connected" && (
+                  <Badge variant="default" className="gap-1"><CheckCircle className="h-3 w-3" />Valid</Badge>
+                )}
+                {status === "failed" && (
+                  <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />Failed</Badge>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button onClick={handleSave} disabled={!apiKey}>Save Key</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
