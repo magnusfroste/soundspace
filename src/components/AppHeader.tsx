@@ -59,8 +59,9 @@ export function AppHeader({ viewMode, onViewModeChange, showChatToggle }: AppHea
         )}
       </div>
 
-      {/* Right side — profile */}
+      {/* Right side — theme toggle + profile */}
       <div className="flex items-center gap-2">
+        <ThemeToggle />
         <NavLink to="/profile" className="hover:opacity-80 transition-opacity">
           <Avatar className="h-7 w-7">
             {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={profile?.display_name ?? "User"} />}
