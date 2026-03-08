@@ -103,7 +103,9 @@ export function AppLayout() {
 
           {!isChat && (
             <div className="flex-shrink-0">
-              <PlayerBar />
+              <ErrorBoundary fallbackMessage="Player error" compact>
+                <PlayerBar />
+              </ErrorBoundary>
             </div>
           )}
         </div>
