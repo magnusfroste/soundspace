@@ -8,6 +8,7 @@ import { NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface AppHeaderProps {
   viewMode: "dashboard" | "chat";
