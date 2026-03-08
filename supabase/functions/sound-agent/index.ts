@@ -288,6 +288,41 @@ const TOOLS = [
         additionalProperties: false
       }
     }
+  },
+  {
+    type: "function",
+    function: {
+      name: "analyze_playlist_flow",
+      description: "Analyze a playlist's musical flow: key transitions, BPM progression, and mood arc. Returns the current order with transition quality scores and a suggested optimal reorder. Use when the user wants to optimize a playlist for smoother listening.",
+      parameters: {
+        type: "object",
+        properties: {
+          playlist_id: { type: "string", description: "ID of the playlist to analyze" }
+        },
+        required: ["playlist_id"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "reorder_playlist",
+      description: "Apply a new song order to an existing playlist. Use after analyze_playlist_flow when the user approves the suggested reorder.",
+      parameters: {
+        type: "object",
+        properties: {
+          playlist_id: { type: "string", description: "ID of the playlist" },
+          song_ids: {
+            type: "array",
+            items: { type: "string" },
+            description: "Song IDs in the new desired order"
+          }
+        },
+        required: ["playlist_id", "song_ids"],
+        additionalProperties: false
+      }
+    }
   }
 ];
 
