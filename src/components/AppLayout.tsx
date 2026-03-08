@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { ChatSidebar } from "@/components/ChatSidebar";
 import { PlayerBar } from "@/components/PlayerBar";
 import { MobileNav } from "@/components/MobileNav";
 import { AppHeader } from "@/components/AppHeader";
@@ -11,6 +12,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAgentChat } from "@/hooks/useAgentChat";
 
 export function AppLayout() {
   const isMobile = useIsMobile();
@@ -41,21 +43,42 @@ export function AppLayout() {
   const showChatToggle = role === "admin" && enabledModules.includes("sound-agent");
   const isChat = viewMode === "chat" && showChatToggle;
 
+  // Agent chat state — lifted so ChatSidebar and AgentChat share data
+  const agentChat = useAgentChat();
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
-        {/* Sidebar — hidden in chat mode and on mobile */}
+        {/* Sidebar — swap between dashboard and chat */}
         <AnimatePresence mode="wait">
-          {!isChat && !isMobile && (
-            <motion.div
-              key="sidebar"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2, ease: "easeInOut" }}
-            >
-              <AppSidebar />
-            </motion.div>
+          {!isMobile && (
+            isChat ? (
+              <motion.div
+                key="chat-sidebar"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+              >
+                <ChatSidebar
+                  conversations={agentChat.conversations}
+                  activeConversationId={agentChat.activeConversationId}
+                  onSelectConversation={agentChat.setActiveConversationId}
+                  onCreateConversation={() => agentChat.createConversation.mutate(undefined)}
+                  onDeleteConversation={(id) => agentChat.deleteConversation.mutate(id)}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="app-sidebar"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+              >
+                <AppSidebar />
+              </motion.div>
+            )
           )}
         </AnimatePresence>
 
@@ -69,7 +92,6 @@ export function AppLayout() {
 
           <AnimatePresence mode="wait">
             {isChat ? (
-              /* Full-width chat view */
               <motion.div
                 key="chat"
                 className="flex-1 overflow-hidden"
@@ -78,7 +100,7 @@ export function AppLayout() {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2, ease: "easeInOut" }}
               >
-                <AgentChat fullWidth />
+                <AgentChat fullWidth agentChat={agentChat} />
               </motion.div>
             ) : (
               <motion.main
@@ -95,15 +117,9 @@ export function AppLayout() {
           </AnimatePresence>
 
           {!isChat && (
-            <motion.div
-              className="flex-shrink-0"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2, ease: "easeInOut" }}
-            >
+            <div className="flex-shrink-0">
               <PlayerBar />
-            </motion.div>
+            </div>
           )}
         </div>
 
