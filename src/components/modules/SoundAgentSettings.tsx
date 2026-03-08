@@ -5,17 +5,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import type { ModuleSettings } from "@/lib/modules";
 import { isIntegrationEnabled } from "@/lib/integrations-state";
+import { Badge } from "@/components/ui/badge";
 
 const SETTINGS_KEY = "module:sound-agent";
 
 const ALL_CHAT_MODELS = [
-  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash (fast)", provider: "gemini" as const },
-  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "gemini" as const },
-  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro (strongest)", provider: "gemini" as const },
-  { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", provider: "gemini" as const },
-  { value: "openai/gpt-5-mini", label: "GPT-5 Mini", provider: "openai" as const },
-  { value: "openai/gpt-5", label: "GPT-5", provider: "openai" as const },
-  { value: "openai/gpt-5.2", label: "GPT-5.2 (latest)", provider: "openai" as const },
+  // Lovable AI Gateway models (always available)
+  { value: "google/gemini-3-flash-preview", label: "Gemini 3 Flash (fast)", provider: "lovable" as const, source: "gateway" },
+  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "lovable" as const, source: "gateway" },
+  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro (strongest)", provider: "lovable" as const, source: "gateway" },
+  { value: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", provider: "lovable" as const, source: "gateway" },
+  { value: "openai/gpt-5-mini", label: "GPT-5 Mini", provider: "lovable" as const, source: "gateway" },
+  { value: "openai/gpt-5", label: "GPT-5", provider: "lovable" as const, source: "gateway" },
+  { value: "openai/gpt-5.2", label: "GPT-5.2 (latest)", provider: "lovable" as const, source: "gateway" },
+  // Native API models (shown when keys are configured)
+  { value: "native:google/gemini-3-flash-preview", label: "Gemini 3 Flash (Native)", provider: "gemini" as const, source: "native" },
+  { value: "native:google/gemini-2.5-flash", label: "Gemini 2.5 Flash (Native)", provider: "gemini" as const, source: "native" },
+  { value: "native:google/gemini-2.5-pro", label: "Gemini 2.5 Pro (Native)", provider: "gemini" as const, source: "native" },
+  { value: "native:openai/gpt-5-mini", label: "GPT-5 Mini (Native)", provider: "openai" as const, source: "native" },
+  { value: "native:openai/gpt-5", label: "GPT-5 (Native)", provider: "openai" as const, source: "native" },
+  { value: "native:openai/gpt-5.2", label: "GPT-5.2 (Native)", provider: "openai" as const, source: "native" },
 ];
 
 const GENERATION_PROVIDERS = [
@@ -28,6 +37,16 @@ const ANALYSIS_PROVIDERS = [
 
 export function SoundAgentSettings() {
   const qc = useQueryClient();
+
+  const { data: keyStatus } = useQuery({
+    queryKey: ["ai-key-status"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("check-ai-keys");
+      if (error) throw error;
+      return data as Record<string, boolean>;
+    },
+    staleTime: 1000 * 60 * 5,
+  });
 
   const { data: settings } = useQuery({
     queryKey: ["site-settings", SETTINGS_KEY],
@@ -67,9 +86,12 @@ export function SoundAgentSettings() {
     mutation.mutate({ ...settings, [field]: value });
   };
 
-  const CHAT_MODELS = ALL_CHAT_MODELS.filter(
-    (m) => isIntegrationEnabled(m.provider)
-  );
+  const CHAT_MODELS = ALL_CHAT_MODELS.filter((m) => {
+    if (m.source === "gateway") return true; // Lovable AI always available
+    if (m.source === "native" && m.provider === "openai") return keyStatus?.openai === true;
+    if (m.source === "native" && m.provider === "gemini") return keyStatus?.gemini === true;
+    return false;
+  });
 
   if (!settings) return null;
 
@@ -82,9 +104,20 @@ export function SoundAgentSettings() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {CHAT_MODELS.map((m) => (
+            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">Lovable AI Gateway</div>
+            {CHAT_MODELS.filter(m => m.source === "gateway").map((m) => (
               <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
             ))}
+            {CHAT_MODELS.some(m => m.source === "native") && (
+              <>
+                <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground mt-1 border-t border-border pt-2">Native API</div>
+                {CHAT_MODELS.filter(m => m.source === "native").map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </>
+            )}
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">LLM used for reasoning, tool orchestration and conversation.</p>
