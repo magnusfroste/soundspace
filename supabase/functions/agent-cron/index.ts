@@ -103,10 +103,14 @@ Analyze what's needed, take concrete actions (generate tracks, fix metadata, fil
       }
 
       console.log(`[agent-cron] Completed objective "${obj.title}"`);
-      results.push({ objective_id: obj.id, title: obj.title, status: "completed" });
+      const r = { objective_id: obj.id, title: obj.title, status: "completed", user_id: obj.user_id };
+      results.push(r);
+      await sb.from("agent_cron_logs").insert({ objective_id: obj.id, objective_title: obj.title, status: "completed", user_id: obj.user_id });
     } catch (e) {
       console.error(`[agent-cron] Error processing objective ${obj.id}:`, e);
-      results.push({ objective_id: obj.id, status: "error", error: e instanceof Error ? e.message : "Unknown" });
+      const errMsg = e instanceof Error ? e.message : "Unknown";
+      results.push({ objective_id: obj.id, status: "error", error: errMsg });
+      await sb.from("agent_cron_logs").insert({ objective_id: obj.id, objective_title: obj.title, status: "error", error: errMsg, user_id: obj.user_id });
     }
   }
 

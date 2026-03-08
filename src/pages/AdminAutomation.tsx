@@ -1,15 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Timer, Play, Clock, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Timer, Play, Clock, CheckCircle2, XCircle, Loader2, History } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 
 export default function AdminAutomation() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [running, setRunning] = useState(false);
 
   const { data: objectives = [] } = useQuery({
@@ -27,12 +29,27 @@ export default function AdminAutomation() {
     },
   });
 
+  const { data: logs = [] } = useQuery({
+    queryKey: ["cron-logs"],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("agent_cron_logs" as any)
+        .select("id, objective_title, status, error, created_at")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data as any[];
+    },
+  });
+
   const triggerCron = async () => {
     setRunning(true);
     try {
       const res = await supabase.functions.invoke("agent-cron");
       if (res.error) throw res.error;
       toast.success(`Cron completed — processed ${res.data?.processed ?? 0} objective(s)`);
+      queryClient.invalidateQueries({ queryKey: ["cron-logs"] });
     } catch (e: any) {
       toast.error("Cron failed: " + (e.message || "Unknown error"));
     } finally {
@@ -103,6 +120,52 @@ export default function AdminAutomation() {
               </Card>
             ))}
           </div>
+        )}
+      </div>
+
+      <div>
+        <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
+          <History className="h-4 w-4 text-muted-foreground" />
+          Activity Log
+        </h2>
+        {logs.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <History className="h-8 w-8 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No cron runs recorded yet.</p>
+          </div>
+        ) : (
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Objective</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Error</TableHead>
+                  <TableHead className="text-right">Timestamp</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {logs.map((log: any) => (
+                  <TableRow key={log.id}>
+                    <TableCell className="font-medium text-sm truncate max-w-[200px]">
+                      {log.objective_title || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={log.status === "completed" ? "default" : "destructive"} className="text-xs">
+                        {log.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+                      {log.error || "—"}
+                    </TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
+                      {new Date(log.created_at).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
         )}
       </div>
     </div>

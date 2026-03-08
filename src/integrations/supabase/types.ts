@@ -38,6 +38,44 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_cron_logs: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          objective_id: string | null
+          objective_title: string | null
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          objective_id?: string | null
+          objective_title?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          objective_id?: string | null
+          objective_title?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_cron_logs_objective_id_fkey"
+            columns: ["objective_id"]
+            isOneToOne: false
+            referencedRelation: "agent_objectives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_memories: {
         Row: {
           category: string
