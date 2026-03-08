@@ -74,12 +74,17 @@ export function useAgentChat() {
 
   // Auto-select most recent conversation if none active
   useEffect(() => {
-    if (!activeConversationId && conversations.length > 0) {
-      setActiveConv(conversations[0].id);
-    } else if (activeConversationId && conversations.length > 0 && !conversations.find(c => c.id === activeConversationId)) {
+    if (!conversationsFetched) return;
+
+    if (conversations.length === 0) {
+      if (activeConversationId) setActiveConv(null);
+      return;
+    }
+
+    if (!activeConversationId || !conversations.find((c) => c.id === activeConversationId)) {
       setActiveConv(conversations[0].id);
     }
-  }, [conversations, activeConversationId, setActiveConv]);
+  }, [conversations, conversationsFetched, activeConversationId, setActiveConv]);
 
   // Fetch messages for active conversation
   const { data: messages = [] } = useQuery({
