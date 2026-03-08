@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import { Bot, Send, Plus, Trash2, Loader2, Music } from "lucide-react";
+import { Send, Plus, Trash2, Loader2, Music } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,11 +19,6 @@ function MessageBubble({ message }: { message: AgentMessage | { role: string; co
   const isUser = message.role === "user";
   return (
     <div className={cn("flex gap-3 py-3", isUser ? "justify-end" : "justify-start")}>
-      {!isUser && (
-        <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-          <Bot className="h-4 w-4 text-primary" />
-        </div>
-      )}
       <div className={cn("max-w-[75%] rounded-xl px-4 py-3", isUser ? "bg-primary text-primary-foreground" : "bg-muted/50")}>
         {isUser ? (
           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -198,9 +193,6 @@ function ChatContent({
       {messages.map((m) => <MessageBubble key={m.id} message={m} />)}
       {(streamingContent !== null || statusMessage) && (
         <div className="flex gap-3 py-3 justify-start">
-          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <Bot className="h-4 w-4 text-primary" />
-          </div>
           <div className="max-w-[75%] rounded-xl px-4 py-3 bg-muted/50">
             {streamingContent && (
               <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
