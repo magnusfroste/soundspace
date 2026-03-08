@@ -38,6 +38,33 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_memories: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          id: string
+          importance: number
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          content: string
+          created_at?: string
+          id?: string
+          importance?: number
+          user_id: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          importance?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       agent_messages: {
         Row: {
           audio_urls: string[] | null
@@ -75,6 +102,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      agent_objectives: {
+        Row: {
+          auto_execute: boolean
+          created_at: string
+          description: string | null
+          id: string
+          progress: Json | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_execute?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          progress?: Json | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_execute?: boolean
+          created_at?: string
+          description?: string | null
+          id?: string
+          progress?: Json | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      agent_skills: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          name: string
+          updated_at: string
+          use_count: number
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          content: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          name: string
+          updated_at?: string
+          use_count?: number
+          user_id: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          name?: string
+          updated_at?: string
+          use_count?: number
+          user_id?: string
+        }
+        Relationships: []
       }
       ai_generations: {
         Row: {

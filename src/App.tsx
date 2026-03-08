@@ -24,6 +24,7 @@ import AdminSettings from "@/pages/AdminSettings";
 import AdminModules from "@/pages/AdminModules";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminAgent from "@/pages/AdminAgent";
+import AdminObjectives from "@/pages/AdminObjectives";
 import MyPlaylists from "@/pages/MyPlaylists";
 import MyPlaylistDetail from "@/pages/MyPlaylistDetail";
 import NotFound from "@/pages/NotFound";
@@ -98,6 +99,7 @@ const App = () => (
               <Route path="/admin/plugins" element={<AdminModules />} />
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/agent" element={<AdminAgent />} />
+              <Route path="/admin/objectives" element={<AdminObjectives />} />
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
             <Route path="*" element={<NotFound />} />

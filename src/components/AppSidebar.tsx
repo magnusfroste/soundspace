@@ -1,7 +1,7 @@
 import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic, Crown, Puzzle, Users, User, Bot,
+  Home, ListMusic, Radio, LayoutDashboard, Music2, CalendarDays, Library, Sparkles, Plug, Settings, Mic, Crown, Puzzle, Users, User, Bot, Target,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/contexts/AuthContext";
@@ -73,7 +73,10 @@ export function AppSidebar() {
   // Build admin nav with conditional SoundAgent
   const adminNav = [
     ...adminNavStatic.slice(0, 2), // Dashboard, AI Studio
-    ...(soundAgentEnabled ? [{ title: "SoundAgent", url: "/admin/agent", icon: Bot }] : []),
+    ...(soundAgentEnabled ? [
+      { title: "SoundAgent", url: "/admin/agent", icon: Bot },
+      { title: "Objectives", url: "/admin/objectives", icon: Target },
+    ] : []),
     ...adminNavStatic.slice(2), // rest
   ];
 
