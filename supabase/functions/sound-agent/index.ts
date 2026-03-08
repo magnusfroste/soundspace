@@ -1,9 +1,15 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+function getServiceClient(supabaseUrl: string) {
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  return createClient(supabaseUrl, serviceKey);
+}
 
 const SYSTEM_PROMPT = `You are SoundAgent — a creative music consultant and production partner for background music in commercial spaces.
 
@@ -513,9 +519,7 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) 
   }
 
   // Upload to storage
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   const fileName = `agent/${crypto.randomUUID()}.wav`;
   const { error: uploadErr } = await sb.storage
@@ -575,9 +579,7 @@ async function executeAnalyze(args: { audio_url: string }, supabaseUrl: string, 
 }
 
 async function executeSave(args: any, supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   const { data, error } = await sb.from("songs").insert({
     title: args.title,
@@ -600,9 +602,7 @@ async function executeSave(args: any, supabaseUrl: string) {
 }
 
 async function executeCreatePlaylist(args: { title: string; description?: string; song_ids: string[] }, supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   // Create playlist
   const { data: playlist, error: plErr } = await sb.from("playlists").insert({
@@ -632,9 +632,7 @@ async function executeCreatePlaylist(args: { title: string; description?: string
 }
 
 async function executeListLibrary(args: any, supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   let query = sb.from("songs").select("id, title, artist, genre, mood, bpm, key_scale, duration").order("created_at", { ascending: false }).limit(args.limit || 20);
   if (args.genre) query = query.ilike("genre", `%${args.genre}%`);
@@ -646,9 +644,7 @@ async function executeListLibrary(args: any, supabaseUrl: string) {
 }
 
 async function executeAnalyzeLibrary(supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   const { data, error } = await sb.from("songs")
     .select("genre, mood, bpm, key_scale, quality_score, duration");
@@ -722,9 +718,7 @@ async function executeAnalyzeLibrary(supabaseUrl: string) {
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   // Get schedule entries with playlist info
   let query = sb.from("schedule_entries")
@@ -839,9 +833,7 @@ function transitionScore(keyDist: number, bpmDiff: number): { score: number; lab
 }
 
 async function executeAnalyzePlaylistFlow(args: { playlist_id: string }, supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   // Get playlist info
   const { data: playlist } = await sb.from("playlists").select("id, title").eq("id", args.playlist_id).single();
@@ -940,9 +932,7 @@ async function executeAnalyzePlaylistFlow(args: { playlist_id: string }, supabas
 }
 
 async function executeReorderPlaylist(args: { playlist_id: string; song_ids: string[] }, supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   // Delete existing entries and re-insert in new order
   const { error: delErr } = await sb.from("playlist_songs")
@@ -964,9 +954,7 @@ async function executeReorderPlaylist(args: { playlist_id: string; song_ids: str
 }
 
 async function executeFindIncomplete(args: { limit?: number }, supabaseUrl: string) {
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   const { data, error } = await sb.from("songs")
     .select("id, title, artist, genre, mood, bpm, key_scale, lyrics, cover_url, file_url, origin_source")
@@ -1060,9 +1048,7 @@ async function executeGenerateSongCover(args: { song_id: string; title: string; 
   if (!imageUrl) return { error: "No image returned from generator" };
 
   // Download and upload to storage
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
+  const sb = getServiceClient(supabaseUrl);
 
   // imageUrl is base64 data URL — convert to blob
   let imageBlob: Uint8Array;
@@ -1181,6 +1167,8 @@ Deno.serve(async (req) => {
   const { messages, conversation_id, settings } = reqBody;
   const chatModel = settings?.chatModel || "google/gemini-3-flash-preview";
   const sttProvider = settings?.sttProvider || "elevenlabs";
+
+  console.log(`[sound-agent] Request: model=${chatModel}, messages=${messages?.length || 0}, conv=${conversation_id}`);
   
   // Determine which API to use based on model prefix
   const useNativeOpenAI = chatModel.startsWith("openai/") && Deno.env.get("OPENAI_API_KEY");
@@ -1189,6 +1177,7 @@ Deno.serve(async (req) => {
   // Fallback to Lovable gateway if no native key configured
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   if (!useNativeOpenAI && !useNativeGemini && !LOVABLE_API_KEY) {
+    console.error("[sound-agent] No AI API key configured");
     return new Response(JSON.stringify({ error: "No AI API key configured. Add OPENAI_API_KEY, GOOGLE_AI_API_KEY, or LOVABLE_API_KEY." }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -1233,6 +1222,7 @@ Deno.serve(async (req) => {
           if (!llmRes.ok) {
             const status = llmRes.status;
             const text = await llmRes.text();
+            console.error(`[sound-agent] LLM error ${status}:`, text.slice(0, 500));
             if (status === 429) { push("error", { error: "Rate limit exceeded. Please try again shortly." }); break; }
             if (status === 402) { push("error", { error: "AI credits exhausted. Please add credits." }); break; }
             push("error", { error: `AI gateway error ${status}` });
@@ -1241,7 +1231,7 @@ Deno.serve(async (req) => {
 
           const llmData = await llmRes.json();
           const choice = llmData.choices?.[0];
-          if (!choice) { push("error", { error: "No response from AI" }); break; }
+          if (!choice) { console.error("[sound-agent] No choice in LLM response:", JSON.stringify(llmData).slice(0, 300)); push("error", { error: "No response from AI" }); break; }
 
           const msg = choice.message;
           llmMessages.push(msg);
@@ -1307,26 +1297,32 @@ Deno.serve(async (req) => {
         // ── Stream final response ──
         push("status", { phase: "responding", message: "Composing response..." });
 
-        // If last message is already assistant text (from non-tool break), stream it token-by-token via a new streaming call
-        // Remove the last assistant message from history to re-request with streaming
+        // If the last message already has assistant text (from the non-streaming loop),
+        // just emit it directly instead of re-requesting
         const lastMsg = llmMessages[llmMessages.length - 1];
-        if (lastMsg.role === "assistant" && lastMsg.content && !lastMsg.tool_calls?.length) {
-          llmMessages.pop();
+        if (lastMsg.role === "assistant" && lastMsg.content && (!lastMsg.tool_calls || lastMsg.tool_calls.length === 0)) {
+          console.log(`[sound-agent] Emitting cached assistant response (${lastMsg.content.length} chars)`);
+          push("token", { content: lastMsg.content });
+          push("done", { audio_urls: collectedAudioUrls, tool_call_count: toolCallCount });
+          controller.close();
+          return;
         }
 
+        // Otherwise request a streaming response WITHOUT tools (final text only)
+        console.log("[sound-agent] Requesting streaming final response");
         const streamRes = await fetch(llmConfig.url, {
           method: "POST",
           headers: llmConfig.headers,
           body: JSON.stringify({
             model: llmConfig.model,
             messages: llmMessages,
-            tools: TOOLS,
             stream: true,
           }),
         });
 
         if (!streamRes.ok || !streamRes.body) {
           const text = await streamRes.text();
+          console.error(`[sound-agent] Streaming failed: ${streamRes.status}`, text.slice(0, 300));
           push("error", { error: `Streaming failed: ${streamRes.status}` });
           push("done", { audio_urls: collectedAudioUrls });
           controller.close();
@@ -1359,9 +1355,11 @@ Deno.serve(async (req) => {
           }
         }
 
+        console.log(`[sound-agent] Done. Tool calls: ${toolCallCount}, audio urls: ${collectedAudioUrls.length}`);
         push("done", { audio_urls: collectedAudioUrls, tool_call_count: toolCallCount });
         controller.close();
       } catch (e) {
+        console.error("[sound-agent] Fatal error:", e instanceof Error ? e.message : e);
         push("error", { error: e instanceof Error ? e.message : "Unknown error" });
         controller.close();
       }
