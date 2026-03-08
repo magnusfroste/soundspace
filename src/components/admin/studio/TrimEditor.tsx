@@ -373,11 +373,11 @@ async function audioBufferToMp3(buffer: AudioBuffer): Promise<Blob> {
     const leftChunk = left.subarray(i, i + blockSize);
     const rightChunk = right.subarray(i, i + blockSize);
     const mp3buf = encoder.encodeBuffer(leftChunk, rightChunk);
-    if (mp3buf.length > 0) mp3Data.push(new Int8Array(mp3buf));
+    if (mp3buf.length > 0) mp3Data.push(new Uint8Array(mp3buf.buffer ?? mp3buf));
   }
 
   const end = encoder.flush();
-  if (end.length > 0) mp3Data.push(new Int8Array(end));
+  if (end.length > 0) mp3Data.push(new Uint8Array(end.buffer ?? end));
 
-  return new Blob(mp3Data, { type: "audio/mpeg" });
+  return new Blob(mp3Data as BlobPart[], { type: "audio/mpeg" });
 }
