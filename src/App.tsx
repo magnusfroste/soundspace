@@ -25,6 +25,7 @@ import AdminModules from "@/pages/AdminModules";
 import AdminUsers from "@/pages/AdminUsers";
 import AdminAgent from "@/pages/AdminAgent";
 import AdminObjectives from "@/pages/AdminObjectives";
+import AdminSkillsMemories from "@/pages/AdminSkillsMemories";
 import MyPlaylists from "@/pages/MyPlaylists";
 import MyPlaylistDetail from "@/pages/MyPlaylistDetail";
 import NotFound from "@/pages/NotFound";
