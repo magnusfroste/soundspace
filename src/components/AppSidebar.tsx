@@ -76,6 +76,7 @@ export function AppSidebar() {
     ...(soundAgentEnabled ? [
       { title: "SoundAgent", url: "/admin/agent", icon: Bot },
       { title: "Objectives", url: "/admin/objectives", icon: Target },
+      { title: "Skills & Memory", url: "/admin/skills", icon: Brain },
     ] : []),
     ...adminNavStatic.slice(2), // rest
   ];

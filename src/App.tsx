@@ -101,6 +101,7 @@ const App = () => (
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/agent" element={<AdminAgent />} />
               <Route path="/admin/objectives" element={<AdminObjectives />} />
+              <Route path="/admin/skills" element={<AdminSkillsMemories />} />
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
