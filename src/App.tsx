@@ -26,6 +26,7 @@ import AdminUsers from "@/pages/AdminUsers";
 import AdminAgent from "@/pages/AdminAgent";
 import AdminObjectives from "@/pages/AdminObjectives";
 import AdminSkillsMemories from "@/pages/AdminSkillsMemories";
+import AdminAutomation from "@/pages/AdminAutomation";
 import MyPlaylists from "@/pages/MyPlaylists";
 import MyPlaylistDetail from "@/pages/MyPlaylistDetail";
 import NotFound from "@/pages/NotFound";
@@ -102,6 +103,7 @@ const App = () => (
               <Route path="/admin/agent" element={<AdminAgent />} />
               <Route path="/admin/objectives" element={<AdminObjectives />} />
               <Route path="/admin/skills" element={<AdminSkillsMemories />} />
+              <Route path="/admin/automation" element={<AdminAutomation />} />
               <Route path="/profile" element={<ProfilePage />} />
             </Route>
             <Route path="*" element={<NotFound />} />
