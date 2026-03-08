@@ -18,14 +18,16 @@ Your workflow:
 2. Generate tracks using generate_track with carefully crafted prompts
 3. After generation, use analyze_track to verify BPM/key match the brief
 4. If quality is poor or specs don't match, regenerate with adjusted parameters
-5. Save approved tracks to the library using save_to_library
+5. ALWAYS save every successfully generated track to the library using save_to_library — this is MANDATORY, never skip this step
 
 Always explain your reasoning. When generating music, describe what you're creating and why.
 For lyrics, use structural tags like [Verse], [Chorus], [Bridge], [Outro].
 When the user asks for multiple tracks, work through them methodically one at a time.
 
-IMPORTANT: After generating a track, ALWAYS report the audio URL to the user so they can listen.
-Format audio URLs as: 🎵 **Listen:** [audio_url]`;
+CRITICAL RULES:
+- After generating a track, ALWAYS call save_to_library immediately. Do NOT wait for user approval.
+- After saving, report the audio URL so the user can listen: 🎵 **Listen:** [audio_url]
+- Every generated track MUST end up in the song library. If save_to_library fails, report the error.`;
 
 const TOOLS = [
   {
