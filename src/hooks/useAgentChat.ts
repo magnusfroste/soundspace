@@ -301,7 +301,8 @@ export function useAgentChat() {
           .eq("id", convId);
       }
 
-      qc.invalidateQueries({ queryKey: ["agent-messages", convId] });
+      // Wait for messages to refetch BEFORE clearing streaming state
+      await qc.invalidateQueries({ queryKey: ["agent-messages", convId] });
     } catch (e: any) {
       toast.error(e.message || "Failed to get agent response");
     } finally {
