@@ -37,6 +37,7 @@
 | `list_library` | Query | Search existing library |
 | `create_playlist` | Storage | Bundle tracks into playlist |
 | `analyze_library` | Analytics | Genre/mood/BPM distribution + gap analysis |
+| `update_song` | Action | Update song metadata (genre, mood, BPM, key, lyrics) |
 | `read_schedule` | Query | Weekly schedule with coverage analysis |
 | `analyze_playlist_flow` | Analytics | Key/BPM transition scoring |
 | `reorder_playlist` | Action | Apply optimized song order |
