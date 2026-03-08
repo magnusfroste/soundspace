@@ -49,6 +49,7 @@ export default function AdminAutomation() {
       const res = await supabase.functions.invoke("agent-cron");
       if (res.error) throw res.error;
       toast.success(`Cron completed — processed ${res.data?.processed ?? 0} objective(s)`);
+      queryClient.invalidateQueries({ queryKey: ["cron-logs"] });
     } catch (e: any) {
       toast.error("Cron failed: " + (e.message || "Unknown error"));
     } finally {
