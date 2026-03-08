@@ -4,3 +4,4 @@ export { OutputPreview } from "./OutputPreview";
 export { BatchOutputPreview } from "./BatchOutputPreview";
 export { AudioExtractPanel } from "./AudioExtractPanel";
 export { GenerationHistory } from "./GenerationHistory";
+export { TrimEditor } from "./TrimEditor";
