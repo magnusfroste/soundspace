@@ -3,12 +3,11 @@ import { useNavigate } from "react-router-dom";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
+import { useProfile } from "@/hooks/useProfile";
 
 interface AppHeaderProps {
   viewMode: "dashboard" | "chat";
@@ -20,18 +19,7 @@ export function AppHeader({ viewMode, onViewModeChange, showChatToggle }: AppHea
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
-  const { data: profile } = useQuery({
-    queryKey: ["header-profile", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("display_name, avatar_url")
-        .eq("user_id", user!.id)
-        .maybeSingle();
-      return data;
-    },
-  });
+  const { data: profile } = useProfile(user?.id);
 
   return (
     <header className="h-12 flex items-center justify-between border-b border-border bg-background/95 backdrop-blur-sm px-4 flex-shrink-0">
