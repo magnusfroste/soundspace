@@ -221,67 +221,91 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) 
   const taskId = releaseData.task_id || releaseData.taskId || releaseData.id || (releaseData.data && (releaseData.data.task_id || releaseData.data.taskId || releaseData.data.id));
   if (!taskId) return { error: `No task_id returned from ACE-Step. Response: ${JSON.stringify(releaseData).slice(0, 300)}` };
 
-  // Poll for result (max 120s)
-  for (let i = 0; i < 60; i++) {
-    await new Promise(r => setTimeout(r, 2000));
+  // Helper to check if status means "done"
+  const isDone = (s: string) => ["completed", "success", "succeeded"].includes(s?.toLowerCase?.() || "");
+  const isFailed = (s: string) => ["failed", "error"].includes(s?.toLowerCase?.() || "");
 
-    const pollRes = await fetch(acestepProxy, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        endpoint: `/query_result?task_id=${taskId}`,
-        method: "GET",
-      })
-    });
+  // Check if already completed in release response
+  const releaseStatus = releaseData.data?.status || releaseData.status;
+  if (isDone(releaseStatus)) {
+    console.log("Task completed immediately, fetching audio...");
+  } else {
+    // Poll for result (max 120s)
+    let pollDone = false;
+    for (let i = 0; i < 60; i++) {
+      await new Promise(r => setTimeout(r, 2000));
 
-    if (!pollRes.ok) continue;
-
-    const pollData = await pollRes.json();
-    if (pollData.status === "completed" || pollData.status === "success") {
-      // Get audio
-      const audioRes = await fetch(acestepProxy, {
+      const pollRes = await fetch(acestepProxy, {
         method: "POST",
         headers,
         body: JSON.stringify({
-          endpoint: `/v1/audio/tasks/${taskId}/result?index=0`,
+          endpoint: `/query_result?task_id=${taskId}`,
           method: "GET",
         })
       });
 
-      if (!audioRes.ok) return { error: "Failed to download generated audio" };
+      if (!pollRes.ok) continue;
 
-      const audioBlob = await audioRes.arrayBuffer();
+      const pollData = await pollRes.json();
+      const status = pollData.data?.status || pollData.status || "";
+      console.log(`Poll ${i}: status=${status}`);
 
-      // Upload to storage
-      const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
-      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const sb = createClient(supabaseUrl, serviceKey);
-
-      const fileName = `agent/${crypto.randomUUID()}.wav`;
-      const { error: uploadErr } = await sb.storage
-        .from("songs")
-        .upload(fileName, new Uint8Array(audioBlob), { contentType: "audio/wav", upsert: true });
-
-      if (uploadErr) return { error: `Upload failed: ${uploadErr.message}` };
-
-      const { data: urlData } = sb.storage.from("songs").getPublicUrl(fileName);
-
-      return {
-        success: true,
-        audio_url: urlData.publicUrl,
-        task_id: taskId,
-        duration,
-        bpm,
-        key_scale: keyScale,
-        time_signature: timeSig,
-        prompt: caption,
-      };
+      if (isDone(status)) { pollDone = true; break; }
+      if (isFailed(status)) {
+        return { error: `Generation failed: ${pollData.data?.error || pollData.error || "unknown"}` };
+      }
     }
-
-    if (pollData.status === "failed" || pollData.status === "error") {
-      return { error: `Generation failed: ${pollData.error || "unknown"}` };
-    }
+    if (!pollDone) return { error: "Generation timed out after 120 seconds" };
   }
+
+  // Fetch generated audio
+  const audioRes = await fetch(acestepProxy, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      endpoint: `/v1/audio/tasks/${taskId}/result?index=0`,
+      method: "GET",
+    })
+  });
+
+  if (!audioRes.ok) {
+    const errText = await audioRes.text();
+    console.log("Audio fetch failed:", audioRes.status, errText);
+    return { error: `Failed to download generated audio (${audioRes.status})` };
+  }
+
+  const audioBlob = await audioRes.arrayBuffer();
+  console.log(`Audio downloaded: ${audioBlob.byteLength} bytes`);
+
+  if (audioBlob.byteLength < 1000) {
+    return { error: `Audio too small (${audioBlob.byteLength} bytes) — generation may have failed silently` };
+  }
+
+  // Upload to storage
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const sb = createClient(supabaseUrl, serviceKey);
+
+  const fileName = `agent/${crypto.randomUUID()}.wav`;
+  const { error: uploadErr } = await sb.storage
+    .from("songs")
+    .upload(fileName, new Uint8Array(audioBlob), { contentType: "audio/wav", upsert: true });
+
+  if (uploadErr) return { error: `Upload failed: ${uploadErr.message}` };
+
+  const { data: urlData } = sb.storage.from("songs").getPublicUrl(fileName);
+  console.log("Track uploaded:", urlData.publicUrl);
+
+  return {
+    success: true,
+    audio_url: urlData.publicUrl,
+    task_id: taskId,
+    duration,
+    bpm,
+    key_scale: keyScale,
+    time_signature: timeSig,
+    prompt: caption,
+  };
 
   return { error: "Generation timed out after 120 seconds" };
 }
