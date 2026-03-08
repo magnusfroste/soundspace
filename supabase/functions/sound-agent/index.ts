@@ -1012,6 +1012,144 @@ async function executeReorderPlaylist(args: { playlist_id: string; song_ids: str
   return { success: true, message: `Playlist reordered with ${args.song_ids.length} tracks in optimized flow.` };
 }
 
+async function executeFindIncomplete(args: { limit?: number }, supabaseUrl: string) {
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const sb = createClient(supabaseUrl, serviceKey);
+
+  const { data, error } = await sb.from("songs")
+    .select("id, title, artist, genre, mood, bpm, key_scale, lyrics, cover_url, file_url, origin_source")
+    .order("created_at", { ascending: false })
+    .limit(args.limit || 50);
+
+  if (error) return { error: error.message };
+  if (!data || data.length === 0) return { total: 0, message: "Library is empty." };
+
+  const missingLyrics = data.filter(s => !s.lyrics);
+  const missingCover = data.filter(s => !s.cover_url);
+  const missingGenre = data.filter(s => !s.genre);
+  const missingMood = data.filter(s => !s.mood);
+  const missingBpm = data.filter(s => !s.bpm);
+
+  const incomplete = data.filter(s => !s.lyrics || !s.cover_url || !s.genre || !s.mood || !s.bpm);
+
+  return {
+    total_scanned: data.length,
+    incomplete_count: incomplete.length,
+    breakdown: {
+      missing_lyrics: missingLyrics.map(s => ({ id: s.id, title: s.title, audio_url: s.file_url })),
+      missing_cover: missingCover.map(s => ({ id: s.id, title: s.title, genre: s.genre, mood: s.mood })),
+      missing_genre: missingGenre.map(s => ({ id: s.id, title: s.title })),
+      missing_mood: missingMood.map(s => ({ id: s.id, title: s.title })),
+      missing_bpm: missingBpm.map(s => ({ id: s.id, title: s.title, audio_url: s.file_url })),
+    },
+    counts: {
+      lyrics: missingLyrics.length,
+      cover: missingCover.length,
+      genre: missingGenre.length,
+      mood: missingMood.length,
+      bpm: missingBpm.length,
+    },
+    recommendation: incomplete.length > 0
+      ? `${incomplete.length} songs need attention. Prioritize: lyrics (${missingLyrics.length}), covers (${missingCover.length}), then tags.`
+      : "All songs have complete metadata! 🎉",
+  };
+}
+
+async function executeTranscribeSong(args: { song_id: string; audio_url: string }, supabaseUrl: string, anonKey: string) {
+  const res = await fetch(`${supabaseUrl}/functions/v1/transcribe-lyrics`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${anonKey}`,
+    },
+    body: JSON.stringify({ song_id: args.song_id, audio_url: args.audio_url }),
+  });
+
+  const data = await res.json();
+  if (!res.ok || !data.success) {
+    return { error: data.error || `Transcription failed (${res.status})` };
+  }
+
+  return {
+    success: true,
+    song_id: args.song_id,
+    lyrics: data.lyrics || "[Instrumental]",
+    message: data.lyrics ? `Transcribed ${data.lyrics.length} characters of lyrics.` : "No vocals detected — marked as instrumental.",
+  };
+}
+
+async function executeGenerateSongCover(args: { song_id: string; title: string; genre?: string; mood?: string; prompt?: string }, supabaseUrl: string) {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) return { error: "LOVABLE_API_KEY not configured" };
+
+  const coverPrompt = [
+    args.title,
+    args.genre && `${args.genre} music`,
+    args.mood && `${args.mood} atmosphere`,
+    args.prompt,
+  ].filter(Boolean).join(", ");
+
+  // Call generate-cover edge function
+  const res = await fetch(`${supabaseUrl}/functions/v1/generate-cover`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+    },
+    body: JSON.stringify({ prompt: coverPrompt, style: "modern abstract" }),
+  });
+
+  const data = await res.json();
+  if (!res.ok || data.error) {
+    return { error: data.error || `Cover generation failed (${res.status})` };
+  }
+
+  const imageUrl = data.imageUrl;
+  if (!imageUrl) return { error: "No image returned from generator" };
+
+  // Download and upload to storage
+  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const sb = createClient(supabaseUrl, serviceKey);
+
+  // imageUrl is base64 data URL — convert to blob
+  let imageBlob: Uint8Array;
+  if (imageUrl.startsWith("data:")) {
+    const base64 = imageUrl.split(",")[1];
+    const binary = atob(base64);
+    imageBlob = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) imageBlob[i] = binary.charCodeAt(i);
+  } else {
+    // It's a URL — fetch it
+    const imgRes = await fetch(imageUrl);
+    imageBlob = new Uint8Array(await imgRes.arrayBuffer());
+  }
+
+  const fileName = `covers/${args.song_id}.png`;
+  const { error: uploadErr } = await sb.storage
+    .from("songs")
+    .upload(fileName, imageBlob, { contentType: "image/png", upsert: true });
+
+  if (uploadErr) return { error: `Upload failed: ${uploadErr.message}` };
+
+  const { data: urlData } = sb.storage.from("songs").getPublicUrl(fileName);
+
+  // Update song record
+  const { error: updateErr } = await sb.from("songs")
+    .update({ cover_url: urlData.publicUrl })
+    .eq("id", args.song_id);
+
+  if (updateErr) return { error: `Saved image but failed to update song: ${updateErr.message}` };
+
+  return {
+    success: true,
+    song_id: args.song_id,
+    cover_url: urlData.publicUrl,
+    message: `Cover art generated and saved for "${args.title}".`,
+  };
+}
+
 // ── SSE helpers ─────────────────────────────────────────────────────────
 
 function sseEvent(event: string, data: any): string {
