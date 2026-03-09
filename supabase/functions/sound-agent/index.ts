@@ -1135,6 +1135,7 @@ async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: s
 
   const underCovered = slots.filter(s => s.needs_more_music && s.is_active);
   return {
+    profile_id: profileId,
     total_slots: slots.length, active_slots: slots.filter(s => s.is_active).length,
     schedule: slots, under_covered_slots: underCovered.length,
     summary: underCovered.length > 0
