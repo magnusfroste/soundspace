@@ -267,7 +267,15 @@ export function useAgentChat() {
     try {
       // Get the user's JWT session token for authenticated requests
       const { data: { session } } = await supabase.auth.getSession();
-      const accessToken = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      // If session expired, try refreshing it
+      let accessToken = session?.access_token;
+      if (!accessToken) {
+        const { data: refreshed } = await supabase.auth.refreshSession();
+        accessToken = refreshed?.session?.access_token || undefined;
+      }
+      if (!accessToken) {
+        throw new Error("Not authenticated — please sign in again");
+      }
 
       const response = await fetch(AGENT_URL, {
         method: "POST",
