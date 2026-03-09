@@ -125,10 +125,26 @@ You have deep expertise in:
 
 You can also help with:
 - **Library analysis**: Check genre/mood/BPM distribution, find gaps, suggest what to create
+- **Schedule creation**: Build the weekly music schedule! Use list_playlists to find available playlists, then create_schedule_entry to assign them to time slots. A typical workflow: list playlists → read current schedule → create entries for each day/time. Think about time-of-day energy mapping when choosing playlists.
 - **Schedule analysis**: Read the weekly schedule, find under-covered slots, suggest/generate fills
 - **Playlist optimization**: Analyze transition flow, suggest reorder based on Circle of Fifths + BPM smoothness (always ask before applying)
 - **Library maintenance**: Find songs missing lyrics/covers/tags and fix them systematically
 - **Single track requests**: For quick jobs, you can skip the planning phase and go straight to execution
+
+## SCHEDULE CREATION WORKFLOW
+
+When asked to create/set up a schedule:
+1. First call read_schedule to see what's already there (this also returns the profile_id you need)
+2. Call list_playlists to see available playlists
+3. Map playlists to time slots based on energy levels and time-of-day:
+   - Morning (06-10): Calm/Focus playlists
+   - Midday (10-14): Focus/Upbeat playlists  
+   - Afternoon (14-18): Upbeat/Groove playlists
+   - Evening (18-22): Groove/Energy playlists
+   - Night (22-02): Chill/Calm playlists
+4. Present a plan to the user before executing
+5. On approval, create entries with create_schedule_entry for each slot
+6. Use different colors per playlist for visual clarity
 
 ## LEARNING & MEMORY
 
@@ -413,6 +429,56 @@ const TOOLS = [
           }
         },
         required: ["updates"],
+        additionalProperties: false
+      }
+    }
+  },
+  // ── Schedule management tools ──
+  {
+    type: "function",
+    function: {
+      name: "list_playlists",
+      description: "List all available playlists (admin-curated). Use to find playlist IDs for scheduling.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Max playlists to return (default 50)" }
+        },
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_schedule_entry",
+      description: "Create a schedule entry to assign a playlist to a specific day and time slot. Use this to build the weekly music schedule.",
+      parameters: {
+        type: "object",
+        properties: {
+          profile_id: { type: "string", description: "Profile ID of the business user" },
+          playlist_id: { type: "string", description: "ID of the playlist to schedule" },
+          day_of_week: { type: "number", description: "Day of week: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday" },
+          start_time: { type: "string", description: "Start time in HH:MM format (e.g. '09:00')" },
+          end_time: { type: "string", description: "End time in HH:MM format (e.g. '12:00')" },
+          color: { type: "string", description: "Optional hex color for the block (e.g. '#9b87f5')" }
+        },
+        required: ["profile_id", "playlist_id", "day_of_week", "start_time", "end_time"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_schedule_entry",
+      description: "Delete a schedule entry by ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          entry_id: { type: "string", description: "ID of the schedule entry to delete" }
+        },
+        required: ["entry_id"],
         additionalProperties: false
       }
     }
@@ -1018,13 +1084,22 @@ async function executeAnalyzeLibrary(supabaseUrl: string) {
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: string) {
+async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: string, userId?: string | null) {
   const sb = getServiceClient(supabaseUrl);
-  let query = sb.from("schedule_entries").select("id, day_of_week, start_time, end_time, is_active, playlist_id, color").order("day_of_week").order("start_time");
-  if (args.profile_id) query = query.eq("profile_id", args.profile_id);
+  
+  // Resolve profile_id if not provided
+  let profileId = args.profile_id;
+  if (!profileId && userId) {
+    const { data: profile } = await sb.from("profiles").select("id").eq("user_id", userId).maybeSingle();
+    profileId = profile?.id;
+  }
+  if (!profileId) return { total_slots: 0, message: "No profile found. Cannot read schedule.", profile_id: null };
+
+  let query = sb.from("schedule_entries").select("id, day_of_week, start_time, end_time, is_active, playlist_id, color, profile_id").order("day_of_week").order("start_time");
+  query = query.eq("profile_id", profileId);
   const { data: entries, error } = await query;
   if (error) return { error: error.message };
-  if (!entries || entries.length === 0) return { total_slots: 0, message: "No schedule entries found." };
+  if (!entries || entries.length === 0) return { total_slots: 0, profile_id: profileId, message: "No schedule entries found. Use create_schedule_entry with this profile_id to add entries." };
 
   const playlistIds = [...new Set(entries.map(e => e.playlist_id))];
   const { data: playlists } = await sb.from("playlists").select("id, title").in("id", playlistIds);
@@ -1060,6 +1135,7 @@ async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: s
 
   const underCovered = slots.filter(s => s.needs_more_music && s.is_active);
   return {
+    profile_id: profileId,
     total_slots: slots.length, active_slots: slots.filter(s => s.is_active).length,
     schedule: slots, under_covered_slots: underCovered.length,
     summary: underCovered.length > 0
@@ -1068,7 +1144,36 @@ async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: s
   };
 }
 
-const KEY_ORDER = ["C", "G", "D", "A", "E", "B", "F#", "Db", "Ab", "Eb", "Bb", "F"];
+async function executeListPlaylists(args: { limit?: number }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const { data, error } = await sb.from("playlists").select("id, title, description, cover_image_url").order("title").limit(args.limit || 50);
+  if (error) return { error: error.message };
+  return { playlists: data || [], count: data?.length || 0 };
+}
+
+async function executeCreateScheduleEntry(args: { profile_id: string; playlist_id: string; day_of_week: number; start_time: string; end_time: string; color?: string }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const { data, error } = await sb.from("schedule_entries").insert({
+    profile_id: args.profile_id,
+    playlist_id: args.playlist_id,
+    day_of_week: args.day_of_week,
+    start_time: args.start_time,
+    end_time: args.end_time,
+    color: args.color || "#9b87f5",
+  }).select("id").single();
+  if (error) return { error: `Failed to create schedule entry: ${error.message}` };
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  return { success: true, entry_id: data.id, message: `Schedule entry created: ${dayNames[args.day_of_week]} ${args.start_time}-${args.end_time}` };
+}
+
+async function executeDeleteScheduleEntry(args: { entry_id: string }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const { error } = await sb.from("schedule_entries").delete().eq("id", args.entry_id);
+  if (error) return { error: `Failed to delete schedule entry: ${error.message}` };
+  return { success: true, message: "Schedule entry deleted." };
+}
+
+
 
 function keyDistance(a: string, b: string): number {
   if (!a || !b) return 6;
@@ -1447,6 +1552,9 @@ Deno.serve(async (req) => {
               save_memory: "Saving memory...",
               list_objectives: "Checking objectives...",
               update_objective_progress: "Updating objective progress...",
+              list_playlists: "Listing available playlists...",
+              create_schedule_entry: "Creating schedule entry...",
+              delete_schedule_entry: "Deleting schedule entry...",
             };
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
@@ -1459,7 +1567,7 @@ Deno.serve(async (req) => {
                 case "list_library": result = await executeListLibrary(args, supabaseUrl); break;
                 case "create_playlist": result = await executeCreatePlaylist(args, supabaseUrl); break;
                 case "analyze_library": result = await executeAnalyzeLibrary(supabaseUrl); break;
-                case "read_schedule": result = await executeReadSchedule(args, supabaseUrl); break;
+                case "read_schedule": result = await executeReadSchedule(args, supabaseUrl, userId); break;
                 case "analyze_playlist_flow": result = await executeAnalyzePlaylistFlow(args, supabaseUrl); break;
                 case "reorder_playlist": result = await executeReorderPlaylist(args, supabaseUrl); break;
                 case "find_incomplete_songs": result = await executeFindIncomplete(args, supabaseUrl); break;
@@ -1471,6 +1579,9 @@ Deno.serve(async (req) => {
                 case "save_memory": result = userId ? await executeSaveMemory(args, supabaseUrl, userId) : { error: "No user context" }; break;
                 case "list_objectives": result = userId ? await executeListObjectives(supabaseUrl, userId) : { objectives: [], count: 0 }; break;
                 case "update_objective_progress": result = await executeUpdateObjectiveProgress(args, supabaseUrl); break;
+                case "list_playlists": result = await executeListPlaylists(args, supabaseUrl); break;
+                case "create_schedule_entry": result = await executeCreateScheduleEntry(args, supabaseUrl); break;
+                case "delete_schedule_entry": result = await executeDeleteScheduleEntry(args, supabaseUrl); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) { result = { error: `Tool error: ${e.message}` }; }
