@@ -154,186 +154,47 @@ function handleQuery(body: Record<string, unknown>): Response {
   );
 }
 
-// ── Resolve active generation provider from site_settings ──────────────
-async function getActiveProvider(supabaseUrl: string): Promise<"acestep" | "elevenlabs"> {
-  try {
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const sb = createClient(supabaseUrl, serviceKey);
+// ── Consume SSE stream from Sound Agent and extract results ────────────
+async function consumeAgentStream(
+  response: Response
+): Promise<{ content: string; audioUrls: string[]; error?: string }> {
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let content = "";
+  let audioUrls: string[] = [];
 
-    // Check module:sound-agent settings for generationProvider
-    const { data: agentSettings } = await sb
-      .from("site_settings")
-      .select("value")
-      .eq("key", "module:sound-agent")
-      .maybeSingle();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
 
-    if (agentSettings?.value) {
-      const val = agentSettings.value as Record<string, unknown>;
-      const provider = val.generationProvider as string | undefined;
-      if (provider === "elevenlabs") return "elevenlabs";
-      if (provider === "acestep") return "acestep";
+    let nlIdx: number;
+    while ((nlIdx = buffer.indexOf("\n")) !== -1) {
+      let line = buffer.slice(0, nlIdx);
+      buffer = buffer.slice(nlIdx + 1);
+      if (line.endsWith("\r")) line = line.slice(0, -1);
+      if (!line.startsWith("data: ")) continue;
+      const jsonStr = line.slice(6).trim();
+      if (jsonStr === "[DONE]") continue;
+
+      try {
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.type === "token" && parsed.content) {
+          content += parsed.content;
+        } else if (parsed.type === "done") {
+          if (parsed.audio_urls) audioUrls = parsed.audio_urls;
+        } else if (parsed.type === "error") {
+          return { content: "", audioUrls: [], error: parsed.error || "Agent error" };
+        }
+      } catch { /* partial JSON */ }
     }
-
-    // Check integrations_enabled to see what's active
-    const { data: intSettings } = await sb
-      .from("site_settings")
-      .select("value")
-      .eq("key", "integrations_enabled")
-      .maybeSingle();
-
-    if (intSettings?.value) {
-      const state = intSettings.value as Record<string, boolean>;
-      if (state.acestep !== false) return "acestep";
-      if (state.elevenlabs !== false) return "elevenlabs";
-    }
-
-    return "acestep"; // default
-  } catch {
-    return "acestep";
   }
+
+  return { content, audioUrls };
 }
 
-// ── Generate via AceStep ───────────────────────────────────────────────
-async function generateViaAceStep(
-  supabaseUrl: string,
-  prompt: string,
-  duration: number
-): Promise<{ audioBytes: Uint8Array; qualityScore: number; metadata: Record<string, unknown> } | { error: string; status: number }> {
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
-  const acestepProxy = `${supabaseUrl}/functions/v1/acestep-proxy`;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${anonKey}`,
-  };
-
-  // Submit generation task
-  const releaseRes = await fetch(acestepProxy, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      endpoint: "/release_task",
-      method: "POST",
-      body: {
-        task_type: "text2music",
-        caption: prompt,
-        lyrics: "[Instrumental]",
-        audio_duration: Math.min(Math.max(duration, 30), 180),
-        bpm: 100,
-        keyscale: "C major",
-        timesignature: "4/4",
-        batch_size: 1,
-        inference_steps: 100,
-        thinking: true,
-      },
-    }),
-  });
-
-  if (!releaseRes.ok) {
-    const err = await releaseRes.text();
-    return { error: `AceStep submission failed: ${err}`, status: 502 };
-  }
-
-  const releaseData = await releaseRes.json();
-  const unwrapped = (releaseData && typeof releaseData === "object" && "code" in releaseData && "data" in releaseData) ? releaseData.data : releaseData;
-  const taskId = unwrapped?.task_id || unwrapped?.taskId || unwrapped?.id;
-  if (!taskId) return { error: `No task_id from AceStep: ${JSON.stringify(releaseData).slice(0, 200)}`, status: 502 };
-
-  // Poll for results (up to 6 minutes)
-  let resultData: any = null;
-  for (let i = 0; i < 120; i++) {
-    await new Promise(r => setTimeout(r, 3000));
-    const pollRes = await fetch(acestepProxy, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ endpoint: "/query_result", method: "POST", body: { task_id_list: [taskId] } }),
-    });
-    if (!pollRes.ok) continue;
-    let pollData = await pollRes.json();
-    if (pollData && typeof pollData === "object" && "code" in pollData && "data" in pollData) pollData = pollData.data;
-    const tasks = Array.isArray(pollData) ? pollData : pollData?.data || [pollData];
-    const task = Array.isArray(tasks) ? tasks[0] : tasks;
-    if (!task) continue;
-    if (task.status === 1) {
-      resultData = typeof task.result === "string" ? JSON.parse(task.result) : task.result;
-      break;
-    }
-    if (task.status === 2) return { error: "AceStep generation failed", status: 502 };
-  }
-
-  if (!resultData) return { error: "AceStep generation timed out", status: 504 };
-
-  // Pick best variation
-  const resultItems = Array.isArray(resultData) ? resultData : [resultData];
-  resultItems.sort((a: any, b: any) => (b.quality_score ?? 0) - (a.quality_score ?? 0));
-  const best = resultItems[0];
-  const audioPath = best?.url || best?.file;
-  if (!audioPath) return { error: "No audio path in AceStep result", status: 502 };
-
-  // Download audio
-  const audioRes = await fetch(acestepProxy, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ endpoint: audioPath, method: "GET" }),
-  });
-  if (!audioRes.ok) return { error: `Failed to download AceStep audio (${audioRes.status})`, status: 502 };
-
-  const audioBlob = await audioRes.arrayBuffer();
-  if (audioBlob.byteLength < 1000) return { error: `Audio too small (${audioBlob.byteLength} bytes)`, status: 502 };
-
-  return {
-    audioBytes: new Uint8Array(audioBlob),
-    qualityScore: best.quality_score ?? 0,
-    metadata: {
-      bpm: best.bpm ?? 100,
-      key_scale: best.keyscale ?? "C major",
-      time_signature: best.timesignature ?? "4/4",
-    },
-  };
-}
-
-// ── Generate via ElevenLabs ────────────────────────────────────────────
-async function generateViaElevenLabs(
-  supabaseUrl: string,
-  prompt: string,
-  duration: number
-): Promise<{ audioBytes: Uint8Array; qualityScore: number; metadata: Record<string, unknown> } | { error: string; status: number }> {
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const genResponse = await fetch(`${supabaseUrl}/functions/v1/generate-music`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${serviceKey}`,
-    },
-    body: JSON.stringify({ prompt, duration }),
-  });
-
-  if (!genResponse.ok) {
-    const errText = await genResponse.text();
-    return { error: `ElevenLabs generation failed: ${genResponse.status}`, status: 502 };
-  }
-
-  const genData = await genResponse.json();
-  const audioBase64 = genData.audio as string;
-  if (!audioBase64) return { error: "No audio from ElevenLabs", status: 502 };
-
-  const binaryStr = atob(audioBase64);
-  const audioBytes = new Uint8Array(binaryStr.length);
-  for (let i = 0; i < binaryStr.length; i++) {
-    audioBytes[i] = binaryStr.charCodeAt(i);
-  }
-
-  return {
-    audioBytes,
-    qualityScore: 80,
-    metadata: {
-      genre: (genData.compositionPlan as any)?.genre || null,
-      title: (genData.compositionPlan as any)?.title || null,
-      lyrics: genData.lyrics || null,
-    },
-  };
-}
-
-// ── task: generate_track ────────────────────────────────────────────────
+// ── task: generate_track — delegates to Sound Agent ─────────────────────
 async function handleTask(
   body: Record<string, unknown>,
   supabaseUrl: string
@@ -375,59 +236,79 @@ async function handleTask(
     }
   }
 
-  // Resolve active provider
-  const provider = await getActiveProvider(supabaseUrl);
-  console.log(`[a2a] Task: generate_track — provider: ${provider}, prompt: "${enrichedPrompt.slice(0, 80)}...", duration: ${duration || 180}s`);
+  // Build the agent message — instruct it to generate, save, and return
+  const agentMessage = `Generate a track and save it to the library. Here are the details:
 
-  // Generate via active provider
-  const genResult = provider === "acestep"
-    ? await generateViaAceStep(supabaseUrl, enrichedPrompt, duration || 60)
-    : await generateViaElevenLabs(supabaseUrl, enrichedPrompt, duration || 180);
+Prompt: ${enrichedPrompt}
+Duration: ${duration || 60} seconds
 
-  if ("error" in genResult) {
-    console.error(`[a2a] ${provider} failed:`, genResult.error);
-    return new Response(
-      JSON.stringify({ status: "error", error: genResult.error }),
-      { status: genResult.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
+Important: Generate the track, save it to the library, and report the audio URL and metadata. Do not ask for confirmation — just execute.`;
 
-  // Upload to storage
+  console.log(`[a2a] Delegating to Sound Agent — prompt: "${enrichedPrompt.slice(0, 80)}..."`);
+
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const sb = createClient(supabaseUrl, serviceKey);
-  const ext = provider === "acestep" ? "wav" : "mp3";
-  const contentType = provider === "acestep" ? "audio/wav" : "audio/mpeg";
-  const fileName = `a2a/a2a-${crypto.randomUUID()}.${ext}`;
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
 
-  const { error: uploadError } = await sb.storage
-    .from("songs")
-    .upload(fileName, genResult.audioBytes, { contentType, upsert: false });
+  // Call Sound Agent edge function (streaming SSE)
+  const agentResponse = await fetch(`${supabaseUrl}/functions/v1/sound-agent`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${serviceKey}`,
+    },
+    body: JSON.stringify({
+      messages: [{ role: "user", content: agentMessage }],
+      settings: {}, // Agent reads its own settings from site_settings
+    }),
+  });
 
-  if (uploadError) {
-    console.error("[a2a] Storage upload failed:", uploadError.message);
+  if (!agentResponse.ok || !agentResponse.body) {
+    const errText = await agentResponse.text();
+    console.error(`[a2a] Sound Agent failed: ${agentResponse.status}`, errText.slice(0, 300));
     return new Response(
-      JSON.stringify({ status: "error", error: "Failed to store audio: " + uploadError.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ status: "error", error: `Sound Agent failed: ${agentResponse.status}` }),
+      { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 
-  const { data: publicUrl } = sb.storage.from("songs").getPublicUrl(fileName);
+  // Consume the agent's SSE stream
+  const agentResult = await consumeAgentStream(agentResponse);
+
+  if (agentResult.error) {
+    console.error(`[a2a] Agent error: ${agentResult.error}`);
+    return new Response(
+      JSON.stringify({ status: "error", error: agentResult.error }),
+      { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+
+  if (!agentResult.audioUrls.length) {
+    console.warn("[a2a] Agent completed but no audio URLs returned");
+    return new Response(
+      JSON.stringify({
+        status: "completed",
+        result: {
+          message: agentResult.content.slice(0, 500),
+          audio_url: null,
+          note: "Agent completed but no audio was generated. Check agent logs.",
+        },
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
 
   const result = {
     status: "completed",
     result: {
-      audio_url: publicUrl.publicUrl,
-      title: (genResult.metadata.title as string) || prompt.slice(0, 60),
-      genre: (genResult.metadata.genre as string) || null,
-      duration: duration || (provider === "acestep" ? 60 : 180),
-      quality_score: genResult.qualityScore,
-      provider,
-      storage_path: fileName,
-      ...genResult.metadata,
+      audio_url: agentResult.audioUrls[0],
+      audio_urls: agentResult.audioUrls,
+      title: prompt.slice(0, 60),
+      duration: duration || 60,
+      agent_response: agentResult.content.slice(0, 1000),
     },
   };
 
-  console.log(`[a2a] Task completed — provider: ${provider}, audio: ${publicUrl.publicUrl}`);
+  console.log(`[a2a] Task completed via Sound Agent — ${agentResult.audioUrls.length} audio(s)`);
 
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
