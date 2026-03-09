@@ -1,0 +1,8 @@
+{
+  "protocol": "a2a/1.0",
+  "agent": "SoundSpace",
+  "status": "online",
+  "endpoint_discovery": "https://labyxrmiqjinatvpqoto.supabase.co/functions/v1/agent-card",
+  "negotiate": "https://labyxrmiqjinatvpqoto.supabase.co/functions/v1/a2a-negotiate",
+  "note": "This is a static pointer. For live agent card, fetch the endpoint_discovery URL."
+}
