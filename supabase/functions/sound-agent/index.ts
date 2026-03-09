@@ -537,31 +537,133 @@ async function isIntegrationEnabledServer(integrationId: string, supabaseUrl: st
   }
 }
 
-async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) {
-  // Check if ACE-Step integration is enabled
-  const aceStepEnabled = await isIntegrationEnabledServer("acestep", supabaseUrl);
-  if (!aceStepEnabled) {
-    return { error: "ACE-Step integration is disabled. Enable it in the Integrations panel to generate tracks." };
-  }
+// ── Enhanced generation with 5 quick wins ──────────────────────────────
 
-  const acestepProxy = `${supabaseUrl}/functions/v1/acestep-proxy`;
-  const headers: Record<string, string> = { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` };
-  const caption = args.prompt;
-  const lyrics = args.lyrics || "[Instrumental]";
-  const bpm = args.bpm || 100;
-  const keyScale = args.key_scale || "C major";
-  const timeSig = args.time_signature || "4/4";
-  const duration = Math.min(Math.max(args.duration || 60, 30), 180);
+const QUALITY_THRESHOLD = 0.7;
+const MAX_REGENERATION_ATTEMPTS = 3;
+const BATCH_SIZE = 2;
+
+/** Lyrics structure templates by genre */
+const LYRICS_STRUCTURES: Record<string, string> = {
+  jazz: "[Intro]\n[Verse 1]\n[Chorus]\n[Verse 2]\n[Bridge]\n[Outro]",
+  ambient: "[Intro]\n[Movement 1]\n[Movement 2]\n[Outro]",
+  lofi: "[Intro]\n[Loop 1]\n[Loop 2]\n[Outro]",
+  electronic: "[Intro]\n[Build]\n[Drop]\n[Breakdown]\n[Drop 2]\n[Outro]",
+  classical: "[Intro]\n[Theme A]\n[Development]\n[Theme B]\n[Recapitulation]\n[Coda]",
+  acoustic: "[Intro]\n[Verse 1]\n[Chorus]\n[Verse 2]\n[Chorus]\n[Bridge]\n[Outro]",
+  default: "[Intro]\n[Verse]\n[Chorus]\n[Verse]\n[Chorus]\n[Outro]",
+};
+
+/** Auto-insert lyrics structure tags based on genre */
+function applyLyricsStructure(lyrics: string | undefined, genre: string | undefined): string {
+  if (lyrics && lyrics.trim() && !lyrics.includes("[")) {
+    // If lyrics exist but no tags, wrap in verse/chorus structure
+    const lines = lyrics.split("\n").filter(l => l.trim());
+    if (lines.length > 0) {
+      const midpoint = Math.floor(lines.length / 2);
+      return `[Verse]\n${lines.slice(0, midpoint).join("\n")}\n\n[Chorus]\n${lines.slice(midpoint).join("\n")}`;
+    }
+  }
+  if (!lyrics || lyrics === "[Instrumental]") {
+    // Return instrumental marker
+    return "[Instrumental]";
+  }
+  return lyrics;
+}
+
+/** Find a reference track from library matching genre/mood for Cover mode */
+async function findReferenceAudio(supabaseUrl: string, genre?: string, mood?: string, bpm?: number): Promise<{ url: string; id: string } | null> {
+  const sb = getServiceClient(supabaseUrl);
+  let query = sb.from("songs").select("id, file_url, bpm, genre, mood, quality_score").order("quality_score", { ascending: false, nullsFirst: false }).limit(10);
+  
+  if (genre) query = query.ilike("genre", `%${genre}%`);
+  if (mood) query = query.ilike("mood", `%${mood}%`);
+  
+  const { data } = await query;
+  if (!data || data.length === 0) return null;
+  
+  // If BPM provided, find closest match
+  if (bpm) {
+    const sorted = data.sort((a, b) => Math.abs((a.bpm || 100) - bpm) - Math.abs((b.bpm || 100) - bpm));
+    return { url: sorted[0].file_url, id: sorted[0].id };
+  }
+  
+  // Return highest quality match
+  return { url: data[0].file_url, id: data[0].id };
+}
+
+/** Fetch matching skills and extract parameters */
+async function getSkillParameters(supabaseUrl: string, userId: string, genre?: string, mood?: string): Promise<{ bpm?: number; key_scale?: string; time_signature?: string }> {
+  const sb = getServiceClient(supabaseUrl);
+  const { data: skills } = await sb.from("agent_skills")
+    .select("name, content, metadata")
+    .eq("user_id", userId)
+    .eq("category", "generation")
+    .limit(20);
+  
+  if (!skills || skills.length === 0) return {};
+  
+  // Find skill matching genre or mood
+  const searchTerms = [genre?.toLowerCase(), mood?.toLowerCase()].filter(Boolean);
+  const matchingSkill = skills.find(s => 
+    searchTerms.some(term => s.name.toLowerCase().includes(term!) || s.content.toLowerCase().includes(term!))
+  );
+  
+  if (!matchingSkill) return {};
+  
+  const meta = matchingSkill.metadata as Record<string, any> || {};
+  const params: { bpm?: number; key_scale?: string; time_signature?: string } = {};
+  
+  // Extract BPM (handle range like "90-100" or single value)
+  if (meta.bpm_range) {
+    const match = String(meta.bpm_range).match(/(\d+)/);
+    if (match) params.bpm = parseInt(match[1], 10);
+  } else if (meta.bpm) {
+    params.bpm = parseInt(meta.bpm, 10);
+  }
+  
+  if (meta.key) params.key_scale = meta.key;
+  if (meta.time_signature) params.time_signature = meta.time_signature;
+  
+  console.log(`Skill "${matchingSkill.name}" injected params:`, params);
+  return params;
+}
+
+/** Core generation logic (returns best variation from batch) */
+async function generateWithBatch(
+  acestepProxy: string,
+  headers: Record<string, string>,
+  params: { caption: string; lyrics: string; duration: number; bpm: number; keyScale: string; timeSig: string; referenceAudioUrl?: string }
+): Promise<{ audioBlob: ArrayBuffer; qualityScore: number; metadata: any } | { error: string }> {
+  const taskType = params.referenceAudioUrl ? "cover" : "text2music";
+  const body: Record<string, any> = {
+    task_type: taskType,
+    caption: params.caption,
+    lyrics: params.lyrics,
+    audio_duration: params.duration,
+    bpm: params.bpm,
+    keyscale: params.keyScale,
+    timesignature: params.timeSig,
+    batch_size: BATCH_SIZE,
+    inference_steps: 100,
+    thinking: true,
+  };
+  
+  // Add reference audio for Cover mode
+  if (params.referenceAudioUrl) {
+    body.audio_url = params.referenceAudioUrl;
+    body.audio_cover_strength = 0.5; // Moderate influence
+  }
 
   const releaseRes = await fetch(acestepProxy, {
     method: "POST", headers,
-    body: JSON.stringify({ endpoint: "/release_task", method: "POST", body: {
-      task_type: "text2music", caption, lyrics, audio_duration: duration,
-      bpm, keyscale: keyScale, timesignature: timeSig, batch_size: 1, inference_steps: 100, thinking: true,
-    }})
+    body: JSON.stringify({ endpoint: "/release_task", method: "POST", body })
   });
 
-  if (!releaseRes.ok) { const err = await releaseRes.text(); return { error: `Failed to submit generation task: ${err}` }; }
+  if (!releaseRes.ok) {
+    const err = await releaseRes.text();
+    return { error: `Failed to submit generation task: ${err}` };
+  }
 
   const releaseData = await releaseRes.json();
   console.log("ACE-Step release_task response:", JSON.stringify(releaseData));
@@ -569,6 +671,7 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) 
   const taskId = unwrapped?.task_id || unwrapped?.taskId || unwrapped?.id;
   if (!taskId) return { error: `No task_id returned. Response: ${JSON.stringify(releaseData).slice(0, 300)}` };
 
+  // Poll for results
   let resultData: any = null;
   for (let i = 0; i < 120; i++) {
     await new Promise(r => setTimeout(r, 3000));
@@ -586,28 +689,139 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string) 
 
   if (!resultData) return { error: "Generation timed out after 360 seconds" };
 
+  // Select best variation by quality_score
   const resultItems = Array.isArray(resultData) ? resultData : [resultData];
-  const firstItem = resultItems[0];
-  const audioPath = firstItem?.url || firstItem?.file;
+  console.log(`Batch returned ${resultItems.length} variations`);
+  
+  // Sort by quality_score descending
+  resultItems.sort((a, b) => (b.quality_score ?? 0) - (a.quality_score ?? 0));
+  const bestItem = resultItems[0];
+  const qualityScore = bestItem.quality_score ?? 0;
+  
+  console.log(`Best variation quality_score: ${qualityScore}`);
+  
+  const audioPath = bestItem?.url || bestItem?.file;
   if (!audioPath) return { error: `No audio path in result: ${JSON.stringify(resultData).slice(0, 300)}` };
 
-  console.log("Fetching audio from path:", audioPath);
+  // Download best audio
   const audioRes = await fetch(acestepProxy, { method: "POST", headers, body: JSON.stringify({ endpoint: audioPath, method: "GET" }) });
-  if (!audioRes.ok) { console.log("Audio fetch failed:", audioRes.status); return { error: `Failed to download audio (${audioRes.status})` }; }
+  if (!audioRes.ok) return { error: `Failed to download audio (${audioRes.status})` };
 
   const audioBlob = await audioRes.arrayBuffer();
-  console.log(`Audio downloaded: ${audioBlob.byteLength} bytes`);
   if (audioBlob.byteLength < 1000) return { error: `Audio too small (${audioBlob.byteLength} bytes)` };
 
+  return {
+    audioBlob,
+    qualityScore,
+    metadata: {
+      bpm: bestItem.bpm ?? params.bpm,
+      key_scale: bestItem.keyscale ?? params.keyScale,
+      time_signature: bestItem.timesignature ?? params.timeSig,
+      variations_generated: resultItems.length,
+    }
+  };
+}
+
+async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, userId?: string) {
+  // Check if ACE-Step integration is enabled
+  const aceStepEnabled = await isIntegrationEnabledServer("acestep", supabaseUrl);
+  if (!aceStepEnabled) {
+    return { error: "ACE-Step integration is disabled. Enable it in the Integrations panel to generate tracks." };
+  }
+
+  const acestepProxy = `${supabaseUrl}/functions/v1/acestep-proxy`;
+  const headers: Record<string, string> = { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` };
+  
+  const caption = args.prompt;
+  const duration = Math.min(Math.max(args.duration || 60, 30), 180);
+  
+  // 1. Apply lyrics structure tags
+  const lyrics = applyLyricsStructure(args.lyrics, args.genre);
+  
+  // 2. Get skill parameters (if user_id available)
+  let skillParams: { bpm?: number; key_scale?: string; time_signature?: string } = {};
+  if (userId) {
+    skillParams = await getSkillParameters(supabaseUrl, userId, args.genre, args.mood);
+  }
+  
+  // Merge with explicit args (explicit args take precedence)
+  const bpm = args.bpm || skillParams.bpm || 100;
+  const keyScale = args.key_scale || skillParams.key_scale || "C major";
+  const timeSig = args.time_signature || skillParams.time_signature || "4/4";
+  
+  // 3. Find reference audio for Cover mode
+  let referenceAudioUrl: string | undefined;
+  if (args.genre || args.mood) {
+    const refTrack = await findReferenceAudio(supabaseUrl, args.genre, args.mood, bpm);
+    if (refTrack) {
+      referenceAudioUrl = refTrack.url;
+      console.log(`Using reference track ${refTrack.id} for Cover mode`);
+    }
+  }
+
   const sb = getServiceClient(supabaseUrl);
+  
+  // 4. Quality gate with auto-regeneration
+  let bestResult: { audioBlob: ArrayBuffer; qualityScore: number; metadata: any } | null = null;
+  let attempts = 0;
+  
+  while (attempts < MAX_REGENERATION_ATTEMPTS) {
+    attempts++;
+    console.log(`Generation attempt ${attempts}/${MAX_REGENERATION_ATTEMPTS}`);
+    
+    const result = await generateWithBatch(acestepProxy, headers, {
+      caption, lyrics, duration, bpm, keyScale, timeSig, referenceAudioUrl
+    });
+    
+    if ("error" in result) {
+      console.log(`Attempt ${attempts} failed: ${result.error}`);
+      if (attempts >= MAX_REGENERATION_ATTEMPTS) return result;
+      continue;
+    }
+    
+    // Check quality gate
+    if (result.qualityScore >= QUALITY_THRESHOLD) {
+      console.log(`Quality threshold met (${result.qualityScore} >= ${QUALITY_THRESHOLD})`);
+      bestResult = result;
+      break;
+    }
+    
+    // Keep best attempt even if below threshold
+    if (!bestResult || result.qualityScore > bestResult.qualityScore) {
+      bestResult = result;
+    }
+    
+    if (attempts < MAX_REGENERATION_ATTEMPTS) {
+      console.log(`Quality ${result.qualityScore} below threshold ${QUALITY_THRESHOLD}, retrying...`);
+    }
+  }
+  
+  if (!bestResult) {
+    return { error: "All generation attempts failed" };
+  }
+  
+  // Upload best result
   const fileName = `agent/${crypto.randomUUID()}.wav`;
-  const { error: uploadErr } = await sb.storage.from("songs").upload(fileName, new Uint8Array(audioBlob), { contentType: "audio/wav", upsert: true });
+  const { error: uploadErr } = await sb.storage.from("songs").upload(fileName, new Uint8Array(bestResult.audioBlob), { contentType: "audio/wav", upsert: true });
   if (uploadErr) return { error: `Upload failed: ${uploadErr.message}` };
 
   const { data: urlData } = sb.storage.from("songs").getPublicUrl(fileName);
   console.log("Track uploaded:", urlData.publicUrl);
 
-  return { success: true, audio_url: urlData.publicUrl, task_id: taskId, duration, bpm, key_scale: keyScale, time_signature: timeSig, prompt: caption };
+  return {
+    success: true,
+    audio_url: urlData.publicUrl,
+    duration,
+    bpm: bestResult.metadata.bpm,
+    key_scale: bestResult.metadata.key_scale,
+    time_signature: bestResult.metadata.time_signature,
+    quality_score: bestResult.qualityScore,
+    prompt: caption,
+    attempts,
+    variations_generated: bestResult.metadata.variations_generated,
+    used_reference_audio: !!referenceAudioUrl,
+    skill_params_injected: Object.keys(skillParams).length > 0,
+  };
 }
 
 async function executeAnalyze(args: { audio_url: string }, supabaseUrl: string, anonKey: string) {
