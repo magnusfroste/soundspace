@@ -51,6 +51,7 @@ export function AgentChat({ fullWidth, agentChat: externalChat }: AgentChatProps
 
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -61,6 +62,7 @@ export function AgentChat({ fullWidth, agentChat: externalChat }: AgentChatProps
     if (!text || isGenerating) return;
     setInput("");
     sendMessage(text);
+    inputRef.current?.focus();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -86,6 +88,7 @@ export function AgentChat({ fullWidth, agentChat: externalChat }: AgentChatProps
           onKeyDown={handleKeyDown}
           onSend={handleSend}
           maxWidth="max-w-2xl"
+          inputRef={inputRef}
         />
       </div>
     );
@@ -144,6 +147,7 @@ export function AgentChat({ fullWidth, agentChat: externalChat }: AgentChatProps
           onKeyDown={handleKeyDown}
           onSend={handleSend}
           maxWidth="max-w-3xl"
+          inputRef={inputRef}
         />
       </div>
     </div>
@@ -219,6 +223,7 @@ function ChatInput({
   onKeyDown,
   onSend,
   maxWidth,
+  inputRef,
 }: {
   input: string;
   isGenerating: boolean;
@@ -226,11 +231,13 @@ function ChatInput({
   onKeyDown: (e: React.KeyboardEvent) => void;
   onSend: () => void;
   maxWidth: string;
+  inputRef?: React.RefObject<HTMLTextAreaElement>;
 }) {
   return (
     <div className="border-t border-border p-4 flex-shrink-0">
       <div className={cn("flex gap-2 items-end mx-auto", maxWidth)}>
         <Textarea
+          ref={inputRef}
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={onKeyDown}
