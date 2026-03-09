@@ -471,6 +471,27 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "update_schedule_entry",
+      description: "Update an existing schedule entry. Can change playlist, day, time, color, or active state.",
+      parameters: {
+        type: "object",
+        properties: {
+          entry_id: { type: "string", description: "ID of the schedule entry to update" },
+          playlist_id: { type: "string", description: "New playlist ID" },
+          day_of_week: { type: "number", description: "New day of week (0=Sun, 1=Mon, ..., 6=Sat)" },
+          start_time: { type: "string", description: "New start time in HH:MM format" },
+          end_time: { type: "string", description: "New end time in HH:MM format" },
+          color: { type: "string", description: "New hex color" },
+          is_active: { type: "boolean", description: "Enable or disable this entry" }
+        },
+        required: ["entry_id"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "delete_schedule_entry",
       description: "Delete a schedule entry by ID.",
       parameters: {
@@ -479,6 +500,21 @@ const TOOLS = [
           entry_id: { type: "string", description: "ID of the schedule entry to delete" }
         },
         required: ["entry_id"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "clear_schedule",
+      description: "Delete ALL schedule entries for a profile. Use when the user wants to start fresh.",
+      parameters: {
+        type: "object",
+        properties: {
+          profile_id: { type: "string", description: "Profile ID whose schedule to clear" }
+        },
+        required: ["profile_id"],
         additionalProperties: false
       }
     }
@@ -1124,12 +1160,16 @@ async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: s
     const slotMinutes = (eh * 60 + em) - (sh * 60 + sm);
     const coveragePercent = slotMinutes > 0 ? Math.round((stats.total_duration_min / slotMinutes) * 100) : 0;
     return {
+      entry_id: e.id,
       day: DAY_NAMES[e.day_of_week] || `Day ${e.day_of_week}`,
+      day_of_week: e.day_of_week,
       time: `${e.start_time.slice(0, 5)}-${e.end_time.slice(0, 5)}`,
+      start_time: e.start_time.slice(0, 5),
+      end_time: e.end_time.slice(0, 5),
       slot_duration_min: slotMinutes, playlist_title: playlist?.title || "Unknown",
       playlist_id: e.playlist_id, song_count: stats.song_count,
       music_duration_min: stats.total_duration_min, coverage_percent: coveragePercent,
-      needs_more_music: coveragePercent < 80, is_active: e.is_active,
+      needs_more_music: coveragePercent < 80, is_active: e.is_active, color: e.color,
     };
   });
 
@@ -1148,7 +1188,18 @@ async function executeListPlaylists(args: { limit?: number }, supabaseUrl: strin
   const sb = getServiceClient(supabaseUrl);
   const { data, error } = await sb.from("playlists").select("id, title, description, cover_image_url").order("title").limit(args.limit || 50);
   if (error) return { error: error.message };
-  return { playlists: data || [], count: data?.length || 0 };
+  // Enrich with song counts
+  const playlistIds = (data || []).map(p => p.id);
+  const { data: pSongs } = await sb.from("playlist_songs").select("playlist_id, song_id").in("playlist_id", playlistIds.length > 0 ? playlistIds : ["none"]);
+  const countMap: Record<string, number> = {};
+  for (const ps of (pSongs || [])) {
+    countMap[ps.playlist_id] = (countMap[ps.playlist_id] || 0) + 1;
+  }
+  const playlists = (data || []).map(p => ({
+    ...p,
+    song_count: countMap[p.id] || 0,
+  }));
+  return { playlists, count: playlists.length, tip: "Use playlist IDs with create_schedule_entry to assign them to time slots." };
 }
 
 async function executeCreateScheduleEntry(args: { profile_id: string; playlist_id: string; day_of_week: number; start_time: string; end_time: string; color?: string }, supabaseUrl: string) {
@@ -1173,6 +1224,27 @@ async function executeDeleteScheduleEntry(args: { entry_id: string }, supabaseUr
   return { success: true, message: "Schedule entry deleted." };
 }
 
+async function executeUpdateScheduleEntry(args: { entry_id: string; playlist_id?: string; day_of_week?: number; start_time?: string; end_time?: string; color?: string; is_active?: boolean }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const updates: Record<string, any> = {};
+  if (args.playlist_id !== undefined) updates.playlist_id = args.playlist_id;
+  if (args.day_of_week !== undefined) updates.day_of_week = args.day_of_week;
+  if (args.start_time !== undefined) updates.start_time = args.start_time;
+  if (args.end_time !== undefined) updates.end_time = args.end_time;
+  if (args.color !== undefined) updates.color = args.color;
+  if (args.is_active !== undefined) updates.is_active = args.is_active;
+  if (Object.keys(updates).length === 0) return { error: "No fields to update" };
+  const { error } = await sb.from("schedule_entries").update(updates).eq("id", args.entry_id);
+  if (error) return { error: `Failed to update schedule entry: ${error.message}` };
+  return { success: true, entry_id: args.entry_id, updated_fields: Object.keys(updates), message: `Schedule entry updated: ${Object.keys(updates).join(", ")}` };
+}
+
+async function executeClearSchedule(args: { profile_id: string }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const { error, count } = await sb.from("schedule_entries").delete().eq("profile_id", args.profile_id);
+  if (error) return { error: `Failed to clear schedule: ${error.message}` };
+  return { success: true, message: `Schedule cleared. All entries removed.` };
+}
 
 
 function keyDistance(a: string, b: string): number {
@@ -1554,7 +1626,9 @@ Deno.serve(async (req) => {
               update_objective_progress: "Updating objective progress...",
               list_playlists: "Listing available playlists...",
               create_schedule_entry: "Creating schedule entry...",
+              update_schedule_entry: "Updating schedule entry...",
               delete_schedule_entry: "Deleting schedule entry...",
+              clear_schedule: "Clearing entire schedule...",
             };
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
@@ -1581,7 +1655,9 @@ Deno.serve(async (req) => {
                 case "update_objective_progress": result = await executeUpdateObjectiveProgress(args, supabaseUrl); break;
                 case "list_playlists": result = await executeListPlaylists(args, supabaseUrl); break;
                 case "create_schedule_entry": result = await executeCreateScheduleEntry(args, supabaseUrl); break;
+                case "update_schedule_entry": result = await executeUpdateScheduleEntry(args, supabaseUrl); break;
                 case "delete_schedule_entry": result = await executeDeleteScheduleEntry(args, supabaseUrl); break;
+                case "clear_schedule": result = await executeClearSchedule(args, supabaseUrl); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) { result = { error: `Tool error: ${e.message}` }; }
