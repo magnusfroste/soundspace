@@ -1526,6 +1526,9 @@ Deno.serve(async (req) => {
               save_memory: "Saving memory...",
               list_objectives: "Checking objectives...",
               update_objective_progress: "Updating objective progress...",
+              list_playlists: "Listing available playlists...",
+              create_schedule_entry: "Creating schedule entry...",
+              delete_schedule_entry: "Deleting schedule entry...",
             };
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
