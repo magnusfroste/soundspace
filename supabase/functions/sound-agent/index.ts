@@ -1118,7 +1118,36 @@ async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: s
   };
 }
 
-const KEY_ORDER = ["C", "G", "D", "A", "E", "B", "F#", "Db", "Ab", "Eb", "Bb", "F"];
+async function executeListPlaylists(args: { limit?: number }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const { data, error } = await sb.from("playlists").select("id, title, description, cover_image_url").order("title").limit(args.limit || 50);
+  if (error) return { error: error.message };
+  return { playlists: data || [], count: data?.length || 0 };
+}
+
+async function executeCreateScheduleEntry(args: { profile_id: string; playlist_id: string; day_of_week: number; start_time: string; end_time: string; color?: string }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const { data, error } = await sb.from("schedule_entries").insert({
+    profile_id: args.profile_id,
+    playlist_id: args.playlist_id,
+    day_of_week: args.day_of_week,
+    start_time: args.start_time,
+    end_time: args.end_time,
+    color: args.color || "#9b87f5",
+  }).select("id").single();
+  if (error) return { error: `Failed to create schedule entry: ${error.message}` };
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  return { success: true, entry_id: data.id, message: `Schedule entry created: ${dayNames[args.day_of_week]} ${args.start_time}-${args.end_time}` };
+}
+
+async function executeDeleteScheduleEntry(args: { entry_id: string }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const { error } = await sb.from("schedule_entries").delete().eq("id", args.entry_id);
+  if (error) return { error: `Failed to delete schedule entry: ${error.message}` };
+  return { success: true, message: "Schedule entry deleted." };
+}
+
+
 
 function keyDistance(a: string, b: string): number {
   if (!a || !b) return 6;
