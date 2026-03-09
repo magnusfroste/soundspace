@@ -1640,7 +1640,9 @@ Deno.serve(async (req) => {
                 case "update_objective_progress": result = await executeUpdateObjectiveProgress(args, supabaseUrl); break;
                 case "list_playlists": result = await executeListPlaylists(args, supabaseUrl); break;
                 case "create_schedule_entry": result = await executeCreateScheduleEntry(args, supabaseUrl); break;
+                case "update_schedule_entry": result = await executeUpdateScheduleEntry(args, supabaseUrl); break;
                 case "delete_schedule_entry": result = await executeDeleteScheduleEntry(args, supabaseUrl); break;
+                case "clear_schedule": result = await executeClearSchedule(args, supabaseUrl); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) { result = { error: `Tool error: ${e.message}` }; }
