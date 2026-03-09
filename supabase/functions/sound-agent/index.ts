@@ -14,6 +14,9 @@ function getServiceClient(supabaseUrl: string) {
 // ── System prompt builder ───────────────────────────────────────────────
 
 function buildSystemPrompt(context: { objectives?: any[]; skills?: any[]; memories?: any[] }): string {
+  const currentTime = new Date().toISOString();
+  const timeContext = `[Current UTC time: ${currentTime}] Daily cron automation runs at 03:00 UTC.\n`;
+  
   let contextBlock = "";
 
   if (context.objectives?.length) {
@@ -38,7 +41,7 @@ function buildSystemPrompt(context: { objectives?: any[]; skills?: any[]; memori
     }
   }
 
-  return BASE_SYSTEM_PROMPT + contextBlock + SYSTEM_PROMPT_FOOTER;
+  return timeContext + BASE_SYSTEM_PROMPT + contextBlock + SYSTEM_PROMPT_FOOTER;
 }
 
 const BASE_SYSTEM_PROMPT = `[Current time: ${new Date().toISOString()} (UTC)] Cron scheduled: 03:00 UTC daily.
