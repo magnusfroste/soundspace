@@ -124,8 +124,12 @@ export function useAgentChat() {
     },
     onSuccess: (conv) => {
       creatingConversationRef.current = false;
+      // Add new conversation to cache immediately (prevents race condition with useEffect)
+      qc.setQueryData<AgentConversation[]>(["agent-conversations", user?.id], (old) => 
+        old ? [conv, ...old] : [conv]
+      );
+      // Set active after cache is updated
       setActiveConv(conv.id);
-      qc.invalidateQueries({ queryKey: ["agent-conversations"] });
     },
     onError: () => {
       creatingConversationRef.current = false;
