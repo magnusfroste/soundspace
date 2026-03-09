@@ -1291,6 +1291,137 @@ async function executeClearSchedule(args: { profile_id: string }, supabaseUrl: s
   return { success: true, message: `Schedule cleared. All entries removed.` };
 }
 
+async function executeAnalyzePlayLogs(args: { days?: number; user_id?: string }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const daysBack = args.days || 30;
+  const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString();
+  
+  let query = sb.from("play_logs").select("song_id, duration_listened, played_at").gte("played_at", since);
+  if (args.user_id) query = query.eq("user_id", args.user_id);
+  const { data: logs, error } = await query.limit(1000);
+  if (error) return { error: error.message };
+  if (!logs || logs.length === 0) return { total_plays: 0, period_days: daysBack, message: "No play data in this period." };
+
+  const songIds = [...new Set(logs.map(l => l.song_id))];
+  const { data: songs } = await sb.from("songs").select("id, title, genre, mood, bpm").in("id", songIds);
+  const songMap = new Map((songs || []).map(s => [s.id, s]));
+
+  const songPlays: Record<string, { count: number; duration: number; title: string; genre?: string; mood?: string }> = {};
+  const genrePlays: Record<string, { count: number; duration: number }> = {};
+  const moodPlays: Record<string, { count: number; duration: number }> = {};
+  const bpmBuckets: Record<string, number> = { "60-85": 0, "85-100": 0, "100-125": 0, "125+": 0 };
+
+  for (const log of logs) {
+    const song = songMap.get(log.song_id);
+    const dur = log.duration_listened || 0;
+    const title = song?.title || "Unknown";
+    
+    if (!songPlays[log.song_id]) songPlays[log.song_id] = { count: 0, duration: 0, title, genre: song?.genre || undefined, mood: song?.mood || undefined };
+    songPlays[log.song_id].count++;
+    songPlays[log.song_id].duration += dur;
+
+    const genre = song?.genre || "Untagged";
+    if (!genrePlays[genre]) genrePlays[genre] = { count: 0, duration: 0 };
+    genrePlays[genre].count++;
+    genrePlays[genre].duration += dur;
+
+    const mood = song?.mood || "Untagged";
+    if (!moodPlays[mood]) moodPlays[mood] = { count: 0, duration: 0 };
+    moodPlays[mood].count++;
+    moodPlays[mood].duration += dur;
+
+    if (song?.bpm) {
+      if (song.bpm < 85) bpmBuckets["60-85"]++;
+      else if (song.bpm < 100) bpmBuckets["85-100"]++;
+      else if (song.bpm < 125) bpmBuckets["100-125"]++;
+      else bpmBuckets["125+"]++;
+    }
+  }
+
+  const topSongs = Object.entries(songPlays).sort((a, b) => b[1].count - a[1].count).slice(0, 10).map(([id, s]) => ({ song_id: id, ...s, duration_min: Math.round(s.duration / 60) }));
+  const topGenres = Object.entries(genrePlays).sort((a, b) => b[1].count - a[1].count).map(([g, s]) => ({ genre: g, plays: s.count, duration_min: Math.round(s.duration / 60) }));
+  const topMoods = Object.entries(moodPlays).sort((a, b) => b[1].count - a[1].count).map(([m, s]) => ({ mood: m, plays: s.count, duration_min: Math.round(s.duration / 60) }));
+
+  return {
+    period_days: daysBack, total_plays: logs.length,
+    total_listen_minutes: Math.round(logs.reduce((s, l) => s + (l.duration_listened || 0), 0) / 60),
+    top_songs: topSongs, genre_breakdown: topGenres, mood_breakdown: topMoods, bpm_distribution: bpmBuckets,
+    insight: topGenres.length > 0 ? `Most played genre: ${topGenres[0].genre} (${topGenres[0].plays} plays). Consider generating more ${topGenres[0].genre} tracks.` : "Not enough data for insights yet.",
+  };
+}
+
+async function executeProactiveScan(args: { profile_id?: string }, supabaseUrl: string, userId?: string | null) {
+  const suggestions: { priority: number; category: string; message: string; action?: string }[] = [];
+
+  // 1. Schedule analysis
+  const scheduleResult = await executeReadSchedule(args, supabaseUrl, userId);
+  const profileId = scheduleResult.profile_id;
+
+  if (scheduleResult.total_slots === 0) {
+    suggestions.push({ priority: 1, category: "schedule", message: "No schedule configured. Your music won't auto-play without a schedule.", action: "create_schedule" });
+  } else if (scheduleResult.under_covered_slots > 0) {
+    suggestions.push({ priority: 2, category: "schedule", message: `${scheduleResult.under_covered_slots} time slot(s) have less than 80% music coverage.`, action: "fill_schedule_gaps" });
+  }
+
+  // Check for empty weekdays
+  if (scheduleResult.schedule) {
+    const scheduledDays = new Set(scheduleResult.schedule.map((s: any) => s.day_of_week));
+    const missingWeekdays = [1, 2, 3, 4, 5].filter(d => !scheduledDays.has(d));
+    if (missingWeekdays.length > 0) {
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      suggestions.push({ priority: 2, category: "schedule", message: `No music scheduled for: ${missingWeekdays.map(d => dayNames[d]).join(", ")}`, action: "add_schedule_entries" });
+    }
+  }
+
+  // 2. Library health
+  const libraryResult = await executeAnalyzeLibrary(supabaseUrl);
+  if (libraryResult.total_tracks === 0) {
+    suggestions.push({ priority: 1, category: "library", message: "Library is empty! Generate some tracks to get started.", action: "generate_tracks" });
+  } else {
+    if (libraryResult.gaps?.missing_genres?.length > 0) {
+      suggestions.push({ priority: 3, category: "library", message: `Missing genres: ${libraryResult.gaps.missing_genres.join(", ")}. More variety = better scheduling.`, action: "generate_missing_genres" });
+    }
+    if (libraryResult.gaps?.empty_bpm_ranges?.length > 0) {
+      suggestions.push({ priority: 4, category: "library", message: `No tracks in BPM range(s): ${libraryResult.gaps.empty_bpm_ranges.join(", ")}`, action: "fill_bpm_gaps" });
+    }
+  }
+
+  // 3. Incomplete metadata
+  const incompleteResult = await executeFindIncomplete({ limit: 50 }, supabaseUrl);
+  if (incompleteResult.incomplete_count > 0) {
+    const counts = incompleteResult.counts;
+    const issues: string[] = [];
+    if (counts.lyrics > 0) issues.push(`${counts.lyrics} missing lyrics`);
+    if (counts.cover > 0) issues.push(`${counts.cover} missing covers`);
+    if (counts.genre > 0) issues.push(`${counts.genre} untagged genre`);
+    if (counts.bpm > 0) issues.push(`${counts.bpm} missing BPM`);
+    suggestions.push({ priority: 3, category: "metadata", message: `${incompleteResult.incomplete_count} songs need attention: ${issues.join(", ")}`, action: "fix_metadata" });
+  }
+
+  // 4. Play trends (last 7 days)
+  const playResult = await executeAnalyzePlayLogs({ days: 7 }, supabaseUrl);
+  if (playResult.total_plays > 0 && playResult.top_songs?.length > 0) {
+    const topGenre = playResult.genre_breakdown?.[0];
+    if (topGenre) {
+      const genreCount = libraryResult.genre_distribution?.[topGenre.genre] || 0;
+      if (genreCount < 10) {
+        suggestions.push({ priority: 2, category: "trending", message: `"${topGenre.genre}" is your most-played genre (${topGenre.plays} plays this week) but you only have ${genreCount} tracks. Generate more!`, action: "generate_popular_genre" });
+      }
+    }
+  }
+
+  suggestions.sort((a, b) => a.priority - b.priority);
+
+  return {
+    profile_id: profileId,
+    total_suggestions: suggestions.length,
+    suggestions: suggestions.slice(0, 5),
+    summary: suggestions.length === 0
+      ? "Everything looks great! Your library, schedule, and metadata are all in good shape. 🎉"
+      : `Found ${suggestions.length} improvement(s). Top priority: ${suggestions[0].message}`,
+  };
+}
+
 
 function keyDistance(a: string, b: string): number {
   if (!a || !b) return 6;
