@@ -1184,7 +1184,18 @@ async function executeListPlaylists(args: { limit?: number }, supabaseUrl: strin
   const sb = getServiceClient(supabaseUrl);
   const { data, error } = await sb.from("playlists").select("id, title, description, cover_image_url").order("title").limit(args.limit || 50);
   if (error) return { error: error.message };
-  return { playlists: data || [], count: data?.length || 0 };
+  // Enrich with song counts
+  const playlistIds = (data || []).map(p => p.id);
+  const { data: pSongs } = await sb.from("playlist_songs").select("playlist_id, song_id").in("playlist_id", playlistIds.length > 0 ? playlistIds : ["none"]);
+  const countMap: Record<string, number> = {};
+  for (const ps of (pSongs || [])) {
+    countMap[ps.playlist_id] = (countMap[ps.playlist_id] || 0) + 1;
+  }
+  const playlists = (data || []).map(p => ({
+    ...p,
+    song_count: countMap[p.id] || 0,
+  }));
+  return { playlists, count: playlists.length, tip: "Use playlist IDs with create_schedule_entry to assign them to time slots." };
 }
 
 async function executeCreateScheduleEntry(args: { profile_id: string; playlist_id: string; day_of_week: number; start_time: string; end_time: string; color?: string }, supabaseUrl: string) {
