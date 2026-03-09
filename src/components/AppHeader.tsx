@@ -1,12 +1,9 @@
-import { LayoutDashboard, MessageSquare } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { LayoutDashboard, MessageSquare, User } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { NavLink } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
 import { useProfile } from "@/hooks/useProfile";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -17,9 +14,7 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ viewMode, onViewModeChange, showChatToggle }: AppHeaderProps) {
-  const { user, signOut } = useAuth();
-  const navigate = useNavigate();
-
+  const { user } = useAuth();
   const { data: profile } = useProfile(user?.id);
 
   return (
@@ -59,10 +54,19 @@ export function AppHeader({ viewMode, onViewModeChange, showChatToggle }: AppHea
         )}
       </div>
 
-      {/* Right side — theme toggle + profile */}
+      {/* Right side — theme toggle + profile access */}
       <div className="flex items-center gap-2">
         <ThemeToggle />
-        <NavLink to="/profile" className="hover:opacity-80 transition-opacity">
+
+        <NavLink
+          to="/profile"
+          className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <User className="h-3.5 w-3.5" />
+          Profile
+        </NavLink>
+
+        <NavLink to="/profile" className="hover:opacity-80 transition-opacity" aria-label="Open profile page">
           <Avatar className="h-7 w-7">
             {profile?.avatar_url && <AvatarImage src={profile.avatar_url} alt={profile?.display_name ?? "User"} />}
             <AvatarFallback className="text-[10px] bg-muted">
