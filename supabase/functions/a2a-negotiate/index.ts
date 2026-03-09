@@ -337,7 +337,16 @@ Important: Generate the track, save it to the library, and report the audio URL 
     );
   }
 
-  if (!agentResult.audioUrls.length) {
+  // Fallback: sometimes the agent reports URLs in text rather than structured `audio_urls`
+  let audioUrls = agentResult.audioUrls;
+  if (!audioUrls.length && agentResult.content) {
+    const matches = agentResult.content.match(
+      /https?:\/\/[^\s"'()]+?\.(?:mp3|wav|m4a|ogg)(?:\?[^\s"'()]*)?/gi
+    );
+    if (matches?.length) audioUrls = Array.from(new Set(matches));
+  }
+
+  if (!audioUrls.length) {
     console.warn("[a2a] Agent completed but no audio URLs returned");
     return new Response(
       JSON.stringify({
@@ -355,15 +364,15 @@ Important: Generate the track, save it to the library, and report the audio URL 
   const result = {
     status: "completed",
     result: {
-      audio_url: agentResult.audioUrls[0],
-      audio_urls: agentResult.audioUrls,
+      audio_url: audioUrls[0],
+      audio_urls: audioUrls,
       title: prompt.slice(0, 60),
       duration: duration || 60,
       agent_response: agentResult.content.slice(0, 1000),
     },
   };
 
-  console.log(`[a2a] Task completed via Sound Agent — ${agentResult.audioUrls.length} audio(s)`);
+  console.log(`[a2a] Task completed via Sound Agent — ${audioUrls.length} audio(s)`);
 
   return new Response(JSON.stringify(result), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
