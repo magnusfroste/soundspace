@@ -593,7 +593,16 @@ async function findReferenceAudio(supabaseUrl: string, genre?: string, mood?: st
 }
 
 /** Fetch matching skills and extract parameters */
-async function getSkillParameters(supabaseUrl: string, userId: string, genre?: string, mood?: string): Promise<{ bpm?: number; key_scale?: string; time_signature?: string }> {
+async function getSkillParameters(supabaseUrl: string, userId: string, genre?: string, mood?: string): Promise<{
+  bpm?: number;
+  key_scale?: string;
+  time_signature?: string;
+  inference_steps?: number;
+  cover_strength?: number;
+  task_type?: string;
+  repainting_start?: number;
+  repainting_end?: number;
+}> {
   const sb = getServiceClient(supabaseUrl);
   const { data: skills } = await sb.from("agent_skills")
     .select("name, content, metadata")
@@ -612,7 +621,7 @@ async function getSkillParameters(supabaseUrl: string, userId: string, genre?: s
   if (!matchingSkill) return {};
   
   const meta = matchingSkill.metadata as Record<string, any> || {};
-  const params: { bpm?: number; key_scale?: string; time_signature?: string } = {};
+  const params: any = {};
   
   // Extract BPM (handle range like "90-100" or single value)
   if (meta.bpm_range) {
@@ -625,6 +634,13 @@ async function getSkillParameters(supabaseUrl: string, userId: string, genre?: s
   if (meta.key) params.key_scale = meta.key;
   if (meta.time_signature) params.time_signature = meta.time_signature;
   
+  // ACE-Step specific parameters
+  if (meta.inference_steps) params.inference_steps = parseInt(meta.inference_steps, 10);
+  if (meta.cover_strength !== undefined) params.cover_strength = parseFloat(meta.cover_strength);
+  if (meta.task_type) params.task_type = meta.task_type;
+  if (meta.repainting_start !== undefined) params.repainting_start = parseInt(meta.repainting_start, 10);
+  if (meta.repainting_end !== undefined) params.repainting_end = parseInt(meta.repainting_end, 10);
+  
   console.log(`Skill "${matchingSkill.name}" injected params:`, params);
   return params;
 }
@@ -633,9 +649,22 @@ async function getSkillParameters(supabaseUrl: string, userId: string, genre?: s
 async function generateWithBatch(
   acestepProxy: string,
   headers: Record<string, string>,
-  params: { caption: string; lyrics: string; duration: number; bpm: number; keyScale: string; timeSig: string; referenceAudioUrl?: string }
+  params: {
+    caption: string;
+    lyrics: string;
+    duration: number;
+    bpm: number;
+    keyScale: string;
+    timeSig: string;
+    referenceAudioUrl?: string;
+    inferenceSteps?: number;
+    coverStrength?: number;
+    taskType?: string;
+    repaintingStart?: number;
+    repaintingEnd?: number;
+  }
 ): Promise<{ audioBlob: ArrayBuffer; qualityScore: number; metadata: any } | { error: string }> {
-  const taskType = params.referenceAudioUrl ? "cover" : "text2music";
+  const taskType = params.taskType || (params.referenceAudioUrl ? "cover" : "text2music");
   const body: Record<string, any> = {
     task_type: taskType,
     caption: params.caption,
@@ -645,14 +674,20 @@ async function generateWithBatch(
     keyscale: params.keyScale,
     timesignature: params.timeSig,
     batch_size: BATCH_SIZE,
-    inference_steps: 100,
+    inference_steps: params.inferenceSteps || 100,
     thinking: true,
   };
   
   // Add reference audio for Cover mode
   if (params.referenceAudioUrl) {
     body.audio_url = params.referenceAudioUrl;
-    body.audio_cover_strength = 0.5; // Moderate influence
+    body.audio_cover_strength = params.coverStrength ?? 0.5;
+  }
+  
+  // Repaint parameters
+  if (taskType === "repaint") {
+    if (params.repaintingStart !== undefined) body.repainting_start = params.repaintingStart;
+    if (params.repaintingEnd !== undefined) body.repainting_end = params.repaintingEnd;
   }
 
   const releaseRes = await fetch(acestepProxy, {
@@ -739,7 +774,7 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
   const lyrics = applyLyricsStructure(args.lyrics, args.genre);
   
   // 2. Get skill parameters (if user_id available)
-  let skillParams: { bpm?: number; key_scale?: string; time_signature?: string } = {};
+  let skillParams: any = {};
   if (userId) {
     skillParams = await getSkillParameters(supabaseUrl, userId, args.genre, args.mood);
   }
@@ -748,10 +783,15 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
   const bpm = args.bpm || skillParams.bpm || 100;
   const keyScale = args.key_scale || skillParams.key_scale || "C major";
   const timeSig = args.time_signature || skillParams.time_signature || "4/4";
+  const inferenceSteps = skillParams.inference_steps || 100;
+  const coverStrength = skillParams.cover_strength;
+  const taskType = skillParams.task_type;
+  const repaintingStart = skillParams.repainting_start;
+  const repaintingEnd = skillParams.repainting_end;
   
-  // 3. Find reference audio for Cover mode
+  // 3. Find reference audio for Cover mode (unless task_type already set by skill)
   let referenceAudioUrl: string | undefined;
-  if (args.genre || args.mood) {
+  if (!taskType && (args.genre || args.mood)) {
     const refTrack = await findReferenceAudio(supabaseUrl, args.genre, args.mood, bpm);
     if (refTrack) {
       referenceAudioUrl = refTrack.url;
@@ -767,10 +807,11 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
   
   while (attempts < MAX_REGENERATION_ATTEMPTS) {
     attempts++;
-    console.log(`Generation attempt ${attempts}/${MAX_REGENERATION_ATTEMPTS}`);
+    console.log(`Generation attempt ${attempts}/${MAX_REGENERATION_ATTEMPTS}, inference_steps=${inferenceSteps}`);
     
     const result = await generateWithBatch(acestepProxy, headers, {
-      caption, lyrics, duration, bpm, keyScale, timeSig, referenceAudioUrl
+      caption, lyrics, duration, bpm, keyScale, timeSig, referenceAudioUrl,
+      inferenceSteps, coverStrength, taskType, repaintingStart, repaintingEnd
     });
     
     if ("error" in result) {
