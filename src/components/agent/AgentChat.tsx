@@ -88,6 +88,7 @@ export function AgentChat({ fullWidth, agentChat: externalChat }: AgentChatProps
           onKeyDown={handleKeyDown}
           onSend={handleSend}
           maxWidth="max-w-2xl"
+          inputRef={inputRef}
         />
       </div>
     );
