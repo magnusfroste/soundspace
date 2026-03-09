@@ -302,6 +302,14 @@ export default function AdminIntegrations() {
         <FugaCard />
         <DistroKidCard />
       </IntegrationSection>
+
+      <IntegrationSection
+        icon={Network}
+        title="A2A Protocol"
+        description="Agent-to-Agent integration for external music generation requests"
+      >
+        <A2ACard />
+      </IntegrationSection>
     </div>
   );
 }
