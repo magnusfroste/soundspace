@@ -222,6 +222,7 @@ function ChatInput({
   onKeyDown,
   onSend,
   maxWidth,
+  inputRef,
 }: {
   input: string;
   isGenerating: boolean;
@@ -229,6 +230,7 @@ function ChatInput({
   onKeyDown: (e: React.KeyboardEvent) => void;
   onSend: () => void;
   maxWidth: string;
+  inputRef?: React.RefObject<HTMLTextAreaElement>;
 }) {
   return (
     <div className="border-t border-border p-4 flex-shrink-0">
