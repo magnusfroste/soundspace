@@ -1084,13 +1084,22 @@ async function executeAnalyzeLibrary(supabaseUrl: string) {
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: string) {
+async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: string, userId?: string | null) {
   const sb = getServiceClient(supabaseUrl);
-  let query = sb.from("schedule_entries").select("id, day_of_week, start_time, end_time, is_active, playlist_id, color").order("day_of_week").order("start_time");
-  if (args.profile_id) query = query.eq("profile_id", args.profile_id);
+  
+  // Resolve profile_id if not provided
+  let profileId = args.profile_id;
+  if (!profileId && userId) {
+    const { data: profile } = await sb.from("profiles").select("id").eq("user_id", userId).maybeSingle();
+    profileId = profile?.id;
+  }
+  if (!profileId) return { total_slots: 0, message: "No profile found. Cannot read schedule.", profile_id: null };
+
+  let query = sb.from("schedule_entries").select("id, day_of_week, start_time, end_time, is_active, playlist_id, color, profile_id").order("day_of_week").order("start_time");
+  query = query.eq("profile_id", profileId);
   const { data: entries, error } = await query;
   if (error) return { error: error.message };
-  if (!entries || entries.length === 0) return { total_slots: 0, message: "No schedule entries found." };
+  if (!entries || entries.length === 0) return { total_slots: 0, profile_id: profileId, message: "No schedule entries found. Use create_schedule_entry with this profile_id to add entries." };
 
   const playlistIds = [...new Set(entries.map(e => e.playlist_id))];
   const { data: playlists } = await sb.from("playlists").select("id, title").in("id", playlistIds);
