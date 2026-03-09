@@ -774,7 +774,7 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
   const lyrics = applyLyricsStructure(args.lyrics, args.genre);
   
   // 2. Get skill parameters (if user_id available)
-  let skillParams: { bpm?: number; key_scale?: string; time_signature?: string } = {};
+  let skillParams: any = {};
   if (userId) {
     skillParams = await getSkillParameters(supabaseUrl, userId, args.genre, args.mood);
   }
@@ -783,10 +783,15 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
   const bpm = args.bpm || skillParams.bpm || 100;
   const keyScale = args.key_scale || skillParams.key_scale || "C major";
   const timeSig = args.time_signature || skillParams.time_signature || "4/4";
+  const inferenceSteps = skillParams.inference_steps || 100;
+  const coverStrength = skillParams.cover_strength;
+  const taskType = skillParams.task_type;
+  const repaintingStart = skillParams.repainting_start;
+  const repaintingEnd = skillParams.repainting_end;
   
-  // 3. Find reference audio for Cover mode
+  // 3. Find reference audio for Cover mode (unless task_type already set by skill)
   let referenceAudioUrl: string | undefined;
-  if (args.genre || args.mood) {
+  if (!taskType && (args.genre || args.mood)) {
     const refTrack = await findReferenceAudio(supabaseUrl, args.genre, args.mood, bpm);
     if (refTrack) {
       referenceAudioUrl = refTrack.url;
@@ -802,10 +807,11 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
   
   while (attempts < MAX_REGENERATION_ATTEMPTS) {
     attempts++;
-    console.log(`Generation attempt ${attempts}/${MAX_REGENERATION_ATTEMPTS}`);
+    console.log(`Generation attempt ${attempts}/${MAX_REGENERATION_ATTEMPTS}, inference_steps=${inferenceSteps}`);
     
     const result = await generateWithBatch(acestepProxy, headers, {
-      caption, lyrics, duration, bpm, keyScale, timeSig, referenceAudioUrl
+      caption, lyrics, duration, bpm, keyScale, timeSig, referenceAudioUrl,
+      inferenceSteps, coverStrength, taskType, repaintingStart, repaintingEnd
     });
     
     if ("error" in result) {
