@@ -1836,6 +1836,8 @@ Deno.serve(async (req) => {
                 case "update_schedule_entry": result = await executeUpdateScheduleEntry(args, supabaseUrl); break;
                 case "delete_schedule_entry": result = await executeDeleteScheduleEntry(args, supabaseUrl); break;
                 case "clear_schedule": result = await executeClearSchedule(args, supabaseUrl); break;
+                case "analyze_play_logs": result = await executeAnalyzePlayLogs(args, supabaseUrl); break;
+                case "proactive_scan": result = await executeProactiveScan(args, supabaseUrl, userId); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) { result = { error: `Tool error: ${e.message}` }; }
