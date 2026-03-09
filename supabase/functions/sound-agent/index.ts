@@ -1553,6 +1553,9 @@ Deno.serve(async (req) => {
                 case "save_memory": result = userId ? await executeSaveMemory(args, supabaseUrl, userId) : { error: "No user context" }; break;
                 case "list_objectives": result = userId ? await executeListObjectives(supabaseUrl, userId) : { objectives: [], count: 0 }; break;
                 case "update_objective_progress": result = await executeUpdateObjectiveProgress(args, supabaseUrl); break;
+                case "list_playlists": result = await executeListPlaylists(args, supabaseUrl); break;
+                case "create_schedule_entry": result = await executeCreateScheduleEntry(args, supabaseUrl); break;
+                case "delete_schedule_entry": result = await executeDeleteScheduleEntry(args, supabaseUrl); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) { result = { error: `Tool error: ${e.message}` }; }
