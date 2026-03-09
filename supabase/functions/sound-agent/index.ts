@@ -417,6 +417,56 @@ const TOOLS = [
       }
     }
   },
+  // ── Schedule management tools ──
+  {
+    type: "function",
+    function: {
+      name: "list_playlists",
+      description: "List all available playlists (admin-curated). Use to find playlist IDs for scheduling.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Max playlists to return (default 50)" }
+        },
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_schedule_entry",
+      description: "Create a schedule entry to assign a playlist to a specific day and time slot. Use this to build the weekly music schedule.",
+      parameters: {
+        type: "object",
+        properties: {
+          profile_id: { type: "string", description: "Profile ID of the business user" },
+          playlist_id: { type: "string", description: "ID of the playlist to schedule" },
+          day_of_week: { type: "number", description: "Day of week: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday" },
+          start_time: { type: "string", description: "Start time in HH:MM format (e.g. '09:00')" },
+          end_time: { type: "string", description: "End time in HH:MM format (e.g. '12:00')" },
+          color: { type: "string", description: "Optional hex color for the block (e.g. '#9b87f5')" }
+        },
+        required: ["profile_id", "playlist_id", "day_of_week", "start_time", "end_time"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_schedule_entry",
+      description: "Delete a schedule entry by ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          entry_id: { type: "string", description: "ID of the schedule entry to delete" }
+        },
+        required: ["entry_id"],
+        additionalProperties: false
+      }
+    }
+  },
   // ── Persistence tools ──
   {
     type: "function",
