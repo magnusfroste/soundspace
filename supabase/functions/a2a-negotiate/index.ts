@@ -160,9 +160,30 @@ async function consumeAgentStream(
 ): Promise<{ content: string; audioUrls: string[]; error?: string }> {
   const reader = response.body!.getReader();
   const decoder = new TextDecoder();
+
   let buffer = "";
   let content = "";
   let audioUrls: string[] = [];
+  let currentEvent: string | null = null;
+
+  const extractAudioUrls = (payload: any): string[] => {
+    const direct =
+      payload?.audio_urls ??
+      payload?.audioUrls ??
+      payload?.result?.audio_urls ??
+      payload?.result?.audioUrls;
+
+    if (Array.isArray(direct)) return direct.filter((u) => typeof u === "string");
+
+    const single =
+      payload?.audio_url ??
+      payload?.audioUrl ??
+      payload?.result?.audio_url ??
+      payload?.result?.audioUrl;
+
+    if (typeof single === "string") return [single];
+    return [];
+  };
 
   while (true) {
     const { done, value } = await reader.read();
@@ -174,20 +195,49 @@ async function consumeAgentStream(
       let line = buffer.slice(0, nlIdx);
       buffer = buffer.slice(nlIdx + 1);
       if (line.endsWith("\r")) line = line.slice(0, -1);
-      if (!line.startsWith("data: ")) continue;
-      const jsonStr = line.slice(6).trim();
-      if (jsonStr === "[DONE]") continue;
 
+      if (line.startsWith("event:")) {
+        currentEvent = line.slice("event:".length).trim() || null;
+        continue;
+      }
+
+      if (!line.startsWith("data:")) continue;
+
+      const jsonStr = line.slice("data:".length).trim();
+      if (!jsonStr || jsonStr === "[DONE]") {
+        currentEvent = null;
+        continue;
+      }
+
+      let parsed: any;
       try {
-        const parsed = JSON.parse(jsonStr);
-        if (parsed.type === "token" && parsed.content) {
-          content += parsed.content;
-        } else if (parsed.type === "done") {
-          if (parsed.audio_urls) audioUrls = parsed.audio_urls;
-        } else if (parsed.type === "error") {
-          return { content: "", audioUrls: [], error: parsed.error || "Agent error" };
-        }
-      } catch { /* partial JSON */ }
+        parsed = JSON.parse(jsonStr);
+      } catch {
+        // partial JSON; keep buffering
+        continue;
+      }
+
+      const eventType = (typeof parsed?.type === "string" ? parsed.type : currentEvent) || "";
+
+      if ((eventType === "token" || eventType === "message") && typeof parsed?.content === "string") {
+        content += parsed.content;
+      }
+
+      if (eventType === "done") {
+        const urls = extractAudioUrls(parsed);
+        if (urls.length) audioUrls = urls;
+      }
+
+      if (eventType === "error") {
+        return {
+          content: "",
+          audioUrls: [],
+          error: parsed?.error || parsed?.message || "Agent error",
+        };
+      }
+
+      // Reset after consuming a data line (SSE event applies to the subsequent data payload)
+      currentEvent = null;
     }
   }
 
