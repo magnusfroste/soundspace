@@ -249,6 +249,10 @@ Important: Generate the track, save it to the library, and report the audio URL 
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "";
 
+  // Create a unique conversation ID to prevent cached responses
+  const sb = createClient(supabaseUrl, serviceKey);
+  const conversationId = crypto.randomUUID();
+
   // Call Sound Agent edge function (streaming SSE)
   const agentResponse = await fetch(`${supabaseUrl}/functions/v1/sound-agent`, {
     method: "POST",
@@ -257,6 +261,7 @@ Important: Generate the track, save it to the library, and report the audio URL 
       Authorization: `Bearer ${serviceKey}`,
     },
     body: JSON.stringify({
+      conversation_id: conversationId, // Force new conversation to prevent caching
       messages: [{ role: "user", content: agentMessage }],
       settings: {}, // Agent reads its own settings from site_settings
     }),
