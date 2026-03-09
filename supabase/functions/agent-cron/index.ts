@@ -11,10 +11,9 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const sb = createClient(supabaseUrl, serviceKey);
 
-  console.log("[agent-cron] Starting automated objective execution");
+  console.log("[agent-cron] Starting automated objective execution (fire-and-forget)");
 
   // Fetch all active objectives with auto_execute enabled
   const { data: objectives, error } = await sb.from("agent_objectives")
@@ -37,7 +36,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  console.log(`[agent-cron] Found ${objectives.length} objective(s) to execute`);
+  console.log(`[agent-cron] Found ${objectives.length} objective(s) — firing requests`);
 
   // Fetch agent settings
   const { data: settingsRow } = await sb.from("site_settings")
@@ -53,8 +52,6 @@ Deno.serve(async (req) => {
   const results: any[] = [];
 
   for (const obj of objectives) {
-    console.log(`[agent-cron] Processing objective: "${obj.title}" for user ${obj.user_id}`);
-
     const progressSummary = obj.progress ? JSON.stringify(obj.progress) : "No progress yet";
 
     const prompt = `[AUTOMATED OBJECTIVE EXECUTION]
@@ -68,8 +65,8 @@ You are running in autonomous mode. Work toward this objective:
 Analyze what's needed, take concrete actions (generate tracks, fix metadata, fill gaps), and update the objective progress when done. Be efficient — focus on the highest-impact actions first. When done, summarize what you accomplished.`;
 
     try {
-      // Call sound-agent with the objective prompt
-      const response = await fetch(`${supabaseUrl}/functions/v1/sound-agent`, {
+      // Fire-and-forget: send request but don't await the response stream
+      fetch(`${supabaseUrl}/functions/v1/sound-agent`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -80,43 +77,49 @@ Analyze what's needed, take concrete actions (generate tracks, fix metadata, fil
           settings,
           user_id: obj.user_id,
         }),
+      }).then(async (res) => {
+        // Background: consume stream so it completes, then log
+        try {
+          const reader = res.body!.getReader();
+          while (true) {
+            const { done } = await reader.read();
+            if (done) break;
+          }
+          console.log(`[agent-cron][bg] Completed objective "${obj.title}"`);
+          await sb.from("agent_cron_logs").insert({
+            objective_id: obj.id,
+            objective_title: obj.title,
+            status: "completed",
+            user_id: obj.user_id,
+          });
+        } catch (e) {
+          const errMsg = e instanceof Error ? e.message : "Unknown";
+          console.error(`[agent-cron][bg] Error for "${obj.title}":`, errMsg);
+          await sb.from("agent_cron_logs").insert({
+            objective_id: obj.id,
+            objective_title: obj.title,
+            status: "error",
+            error: errMsg,
+            user_id: obj.user_id,
+          });
+        }
+      }).catch((e) => {
+        console.error(`[agent-cron][bg] Fetch failed for "${obj.title}":`, e);
       });
 
-      if (!response.ok) {
-        console.error(`[agent-cron] sound-agent failed for objective ${obj.id}: ${response.status}`);
-        results.push({ objective_id: obj.id, status: "error", error: `HTTP ${response.status}` });
-        continue;
-      }
+      console.log(`[agent-cron] Fired objective "${obj.title}" for user ${obj.user_id}`);
+      results.push({ objective_id: obj.id, title: obj.title, status: "fired" });
 
-      // Consume SSE stream to completion (we don't display it, just let it run)
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder();
-      let lastContent = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const text = decoder.decode(value, { stream: true });
-        // Extract last content for logging
-        const tokenMatch = text.match(/"content":"([^"]+)"/g);
-        if (tokenMatch) lastContent = tokenMatch[tokenMatch.length - 1];
-      }
-
-      console.log(`[agent-cron] Completed objective "${obj.title}"`);
-      const r = { objective_id: obj.id, title: obj.title, status: "completed", user_id: obj.user_id };
-      results.push(r);
-      await sb.from("agent_cron_logs").insert({ objective_id: obj.id, objective_title: obj.title, status: "completed", user_id: obj.user_id });
     } catch (e) {
-      console.error(`[agent-cron] Error processing objective ${obj.id}:`, e);
+      console.error(`[agent-cron] Error firing objective ${obj.id}:`, e);
       const errMsg = e instanceof Error ? e.message : "Unknown";
       results.push({ objective_id: obj.id, status: "error", error: errMsg });
-      await sb.from("agent_cron_logs").insert({ objective_id: obj.id, objective_title: obj.title, status: "error", error: errMsg, user_id: obj.user_id });
     }
   }
 
-  console.log(`[agent-cron] Finished. Results:`, JSON.stringify(results));
+  console.log(`[agent-cron] All ${results.length} objective(s) fired. Returning immediately.`);
 
-  return new Response(JSON.stringify({ processed: results.length, results }), {
+  return new Response(JSON.stringify({ fired: results.length, results }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
