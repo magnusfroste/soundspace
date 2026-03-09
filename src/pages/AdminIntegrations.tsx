@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plug, Sparkles, RefreshCw, CheckCircle2, XCircle, AlertCircle, Brain, Music, Truck } from "lucide-react";
+import { Plug, Sparkles, RefreshCw, CheckCircle2, XCircle, AlertCircle, Brain, Music, Truck, Network } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { isIntegrationEnabled, setIntegrationEnabled } from "@/lib/integrations-state";
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LocalAICard, MubertCard, MusicgenCard, AceStepCard, OpenAICard, GeminiCard, LovableAICard, RevelatorCard, FugaCard, DistroKidCard } from "@/components/integrations";
+import { LocalAICard, MubertCard, MusicgenCard, AceStepCard, OpenAICard, GeminiCard, LovableAICard, RevelatorCard, FugaCard, DistroKidCard, A2ACard } from "@/components/integrations";
 
 interface ElevenLabsStatus {
   connected: boolean;
@@ -301,6 +301,14 @@ export default function AdminIntegrations() {
         <RevelatorCard />
         <FugaCard />
         <DistroKidCard />
+      </IntegrationSection>
+
+      <IntegrationSection
+        icon={Network}
+        title="A2A Protocol"
+        description="Agent-to-Agent integration for external music generation requests"
+      >
+        <A2ACard />
       </IntegrationSection>
     </div>
   );

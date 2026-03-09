@@ -289,6 +289,32 @@ async function handleTask(
   });
 }
 
+// ── Request logging ─────────────────────────────────────────────────────
+async function logRequest(
+  supabaseUrl: string,
+  type: string,
+  skillId: string | null,
+  ip: string,
+  status: string,
+  error?: string,
+  resultSummary?: Record<string, unknown>
+) {
+  try {
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const sb = createClient(supabaseUrl, serviceKey);
+    await sb.from("a2a_request_logs").insert({
+      type,
+      skill_id: skillId,
+      ip_address: ip,
+      status,
+      error: error || null,
+      result_summary: resultSummary || {},
+    });
+  } catch (e) {
+    console.error("[a2a] Failed to log request:", e);
+  }
+}
+
 // ── Main handler ────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -300,7 +326,10 @@ Deno.serve(async (req) => {
     req.headers.get("cf-connecting-ip") ||
     "unknown";
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+
   if (!checkRateLimit(clientIp)) {
+    await logRequest(supabaseUrl, "rate_limited", null, clientIp, "rejected", "Rate limit exceeded");
     return new Response(
       JSON.stringify({ error: "Rate limit exceeded (30 req/min)" }),
       {
@@ -314,14 +343,22 @@ Deno.serve(async (req) => {
     );
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-
   if (req.method === "GET") {
+    await logRequest(supabaseUrl, "discovery", null, clientIp, "completed");
     return handleGet(supabaseUrl);
   }
 
   if (req.method === "POST") {
-    return handlePost(req, supabaseUrl);
+    const response = await handlePost(req, supabaseUrl);
+    // Log POST requests with parsed info
+    try {
+      const cloned = response.clone();
+      const body = await cloned.json();
+      const type = body.type || "task";
+      const status = response.status >= 400 ? "error" : "completed";
+      await logRequest(supabaseUrl, type, body.skill_id || body.result?.title || null, clientIp, status, body.error, body.result ? { title: body.result.title, genre: body.result.genre } : undefined);
+    } catch { /* ignore logging failures */ }
+    return response;
   }
 
   return new Response(

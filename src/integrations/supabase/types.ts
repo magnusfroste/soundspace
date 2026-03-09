@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      a2a_request_logs: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          ip_address: string | null
+          result_summary: Json | null
+          skill_id: string | null
+          status: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          ip_address?: string | null
+          result_summary?: Json | null
+          skill_id?: string | null
+          status?: string
+          type?: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          ip_address?: string | null
+          result_summary?: Json | null
+          skill_id?: string | null
+          status?: string
+          type?: string
+        }
+        Relationships: []
+      }
       agent_conversations: {
         Row: {
           created_at: string
