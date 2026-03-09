@@ -130,6 +130,7 @@ export function useAgentChat() {
       );
       // Set active after cache is updated
       setActiveConv(conv.id);
+      toast.success("New conversation created");
     },
     onError: () => {
       creatingConversationRef.current = false;
