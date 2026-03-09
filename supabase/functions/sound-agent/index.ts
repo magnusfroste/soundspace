@@ -1209,6 +1209,27 @@ async function executeDeleteScheduleEntry(args: { entry_id: string }, supabaseUr
   return { success: true, message: "Schedule entry deleted." };
 }
 
+async function executeUpdateScheduleEntry(args: { entry_id: string; playlist_id?: string; day_of_week?: number; start_time?: string; end_time?: string; color?: string; is_active?: boolean }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const updates: Record<string, any> = {};
+  if (args.playlist_id !== undefined) updates.playlist_id = args.playlist_id;
+  if (args.day_of_week !== undefined) updates.day_of_week = args.day_of_week;
+  if (args.start_time !== undefined) updates.start_time = args.start_time;
+  if (args.end_time !== undefined) updates.end_time = args.end_time;
+  if (args.color !== undefined) updates.color = args.color;
+  if (args.is_active !== undefined) updates.is_active = args.is_active;
+  if (Object.keys(updates).length === 0) return { error: "No fields to update" };
+  const { error } = await sb.from("schedule_entries").update(updates).eq("id", args.entry_id);
+  if (error) return { error: `Failed to update schedule entry: ${error.message}` };
+  return { success: true, entry_id: args.entry_id, updated_fields: Object.keys(updates), message: `Schedule entry updated: ${Object.keys(updates).join(", ")}` };
+}
+
+async function executeClearSchedule(args: { profile_id: string }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const { error, count } = await sb.from("schedule_entries").delete().eq("profile_id", args.profile_id);
+  if (error) return { error: `Failed to clear schedule: ${error.message}` };
+  return { success: true, message: `Schedule cleared. All entries removed.` };
+}
 
 
 function keyDistance(a: string, b: string): number {
