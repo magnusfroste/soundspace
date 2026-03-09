@@ -1805,6 +1805,8 @@ Deno.serve(async (req) => {
               update_schedule_entry: "Updating schedule entry...",
               delete_schedule_entry: "Deleting schedule entry...",
               clear_schedule: "Clearing entire schedule...",
+              analyze_play_logs: "Analyzing listening data...",
+              proactive_scan: "Running health check...",
             };
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
