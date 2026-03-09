@@ -471,6 +471,27 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "update_schedule_entry",
+      description: "Update an existing schedule entry. Can change playlist, day, time, color, or active state.",
+      parameters: {
+        type: "object",
+        properties: {
+          entry_id: { type: "string", description: "ID of the schedule entry to update" },
+          playlist_id: { type: "string", description: "New playlist ID" },
+          day_of_week: { type: "number", description: "New day of week (0=Sun, 1=Mon, ..., 6=Sat)" },
+          start_time: { type: "string", description: "New start time in HH:MM format" },
+          end_time: { type: "string", description: "New end time in HH:MM format" },
+          color: { type: "string", description: "New hex color" },
+          is_active: { type: "boolean", description: "Enable or disable this entry" }
+        },
+        required: ["entry_id"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "delete_schedule_entry",
       description: "Delete a schedule entry by ID.",
       parameters: {
@@ -479,6 +500,21 @@ const TOOLS = [
           entry_id: { type: "string", description: "ID of the schedule entry to delete" }
         },
         required: ["entry_id"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "clear_schedule",
+      description: "Delete ALL schedule entries for a profile. Use when the user wants to start fresh.",
+      parameters: {
+        type: "object",
+        properties: {
+          profile_id: { type: "string", description: "Profile ID whose schedule to clear" }
+        },
+        required: ["profile_id"],
         additionalProperties: false
       }
     }
