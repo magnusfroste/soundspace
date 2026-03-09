@@ -263,14 +263,13 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
         <EditableCell value={song.mood} field="mood" songId={song.id} asBadge badgeVariant="outline" />
       </div>
 
-      {/* Prompt (read-only) */}
-      <div className="w-48 flex-shrink-0 hidden xl:block">
+      {/* AI Prompt */}
+      <div className="w-8 flex-shrink-0 hidden xl:flex justify-center">
         {song.prompt ? (
           <Tooltip delayDuration={100}>
             <TooltipTrigger asChild>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground cursor-help">
-                <Sparkles className="h-3 w-3 text-primary flex-shrink-0" />
-                <span className="truncate">{song.prompt}</span>
+              <div className="text-primary/70 hover:text-primary transition-colors cursor-help">
+                <Sparkles className="h-3.5 w-3.5" />
               </div>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-sm pointer-events-auto">
