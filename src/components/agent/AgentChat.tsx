@@ -236,6 +236,7 @@ function ChatInput({
     <div className="border-t border-border p-4 flex-shrink-0">
       <div className={cn("flex gap-2 items-end mx-auto", maxWidth)}>
         <Textarea
+          ref={inputRef}
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={onKeyDown}
