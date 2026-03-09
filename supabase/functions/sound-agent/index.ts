@@ -649,9 +649,22 @@ async function getSkillParameters(supabaseUrl: string, userId: string, genre?: s
 async function generateWithBatch(
   acestepProxy: string,
   headers: Record<string, string>,
-  params: { caption: string; lyrics: string; duration: number; bpm: number; keyScale: string; timeSig: string; referenceAudioUrl?: string }
+  params: {
+    caption: string;
+    lyrics: string;
+    duration: number;
+    bpm: number;
+    keyScale: string;
+    timeSig: string;
+    referenceAudioUrl?: string;
+    inferenceSteps?: number;
+    coverStrength?: number;
+    taskType?: string;
+    repaintingStart?: number;
+    repaintingEnd?: number;
+  }
 ): Promise<{ audioBlob: ArrayBuffer; qualityScore: number; metadata: any } | { error: string }> {
-  const taskType = params.referenceAudioUrl ? "cover" : "text2music";
+  const taskType = params.taskType || (params.referenceAudioUrl ? "cover" : "text2music");
   const body: Record<string, any> = {
     task_type: taskType,
     caption: params.caption,
@@ -661,14 +674,20 @@ async function generateWithBatch(
     keyscale: params.keyScale,
     timesignature: params.timeSig,
     batch_size: BATCH_SIZE,
-    inference_steps: 100,
+    inference_steps: params.inferenceSteps || 100,
     thinking: true,
   };
   
   // Add reference audio for Cover mode
   if (params.referenceAudioUrl) {
     body.audio_url = params.referenceAudioUrl;
-    body.audio_cover_strength = 0.5; // Moderate influence
+    body.audio_cover_strength = params.coverStrength ?? 0.5;
+  }
+  
+  // Repaint parameters
+  if (taskType === "repaint") {
+    if (params.repaintingStart !== undefined) body.repainting_start = params.repaintingStart;
+    if (params.repaintingEnd !== undefined) body.repainting_end = params.repaintingEnd;
   }
 
   const releaseRes = await fetch(acestepProxy, {
