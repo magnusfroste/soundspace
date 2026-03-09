@@ -1412,7 +1412,7 @@ Deno.serve(async (req) => {
             try {
               switch (fn) {
                 case "research_music_style": result = executeResearch(args); break;
-                case "generate_track": result = await executeGenerate(args, supabaseUrl, anonKey); if (result.audio_url) collectedAudioUrls.push(result.audio_url); break;
+                case "generate_track": result = await executeGenerate(args, supabaseUrl, anonKey, userId); if (result.audio_url) collectedAudioUrls.push(result.audio_url); break;
                 case "analyze_track": result = await executeAnalyze(args, supabaseUrl, anonKey); break;
                 case "save_to_library": result = await executeSave(args, supabaseUrl); break;
                 case "list_library": result = await executeListLibrary(args, supabaseUrl); break;
