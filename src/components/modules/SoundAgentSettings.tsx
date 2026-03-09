@@ -27,6 +27,7 @@ const MODELS_BY_PROVIDER: Record<ChatProvider, { value: string; label: string }[
     { value: "openai/gpt-5.2", label: "GPT-5.2 (latest)" },
   ],
   openai: [
+    { value: "native:openai/gpt-4.1", label: "GPT-4.1" },
     { value: "native:openai/gpt-4.1-mini", label: "GPT-4.1 Mini" },
     { value: "native:openai/gpt-5-mini", label: "GPT-5 Mini" },
     { value: "native:openai/gpt-5", label: "GPT-5" },
