@@ -593,7 +593,16 @@ async function findReferenceAudio(supabaseUrl: string, genre?: string, mood?: st
 }
 
 /** Fetch matching skills and extract parameters */
-async function getSkillParameters(supabaseUrl: string, userId: string, genre?: string, mood?: string): Promise<{ bpm?: number; key_scale?: string; time_signature?: string }> {
+async function getSkillParameters(supabaseUrl: string, userId: string, genre?: string, mood?: string): Promise<{
+  bpm?: number;
+  key_scale?: string;
+  time_signature?: string;
+  inference_steps?: number;
+  cover_strength?: number;
+  task_type?: string;
+  repainting_start?: number;
+  repainting_end?: number;
+}> {
   const sb = getServiceClient(supabaseUrl);
   const { data: skills } = await sb.from("agent_skills")
     .select("name, content, metadata")
@@ -612,7 +621,7 @@ async function getSkillParameters(supabaseUrl: string, userId: string, genre?: s
   if (!matchingSkill) return {};
   
   const meta = matchingSkill.metadata as Record<string, any> || {};
-  const params: { bpm?: number; key_scale?: string; time_signature?: string } = {};
+  const params: any = {};
   
   // Extract BPM (handle range like "90-100" or single value)
   if (meta.bpm_range) {
@@ -624,6 +633,13 @@ async function getSkillParameters(supabaseUrl: string, userId: string, genre?: s
   
   if (meta.key) params.key_scale = meta.key;
   if (meta.time_signature) params.time_signature = meta.time_signature;
+  
+  // ACE-Step specific parameters
+  if (meta.inference_steps) params.inference_steps = parseInt(meta.inference_steps, 10);
+  if (meta.cover_strength !== undefined) params.cover_strength = parseFloat(meta.cover_strength);
+  if (meta.task_type) params.task_type = meta.task_type;
+  if (meta.repainting_start !== undefined) params.repainting_start = parseInt(meta.repainting_start, 10);
+  if (meta.repainting_end !== undefined) params.repainting_end = parseInt(meta.repainting_end, 10);
   
   console.log(`Skill "${matchingSkill.name}" injected params:`, params);
   return params;
