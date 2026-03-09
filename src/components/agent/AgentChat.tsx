@@ -51,6 +51,7 @@ export function AgentChat({ fullWidth, agentChat: externalChat }: AgentChatProps
 
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -61,6 +62,7 @@ export function AgentChat({ fullWidth, agentChat: externalChat }: AgentChatProps
     if (!text || isGenerating) return;
     setInput("");
     sendMessage(text);
+    inputRef.current?.focus();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
