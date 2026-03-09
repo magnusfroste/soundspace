@@ -534,6 +534,36 @@ const TOOLS = [
       }
     }
   },
+  // ── Analytics & proactive tools ──
+  {
+    type: "function",
+    function: {
+      name: "analyze_play_logs",
+      description: "Analyze listening data to understand what music gets played most. Returns top songs, genres, moods, and BPM ranges by play count and listen duration. Use to make data-driven music decisions.",
+      parameters: {
+        type: "object",
+        properties: {
+          days: { type: "number", description: "How many days back to analyze (default 30)" },
+          user_id: { type: "string", description: "Optional: filter by specific user" }
+        },
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "proactive_scan",
+      description: "Run a comprehensive health check across the entire platform: schedule coverage, library gaps, playlist quality, and listening trends. Returns prioritized actionable suggestions. Use this when starting a conversation or when the user asks 'what should I do next?'.",
+      parameters: {
+        type: "object",
+        properties: {
+          profile_id: { type: "string", description: "Optional profile ID for schedule analysis" }
+        },
+        additionalProperties: false
+      }
+    }
+  },
   // ── Persistence tools ──
   {
     type: "function",
