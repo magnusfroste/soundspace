@@ -11,6 +11,13 @@ export default defineConfig(({ mode }) => ({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      "/a2a": {
+        target: `${process.env.VITE_SUPABASE_URL}/functions/v1/a2a`,
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/a2a/, ""),
+      },
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
