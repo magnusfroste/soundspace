@@ -1160,12 +1160,16 @@ async function executeReadSchedule(args: { profile_id?: string }, supabaseUrl: s
     const slotMinutes = (eh * 60 + em) - (sh * 60 + sm);
     const coveragePercent = slotMinutes > 0 ? Math.round((stats.total_duration_min / slotMinutes) * 100) : 0;
     return {
+      entry_id: e.id,
       day: DAY_NAMES[e.day_of_week] || `Day ${e.day_of_week}`,
+      day_of_week: e.day_of_week,
       time: `${e.start_time.slice(0, 5)}-${e.end_time.slice(0, 5)}`,
+      start_time: e.start_time.slice(0, 5),
+      end_time: e.end_time.slice(0, 5),
       slot_duration_min: slotMinutes, playlist_title: playlist?.title || "Unknown",
       playlist_id: e.playlist_id, song_count: stats.song_count,
       music_duration_min: stats.total_duration_min, coverage_percent: coveragePercent,
-      needs_more_music: coveragePercent < 80, is_active: e.is_active,
+      needs_more_music: coveragePercent < 80, is_active: e.is_active, color: e.color,
     };
   });
 
