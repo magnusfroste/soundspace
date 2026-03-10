@@ -259,6 +259,8 @@ function IntegrationSection({ icon: Icon, title, description, children }: {
 }
 
 export default function AdminIntegrations() {
+  useEffect(() => { fetchIntegrationsState(); }, []);
+
   return (
     <div className="space-y-8">
       <div>
