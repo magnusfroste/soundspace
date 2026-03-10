@@ -1,39 +1,76 @@
 import { supabase } from "@/integrations/supabase/client";
 
-const STORAGE_KEY = "somhonesto_integrations_enabled";
 const DB_SETTINGS_KEY = "integrations_enabled";
+const LOCAL_CACHE_KEY = "somhonesto_integrations_cache";
 
 export type IntegrationId = "elevenlabs" | "mubert" | "musicgen" | "acestep" | "local" | "openai" | "gemini" | "lovable" | "revelator" | "fuga" | "distrokid";
 
-function load(): Record<string, boolean> {
+/** In-memory cache updated from DB. Falls back to localStorage cache for offline/startup. */
+let memoryCache: Record<string, boolean> | null = null;
+let fetchPromise: Promise<Record<string, boolean>> | null = null;
+
+function getLocalCache(): Record<string, boolean> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(LOCAL_CACHE_KEY);
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
   }
 }
 
-function save(state: Record<string, boolean>) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+function setLocalCache(state: Record<string, boolean>) {
+  try {
+    localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(state));
+  } catch { /* ignore */ }
 }
 
+/** Fetch state from database (cached in memory after first call) */
+export async function fetchIntegrationsState(): Promise<Record<string, boolean>> {
+  if (memoryCache) return memoryCache;
+
+  if (!fetchPromise) {
+    fetchPromise = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("site_settings")
+          .select("value")
+          .eq("key", DB_SETTINGS_KEY)
+          .maybeSingle();
+
+        if (error) throw error;
+        const state = (data?.value as Record<string, boolean>) || {};
+        memoryCache = state;
+        setLocalCache(state);
+        return state;
+      } catch {
+        // Fallback to local cache
+        const cached = getLocalCache();
+        memoryCache = cached;
+        return cached;
+      } finally {
+        fetchPromise = null;
+      }
+    })();
+  }
+
+  return fetchPromise;
+}
+
+/** Synchronous check — uses memory/local cache. Call fetchIntegrationsState() first when possible. */
 export function isIntegrationEnabled(id: IntegrationId): boolean {
-  const state = load();
-  // Default to true (enabled) if not explicitly set
+  const state = memoryCache ?? getLocalCache();
   return state[id] !== false;
 }
 
-export function setIntegrationEnabled(id: IntegrationId, enabled: boolean) {
-  const state = load();
-  state[id] = enabled;
-  save(state);
-  // Sync to database so edge functions can read integration status
-  syncToDatabase(state);
-}
+/** Update integration toggle — writes to DB (source of truth), updates caches */
+export async function setIntegrationEnabled(id: IntegrationId, enabled: boolean) {
+  // Optimistic update
+  const current = memoryCache ?? getLocalCache();
+  const updated = { ...current, [id]: enabled };
+  memoryCache = updated;
+  setLocalCache(updated);
 
-/** Persist the full integrations state to site_settings for server-side access */
-async function syncToDatabase(state: Record<string, boolean>) {
+  // Persist to database
   try {
     const { data: existing } = await supabase
       .from("site_settings")
@@ -44,14 +81,19 @@ async function syncToDatabase(state: Record<string, boolean>) {
     if (existing) {
       await supabase
         .from("site_settings")
-        .update({ value: state as any, updated_at: new Date().toISOString() })
+        .update({ value: updated as any, updated_at: new Date().toISOString() })
         .eq("key", DB_SETTINGS_KEY);
     } else {
       await supabase
         .from("site_settings")
-        .insert({ key: DB_SETTINGS_KEY, value: state as any });
+        .insert({ key: DB_SETTINGS_KEY, value: updated as any });
     }
   } catch {
-    // Silent fail — localStorage is the primary source, DB is for edge functions
+    // DB write failed — local cache is still updated for this session
   }
+}
+
+/** Invalidate in-memory cache (e.g. after navigation or refetch) */
+export function invalidateIntegrationsCache() {
+  memoryCache = null;
 }
