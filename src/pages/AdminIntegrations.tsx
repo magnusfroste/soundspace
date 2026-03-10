@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Plug, Sparkles, RefreshCw, CheckCircle2, XCircle, AlertCircle, Brain, Music, Truck, Network } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
-import { isIntegrationEnabled, setIntegrationEnabled } from "@/lib/integrations-state";
+import { isIntegrationEnabled, setIntegrationEnabled, fetchIntegrationsState } from "@/lib/integrations-state";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -259,6 +259,8 @@ function IntegrationSection({ icon: Icon, title, description, children }: {
 }
 
 export default function AdminIntegrations() {
+  useEffect(() => { fetchIntegrationsState(); }, []);
+
   return (
     <div className="space-y-8">
       <div>
