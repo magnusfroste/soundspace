@@ -15,8 +15,9 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ viewMode, onViewModeChange, showChatToggle }: AppHeaderProps) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { data: profile } = useProfile(user?.id);
+  const isAdmin = role === "admin";
 
   return (
     <header className="h-12 flex items-center justify-between border-b border-border bg-background/95 backdrop-blur-sm px-4 flex-shrink-0">
