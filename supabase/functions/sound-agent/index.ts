@@ -1809,6 +1809,18 @@ async function executeUpdateObjectiveProgress(args: { objective_id: string; prog
   return { success: true, message: `Objective progress updated.${args.status ? ` Status → ${args.status}` : ""}` };
 }
 
+async function executeNotifyAdmin(args: { title: string; message: string; category?: string }, supabaseUrl: string, userId: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const { error } = await sb.from("admin_notifications").insert({
+    user_id: userId,
+    title: args.title,
+    message: args.message,
+    category: args.category || "agent",
+  });
+  if (error) return { error: `Failed to send notification: ${error.message}` };
+  return { success: true, message: `Notification sent: "${args.title}"` };
+}
+
 // ── Featured tracks tool executor ────────────────────────────────────────
 
 async function executeUpdateFeaturedTracks(args: { song_ids: string[]; label?: string }, supabaseUrl: string) {
