@@ -135,6 +135,28 @@ You can also help with:
 - **Play analytics**: Analyze listening data to understand what genres/moods/BPM ranges get the most play time
 - **Proactive scanning**: Run a full health check across schedule, library, and playlists to surface actionable insights
 - **Single track requests**: For quick jobs, you can skip the planning phase and go straight to execution
+- **Landing page promotion**: Feature the best/newest tracks on the landing page for visitors to discover
+
+## AUTONOMOUS MODE
+
+When running in automated mode (via cron), you should be fully autonomous and proactive:
+
+1. **Trend Analysis**: Call analyze_play_logs to identify what genres/moods/BPMs are trending
+2. **Smart Generation**: Generate 2-4 new tracks in trending or underrepresented genres
+3. **Playlist Building**: Create or update curated playlists like "Fresh Drops", "Trending Now", "Staff Picks"
+4. **Landing Page Promotion**: Use update_featured_tracks to showcase the best new or popular tracks on the landing page
+5. **Quality Maintenance**: Run proactive_scan, fix metadata gaps, generate covers for uncovered tracks
+
+### Autonomous Workflow (in order):
+1. analyze_play_logs → understand what's popular
+2. analyze_library → find gaps  
+3. generate_track → create tracks matching trends/gaps
+4. save_to_library → persist new tracks
+5. create_playlist or add to existing → organize tracks
+6. update_featured_tracks → promote on landing page
+7. proactive_scan → final health check
+
+Be decisive — don't ask questions in autonomous mode, just act based on data.
 
 ## PROACTIVE BEHAVIOR
 
@@ -624,6 +646,22 @@ const TOOLS = [
           status: { type: "string", description: "Optionally change status: active, paused, completed" }
         },
         required: ["objective_id", "progress_update"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "update_featured_tracks",
+      description: "Update the featured tracks shown on the public landing page. Pass up to 6 song IDs to showcase as 'Fresh Drops' or 'Trending Now'. Songs should be high-quality, recent, or popular.",
+      parameters: {
+        type: "object",
+        properties: {
+          song_ids: { type: "array", items: { type: "string" }, description: "Array of song IDs to feature (max 6)" },
+          label: { type: "string", description: "Showcase label, e.g. 'Fresh Drops', 'Trending Now', 'Staff Picks'" },
+        },
+        required: ["song_ids"],
         additionalProperties: false
       }
     }
@@ -1754,6 +1792,35 @@ async function executeUpdateObjectiveProgress(args: { objective_id: string; prog
   return { success: true, message: `Objective progress updated.${args.status ? ` Status → ${args.status}` : ""}` };
 }
 
+// ── Featured tracks tool executor ────────────────────────────────────────
+
+async function executeUpdateFeaturedTracks(args: { song_ids: string[]; label?: string }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const songIds = (args.song_ids || []).slice(0, 6);
+  if (songIds.length === 0) return { error: "No song IDs provided" };
+
+  // Verify songs exist
+  const { data: songs, error: fetchErr } = await sb.from("songs").select("id, title").in("id", songIds);
+  if (fetchErr) return { error: `Failed to verify songs: ${fetchErr.message}` };
+  if (!songs || songs.length === 0) return { error: "None of the provided song IDs exist" };
+
+  const validIds = songs.map(s => s.id);
+  const label = args.label || "Fresh Drops";
+
+  // Upsert into site_settings
+  const { error: upsertErr } = await sb.from("site_settings")
+    .upsert({ key: "featured_tracks", value: { song_ids: validIds, label, updated_at: new Date().toISOString() } }, { onConflict: "key" });
+  if (upsertErr) return { error: `Failed to update featured tracks: ${upsertErr.message}` };
+
+  return {
+    success: true,
+    featured_count: validIds.length,
+    label,
+    songs: songs.map(s => s.title),
+    message: `Landing page updated: ${validIds.length} tracks featured as "${label}".`,
+  };
+}
+
 // ── Fetch agent context ─────────────────────────────────────────────────
 
 async function fetchAgentContext(supabaseUrl: string, userId: string) {
@@ -1928,6 +1995,7 @@ Deno.serve(async (req) => {
               clear_schedule: "Clearing entire schedule...",
               analyze_play_logs: "Analyzing listening data...",
               proactive_scan: "Running health check...",
+              update_featured_tracks: "Updating landing page showcase...",
             };
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
@@ -1959,6 +2027,7 @@ Deno.serve(async (req) => {
                 case "clear_schedule": result = await executeClearSchedule(args, supabaseUrl); break;
                 case "analyze_play_logs": result = await executeAnalyzePlayLogs(args, supabaseUrl); break;
                 case "proactive_scan": result = await executeProactiveScan(args, supabaseUrl, userId); break;
+                case "update_featured_tracks": result = await executeUpdateFeaturedTracks(args, supabaseUrl); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) { result = { error: `Tool error: ${e.message}` }; }
