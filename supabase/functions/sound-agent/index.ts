@@ -666,6 +666,23 @@ const TOOLS = [
       }
     }
   },
+  {
+    type: "function",
+    function: {
+      name: "notify_admin",
+      description: "Send a notification to the admin dashboard. Use after completing significant autonomous work (e.g. tracks generated, playlists created, landing page updated).",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Short notification title" },
+          message: { type: "string", description: "Detailed message about what was done" },
+          category: { type: "string", description: "Category: generation, playlist, promotion, analytics, agent" },
+        },
+        required: ["title", "message"],
+        additionalProperties: false
+      }
+    }
+  },
 ];
 
 // ── Knowledge base ──────────────────────────────────────────────────────
@@ -1792,6 +1809,18 @@ async function executeUpdateObjectiveProgress(args: { objective_id: string; prog
   return { success: true, message: `Objective progress updated.${args.status ? ` Status → ${args.status}` : ""}` };
 }
 
+async function executeNotifyAdmin(args: { title: string; message: string; category?: string }, supabaseUrl: string, userId: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const { error } = await sb.from("admin_notifications").insert({
+    user_id: userId,
+    title: args.title,
+    message: args.message,
+    category: args.category || "agent",
+  });
+  if (error) return { error: `Failed to send notification: ${error.message}` };
+  return { success: true, message: `Notification sent: "${args.title}"` };
+}
+
 // ── Featured tracks tool executor ────────────────────────────────────────
 
 async function executeUpdateFeaturedTracks(args: { song_ids: string[]; label?: string }, supabaseUrl: string) {
@@ -1996,6 +2025,7 @@ Deno.serve(async (req) => {
               analyze_play_logs: "Analyzing listening data...",
               proactive_scan: "Running health check...",
               update_featured_tracks: "Updating landing page showcase...",
+              notify_admin: "Sending notification...",
             };
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
@@ -2028,6 +2058,7 @@ Deno.serve(async (req) => {
                 case "analyze_play_logs": result = await executeAnalyzePlayLogs(args, supabaseUrl); break;
                 case "proactive_scan": result = await executeProactiveScan(args, supabaseUrl, userId); break;
                 case "update_featured_tracks": result = await executeUpdateFeaturedTracks(args, supabaseUrl); break;
+                case "notify_admin": result = userId ? await executeNotifyAdmin(args, supabaseUrl, userId) : { error: "No user context" }; break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) { result = { error: `Tool error: ${e.message}` }; }

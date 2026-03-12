@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { NavLink } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificationBell } from "@/components/NotificationBell";
 
 interface AppHeaderProps {
   viewMode: "dashboard" | "chat";
@@ -14,8 +15,9 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ viewMode, onViewModeChange, showChatToggle }: AppHeaderProps) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { data: profile } = useProfile(user?.id);
+  const isAdmin = role === "admin";
 
   return (
     <header className="h-12 flex items-center justify-between border-b border-border bg-background/95 backdrop-blur-sm px-4 flex-shrink-0">
@@ -57,6 +59,7 @@ export function AppHeader({ viewMode, onViewModeChange, showChatToggle }: AppHea
       {/* Right side — theme toggle + profile access */}
       <div className="flex items-center gap-2">
         <ThemeToggle />
+        {isAdmin && <NotificationBell />}
 
         <NavLink
           to="/profile"

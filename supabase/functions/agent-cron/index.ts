@@ -80,6 +80,13 @@ Analyze what's needed, take concrete actions (generate tracks, fix metadata, fil
               status: "completed",
               user_id: obj.user_id,
             });
+            // Notify admin
+            await sb.from("admin_notifications").insert({
+              user_id: obj.user_id,
+              title: `✅ Objective completed: ${obj.title}`,
+              message: `SoundAgent autonomously worked on "${obj.title}" and completed the execution.`,
+              category: "agent",
+            });
           } catch (e) {
             const errMsg = e instanceof Error ? e.message : "Unknown";
             console.error(`[agent-cron][bg] Error for "${obj.title}":`, errMsg);
@@ -155,6 +162,13 @@ After completing, save a skill with what worked well.`;
             objective_title: "Proactive Autonomous Cycle",
             status: "completed",
             user_id: adminUserId,
+          });
+          // Write admin notification
+          await sb.from("admin_notifications").insert({
+            user_id: adminUserId,
+            title: "🤖 Proactive cycle completed",
+            message: "SoundAgent analyzed trends, generated new tracks, curated playlists, and updated the landing page.",
+            category: "agent",
           });
         } catch (e) {
           const errMsg = e instanceof Error ? e.message : "Unknown";
