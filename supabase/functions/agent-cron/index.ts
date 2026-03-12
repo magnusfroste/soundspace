@@ -21,9 +21,15 @@ Deno.serve(async (req) => {
     .eq("key", "module:sound-agent")
     .maybeSingle();
 
-  const settings = (settingsRow?.value as Record<string, any>) || {
+  const baseSettings = (settingsRow?.value as Record<string, any>) || {
     chatModel: "google/gemini-3-flash-preview",
     sttProvider: "elevenlabs",
+  };
+
+  // Override model for autonomous mode — needs strong reasoning for multi-step tool chaining
+  const settings = {
+    ...baseSettings,
+    chatModel: "google/gemini-2.5-flash",
   };
 
   const results: any[] = [];
