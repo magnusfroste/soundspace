@@ -58,20 +58,20 @@ You are running in fully autonomous mode. You MUST use tools to take action. Do 
 **Description:** ${obj.description || "No description"}
 **Current Progress:** ${progressSummary}
 
-## CRITICAL RULES:
-1. After EVERY generate_track call, you MUST call save_to_library with the returned audio_url to persist the track
-2. After saving tracks, call update_objective_progress to record what you did
-3. Focus on highest-impact actions first
-4. Generate 2-3 tracks maximum per run to stay within time limits
+## CRITICAL RULES — READ CAREFULLY:
+1. Call ONLY ONE tool at a time. Never batch multiple tool calls in one response.
+2. After EVERY generate_track, your NEXT tool call MUST be save_to_library with the returned audio_url.
+3. Generate only 1 track per run to stay within time limits.
+4. After saving, call update_objective_progress to record what you did.
 
-## WORKFLOW:
-1. Call analyze_library to understand current state
-2. Call generate_track for each new track needed
-3. Call save_to_library for EACH generated track (with full metadata: title, artist, genre, mood, bpm)
-4. Call update_objective_progress with a summary
-5. Call notify_admin with what you accomplished
+## WORKFLOW (one tool call per step):
+Step 1: Call analyze_library to understand current state
+Step 2: Call generate_track with a creative prompt (use inference_steps 60 for speed)
+Step 3: Call save_to_library with the audio_url from step 2 (include title, artist, genre, mood, bpm)
+Step 4: Call update_objective_progress with a summary
+Step 5: Call notify_admin with what you accomplished
 
-DO NOT skip save_to_library. A track that isn't saved is wasted work.`;
+NEVER call multiple generate_track in one response. ONE track, then SAVE it.`;
 
       try {
         fetch(`${supabaseUrl}/functions/v1/sound-agent`, {
