@@ -59,6 +59,7 @@ export function AppHeader({ viewMode, onViewModeChange, showChatToggle }: AppHea
       {/* Right side — theme toggle + profile access */}
       <div className="flex items-center gap-2">
         <ThemeToggle />
+        {isAdmin && <NotificationBell />}
 
         <NavLink
           to="/profile"
