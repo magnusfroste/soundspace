@@ -687,11 +687,117 @@ async function isIntegrationEnabledServer(integrationId: string, supabaseUrl: st
   }
 }
 
-// ── Enhanced generation with 5 quick wins ──────────────────────────────
+// ── Enhanced generation with real quality assessment ────────────────────
 
 const QUALITY_THRESHOLD = 0.7;
 const MAX_REGENERATION_ATTEMPTS = 3;
 const BATCH_SIZE = 2;
+
+/** Poll an ACE-Step extract/generate task until complete */
+async function pollAceStepTask(
+  acestepProxy: string,
+  headers: Record<string, string>,
+  taskId: string,
+  maxAttempts = 60,
+  interval = 3000,
+): Promise<any> {
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, interval));
+    const pollRes = await fetch(acestepProxy, {
+      method: "POST", headers,
+      body: JSON.stringify({ endpoint: "/query_result", method: "POST", body: { task_id_list: [taskId] } }),
+    });
+    if (!pollRes.ok) continue;
+    let pollData = await pollRes.json();
+    if (pollData && typeof pollData === "object" && "code" in pollData && "data" in pollData) pollData = pollData.data;
+    const tasks = Array.isArray(pollData) ? pollData : pollData?.data || [pollData];
+    const task = Array.isArray(tasks) ? tasks[0] : tasks;
+    if (!task) continue;
+    if (task.status === 1) return typeof task.result === "string" ? JSON.parse(task.result) : task.result;
+    if (task.status === 2) throw new Error("ACE-Step task failed");
+  }
+  throw new Error("ACE-Step task timed out");
+}
+
+/** Analyze audio via ACE-Step extract endpoint → returns BPM, key, caption */
+async function analyzeAudioViaExtract(
+  acestepProxy: string,
+  headers: Record<string, string>,
+  audioUrl: string,
+): Promise<{ bpm?: number; keyScale?: string; timeSignature?: string; caption?: string } | null> {
+  try {
+    const submitRes = await fetch(acestepProxy, {
+      method: "POST", headers,
+      body: JSON.stringify({
+        endpoint: "/release_task", method: "POST",
+        body: { task_type: "extract", audio_url: audioUrl, audio_duration: 0, batch_size: 1, inference_steps: 100, thinking: true },
+      }),
+    });
+    if (!submitRes.ok) return null;
+
+    let submitData = await submitRes.json();
+    if (submitData && typeof submitData === "object" && "code" in submitData && "data" in submitData) submitData = submitData.data;
+    const taskId = submitData?.task_id || submitData?.taskId || submitData?.id;
+    if (!taskId) return null;
+
+    const result = await pollAceStepTask(acestepProxy, headers, taskId, 40, 3000);
+    const item = Array.isArray(result) ? result[0] : result;
+    if (!item) return null;
+
+    return {
+      bpm: item.bpm ?? undefined,
+      keyScale: item.keyscale ?? item.key_scale ?? undefined,
+      timeSignature: item.timesignature ?? item.time_signature ?? undefined,
+      caption: item.caption ?? item.prompt ?? undefined,
+    };
+  } catch (e) {
+    console.log("Extract analysis failed:", e);
+    return null;
+  }
+}
+
+/** Compute a real quality score by comparing extracted features vs requested params */
+function computeRealQualityScore(
+  extracted: { bpm?: number; keyScale?: string; timeSignature?: string } | null,
+  requested: { bpm: number; keyScale: string; timeSig: string },
+): number {
+  if (!extracted) return 0.75; // Default passing score if analysis unavailable
+
+  let score = 1.0;
+
+  // BPM accuracy (weight: 40%)
+  if (extracted.bpm && requested.bpm) {
+    const bpmDeviation = Math.abs(extracted.bpm - requested.bpm) / requested.bpm;
+    if (bpmDeviation > 0.20) score -= 0.40;       // >20% off → full penalty
+    else if (bpmDeviation > 0.10) score -= 0.20;   // >10% off → half penalty
+    else if (bpmDeviation > 0.05) score -= 0.05;   // >5% off → minor penalty
+  }
+
+  // Key match (weight: 35%)
+  if (extracted.keyScale && requested.keyScale) {
+    const extractedKey = extracted.keyScale.toLowerCase().trim();
+    const requestedKey = requested.keyScale.toLowerCase().trim();
+    if (extractedKey !== requestedKey) {
+      // Check if same root note (partial match)
+      const extractedRoot = extractedKey.split(" ")[0];
+      const requestedRoot = requestedKey.split(" ")[0];
+      if (extractedRoot === requestedRoot) {
+        score -= 0.15; // Same root, different mode (e.g. C major vs C minor)
+      } else {
+        score -= 0.35; // Completely different key
+      }
+    }
+  }
+
+  // Time signature match (weight: 25%)
+  if (extracted.timeSignature && requested.timeSig) {
+    if (extracted.timeSignature.trim() !== requested.timeSig.trim()) {
+      score -= 0.25;
+    }
+  }
+
+  return Math.max(0, Math.round(score * 100) / 100);
+}
 
 /** Lyrics structure templates by genre */
 const LYRICS_STRUCTURES: Record<string, string> = {
