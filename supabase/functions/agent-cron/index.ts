@@ -156,6 +156,13 @@ After completing, save a skill with what worked well.`;
             status: "completed",
             user_id: adminUserId,
           });
+          // Write admin notification
+          await sb.from("admin_notifications").insert({
+            user_id: adminUserId,
+            title: "🤖 Proactive cycle completed",
+            message: "SoundAgent analyzed trends, generated new tracks, curated playlists, and updated the landing page.",
+            category: "agent",
+          });
         } catch (e) {
           const errMsg = e instanceof Error ? e.message : "Unknown";
           console.error("[agent-cron][bg] Proactive cycle error:", errMsg);
