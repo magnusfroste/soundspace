@@ -1949,6 +1949,7 @@ Deno.serve(async (req) => {
               clear_schedule: "Clearing entire schedule...",
               analyze_play_logs: "Analyzing listening data...",
               proactive_scan: "Running health check...",
+              update_featured_tracks: "Updating landing page showcase...",
             };
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
