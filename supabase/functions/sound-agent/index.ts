@@ -687,11 +687,117 @@ async function isIntegrationEnabledServer(integrationId: string, supabaseUrl: st
   }
 }
 
-// ── Enhanced generation with 5 quick wins ──────────────────────────────
+// ── Enhanced generation with real quality assessment ────────────────────
 
 const QUALITY_THRESHOLD = 0.7;
 const MAX_REGENERATION_ATTEMPTS = 3;
 const BATCH_SIZE = 2;
+
+/** Poll an ACE-Step extract/generate task until complete */
+async function pollAceStepTask(
+  acestepProxy: string,
+  headers: Record<string, string>,
+  taskId: string,
+  maxAttempts = 60,
+  interval = 3000,
+): Promise<any> {
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(r => setTimeout(r, interval));
+    const pollRes = await fetch(acestepProxy, {
+      method: "POST", headers,
+      body: JSON.stringify({ endpoint: "/query_result", method: "POST", body: { task_id_list: [taskId] } }),
+    });
+    if (!pollRes.ok) continue;
+    let pollData = await pollRes.json();
+    if (pollData && typeof pollData === "object" && "code" in pollData && "data" in pollData) pollData = pollData.data;
+    const tasks = Array.isArray(pollData) ? pollData : pollData?.data || [pollData];
+    const task = Array.isArray(tasks) ? tasks[0] : tasks;
+    if (!task) continue;
+    if (task.status === 1) return typeof task.result === "string" ? JSON.parse(task.result) : task.result;
+    if (task.status === 2) throw new Error("ACE-Step task failed");
+  }
+  throw new Error("ACE-Step task timed out");
+}
+
+/** Analyze audio via ACE-Step extract endpoint → returns BPM, key, caption */
+async function analyzeAudioViaExtract(
+  acestepProxy: string,
+  headers: Record<string, string>,
+  audioUrl: string,
+): Promise<{ bpm?: number; keyScale?: string; timeSignature?: string; caption?: string } | null> {
+  try {
+    const submitRes = await fetch(acestepProxy, {
+      method: "POST", headers,
+      body: JSON.stringify({
+        endpoint: "/release_task", method: "POST",
+        body: { task_type: "extract", audio_url: audioUrl, audio_duration: 0, batch_size: 1, inference_steps: 100, thinking: true },
+      }),
+    });
+    if (!submitRes.ok) return null;
+
+    let submitData = await submitRes.json();
+    if (submitData && typeof submitData === "object" && "code" in submitData && "data" in submitData) submitData = submitData.data;
+    const taskId = submitData?.task_id || submitData?.taskId || submitData?.id;
+    if (!taskId) return null;
+
+    const result = await pollAceStepTask(acestepProxy, headers, taskId, 40, 3000);
+    const item = Array.isArray(result) ? result[0] : result;
+    if (!item) return null;
+
+    return {
+      bpm: item.bpm ?? undefined,
+      keyScale: item.keyscale ?? item.key_scale ?? undefined,
+      timeSignature: item.timesignature ?? item.time_signature ?? undefined,
+      caption: item.caption ?? item.prompt ?? undefined,
+    };
+  } catch (e) {
+    console.log("Extract analysis failed:", e);
+    return null;
+  }
+}
+
+/** Compute a real quality score by comparing extracted features vs requested params */
+function computeRealQualityScore(
+  extracted: { bpm?: number; keyScale?: string; timeSignature?: string } | null,
+  requested: { bpm: number; keyScale: string; timeSig: string },
+): number {
+  if (!extracted) return 0.75; // Default passing score if analysis unavailable
+
+  let score = 1.0;
+
+  // BPM accuracy (weight: 40%)
+  if (extracted.bpm && requested.bpm) {
+    const bpmDeviation = Math.abs(extracted.bpm - requested.bpm) / requested.bpm;
+    if (bpmDeviation > 0.20) score -= 0.40;       // >20% off → full penalty
+    else if (bpmDeviation > 0.10) score -= 0.20;   // >10% off → half penalty
+    else if (bpmDeviation > 0.05) score -= 0.05;   // >5% off → minor penalty
+  }
+
+  // Key match (weight: 35%)
+  if (extracted.keyScale && requested.keyScale) {
+    const extractedKey = extracted.keyScale.toLowerCase().trim();
+    const requestedKey = requested.keyScale.toLowerCase().trim();
+    if (extractedKey !== requestedKey) {
+      // Check if same root note (partial match)
+      const extractedRoot = extractedKey.split(" ")[0];
+      const requestedRoot = requestedKey.split(" ")[0];
+      if (extractedRoot === requestedRoot) {
+        score -= 0.15; // Same root, different mode (e.g. C major vs C minor)
+      } else {
+        score -= 0.35; // Completely different key
+      }
+    }
+  }
+
+  // Time signature match (weight: 25%)
+  if (extracted.timeSignature && requested.timeSig) {
+    if (extracted.timeSignature.trim() !== requested.timeSig.trim()) {
+      score -= 0.25;
+    }
+  }
+
+  return Math.max(0, Math.round(score * 100) / 100);
+}
 
 /** Lyrics structure templates by genre */
 const LYRICS_STRUCTURES: Record<string, string> = {
@@ -856,54 +962,58 @@ async function generateWithBatch(
   const taskId = unwrapped?.task_id || unwrapped?.taskId || unwrapped?.id;
   if (!taskId) return { error: `No task_id returned. Response: ${JSON.stringify(releaseData).slice(0, 300)}` };
 
-  // Poll for results
-  let resultData: any = null;
-  for (let i = 0; i < 120; i++) {
-    await new Promise(r => setTimeout(r, 3000));
-    const pollRes = await fetch(acestepProxy, { method: "POST", headers, body: JSON.stringify({ endpoint: "/query_result", method: "POST", body: { task_id_list: [taskId] } }) });
-    if (!pollRes.ok) continue;
-    let pollData = await pollRes.json();
-    if (pollData && typeof pollData === "object" && "code" in pollData && "data" in pollData) pollData = pollData.data;
-    const tasks = Array.isArray(pollData) ? pollData : pollData?.data || [pollData];
-    const task = Array.isArray(tasks) ? tasks[0] : tasks;
-    if (!task) continue;
-    console.log(`Poll ${i}: status=${task.status}`);
-    if (task.status === 1) { resultData = typeof task.result === "string" ? JSON.parse(task.result) : task.result; break; }
-    if (task.status === 2) return { error: "ACE-Step generation failed" };
+  // Poll for results using shared helper
+  let resultData: any;
+  try {
+    resultData = await pollAceStepTask(acestepProxy, headers, taskId, 120, 3000);
+  } catch (e: any) {
+    return { error: e.message || "Generation timed out" };
   }
 
-  if (!resultData) return { error: "Generation timed out after 360 seconds" };
-
-  // Select best variation by quality_score
   const resultItems = Array.isArray(resultData) ? resultData : [resultData];
   console.log(`Batch returned ${resultItems.length} variations`);
-  
-  // Sort by quality_score descending
-  resultItems.sort((a, b) => (b.quality_score ?? -1) - (a.quality_score ?? -1));
+
+  // Download first variation's audio, then analyze it for real quality scoring
   const bestItem = resultItems[0];
-  // If ACE-Step doesn't return a quality_score, treat as passing (1.0) to avoid pointless retries
-  const qualityScore = (bestItem.quality_score !== undefined && bestItem.quality_score !== null) ? bestItem.quality_score : 1.0;
-  
-  console.log(`Best variation quality_score: ${qualityScore}`);
-  
   const audioPath = bestItem?.url || bestItem?.file;
   if (!audioPath) return { error: `No audio path in result: ${JSON.stringify(resultData).slice(0, 300)}` };
 
-  // Download best audio
   const audioRes = await fetch(acestepProxy, { method: "POST", headers, body: JSON.stringify({ endpoint: audioPath, method: "GET" }) });
   if (!audioRes.ok) return { error: `Failed to download audio (${audioRes.status})` };
 
   const audioBlob = await audioRes.arrayBuffer();
   if (audioBlob.byteLength < 1000) return { error: `Audio too small (${audioBlob.byteLength} bytes)` };
 
+  // Upload temporarily to get a URL for analysis
+  const sb = getServiceClient(acestepProxy.replace("/functions/v1/acestep-proxy", ""));
+  const tempFileName = `agent/tmp-analysis-${crypto.randomUUID()}.wav`;
+  await sb.storage.from("songs").upload(tempFileName, new Uint8Array(audioBlob), { contentType: "audio/wav", upsert: true });
+  const { data: tempUrlData } = sb.storage.from("songs").getPublicUrl(tempFileName);
+
+  // Run real quality analysis via extract endpoint
+  console.log("Running extract analysis for real quality scoring...");
+  const extracted = await analyzeAudioViaExtract(acestepProxy, headers, tempUrlData.publicUrl);
+
+  // Clean up temp file (fire & forget)
+  sb.storage.from("songs").remove([tempFileName]).catch(() => {});
+
+  const qualityScore = computeRealQualityScore(extracted, {
+    bpm: params.bpm,
+    keyScale: params.keyScale,
+    timeSig: params.timeSig,
+  });
+  
+  console.log(`Real quality assessment: score=${qualityScore}, extracted=`, JSON.stringify(extracted));
+
   return {
     audioBlob,
     qualityScore,
     metadata: {
-      bpm: bestItem.bpm ?? params.bpm,
-      key_scale: bestItem.keyscale ?? params.keyScale,
-      time_signature: bestItem.timesignature ?? params.timeSig,
+      bpm: extracted?.bpm ?? bestItem.bpm ?? params.bpm,
+      key_scale: extracted?.keyScale ?? bestItem.keyscale ?? params.keyScale,
+      time_signature: extracted?.timeSignature ?? bestItem.timesignature ?? params.timeSig,
       variations_generated: resultItems.length,
+      analysis: extracted ? { extracted_bpm: extracted.bpm, extracted_key: extracted.keyScale, extracted_time_sig: extracted.timeSignature, caption: extracted.caption } : null,
     }
   };
 }
@@ -1008,6 +1118,7 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
     key_scale: bestResult.metadata.key_scale,
     time_signature: bestResult.metadata.time_signature,
     quality_score: bestResult.qualityScore,
+    quality_analysis: bestResult.metadata.analysis || null,
     prompt: caption,
     attempts,
     variations_generated: bestResult.metadata.variations_generated,
@@ -1017,20 +1128,26 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
 }
 
 async function executeAnalyze(args: { audio_url: string }, supabaseUrl: string, anonKey: string) {
-  // Check if ACE-Step integration is enabled
   const aceStepEnabled = await isIntegrationEnabledServer("acestep", supabaseUrl);
   if (!aceStepEnabled) {
     return { error: "ACE-Step integration is disabled. Enable it in the Integrations panel to analyze tracks." };
   }
   const acestepProxy = `${supabaseUrl}/functions/v1/acestep-proxy`;
-  const extractRes = await fetch(acestepProxy, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` },
-    body: JSON.stringify({ endpoint: "/release_task", method: "POST", body: { task_type: "extract", audio_url: args.audio_url, audio_duration: 60, batch_size: 1, inference_steps: 100 } })
-  });
-  if (!extractRes.ok) return { error: "Extract submission failed", note: "Analysis unavailable" };
-  const extractData = await extractRes.json();
-  return { analysis: extractData, note: "Check BPM, key, and caption fields for quality verification." };
+  const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` };
+
+  const extracted = await analyzeAudioViaExtract(acestepProxy, headers, args.audio_url);
+  if (!extracted) {
+    return { error: "Analysis failed — ACE-Step extract did not return results." };
+  }
+
+  return {
+    success: true,
+    bpm: extracted.bpm,
+    key: extracted.keyScale,
+    time_signature: extracted.timeSignature,
+    caption: extracted.caption,
+    note: "Real analysis via ACE-Step extract endpoint.",
+  };
 }
 
 async function executeSave(args: any, supabaseUrl: string) {
