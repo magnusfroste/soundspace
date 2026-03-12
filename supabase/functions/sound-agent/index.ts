@@ -879,9 +879,10 @@ async function generateWithBatch(
   console.log(`Batch returned ${resultItems.length} variations`);
   
   // Sort by quality_score descending
-  resultItems.sort((a, b) => (b.quality_score ?? 0) - (a.quality_score ?? 0));
+  resultItems.sort((a, b) => (b.quality_score ?? -1) - (a.quality_score ?? -1));
   const bestItem = resultItems[0];
-  const qualityScore = bestItem.quality_score ?? 0;
+  // If ACE-Step doesn't return a quality_score, treat as passing (1.0) to avoid pointless retries
+  const qualityScore = (bestItem.quality_score !== undefined && bestItem.quality_score !== null) ? bestItem.quality_score : 1.0;
   
   console.log(`Best variation quality_score: ${qualityScore}`);
   
