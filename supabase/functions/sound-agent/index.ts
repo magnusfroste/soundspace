@@ -636,6 +636,23 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "update_objective_progress",
+      description: "Update progress on an objective after completing relevant work.",
+      parameters: {
+        type: "object",
+        properties: {
+          objective_id: { type: "string", description: "ID of the objective" },
+          progress_update: { type: "object", description: "Progress data to merge (e.g. {tracks_created: 4, genres_covered: ['jazz', 'ambient']})" },
+          status: { type: "string", description: "Optionally change status: active, paused, completed" }
+        },
+        required: ["objective_id", "progress_update"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "update_featured_tracks",
       description: "Update the featured tracks shown on the public landing page. Pass up to 6 song IDs to showcase as 'Fresh Drops' or 'Trending Now'. Songs should be high-quality, recent, or popular.",
       parameters: {
