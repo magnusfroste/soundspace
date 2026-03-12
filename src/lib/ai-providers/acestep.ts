@@ -305,10 +305,23 @@ export const aceStepProvider: AIProvider = {
       resultArray.map((item: any) => mapResultToGeneration(item, options))
     );
 
-    // Sort by quality score descending if available
-    variations.sort((a, b) => (b.qualityScore ?? 0) - (a.qualityScore ?? 0));
+    // Run extract analysis on each variation for real quality scoring
+    const scored = await Promise.all(
+      variations.map(async (v) => {
+        try {
+          const extracted = await extractAudioFeatures(v.audioBlob);
+          v.qualityScore = computeClientQualityScore(extracted, options);
+        } catch {
+          v.qualityScore = 0.75; // Default if analysis fails
+        }
+        return v;
+      })
+    );
 
-    return variations;
+    // Sort by real quality score descending
+    scored.sort((a, b) => (b.qualityScore ?? 0) - (a.qualityScore ?? 0));
+
+    return scored;
   },
 
   async checkStatus(): Promise<ProviderStatus> {
