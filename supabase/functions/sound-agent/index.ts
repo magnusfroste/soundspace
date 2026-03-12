@@ -2027,6 +2027,7 @@ Deno.serve(async (req) => {
               update_featured_tracks: "Updating landing page showcase...",
               notify_admin: "Sending notification...",
             };
+            console.log(`[sound-agent] Tool call #${toolCallCount}: ${fn}(${JSON.stringify(args).slice(0, 200)})`);
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
             try {
