@@ -1128,20 +1128,26 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
 }
 
 async function executeAnalyze(args: { audio_url: string }, supabaseUrl: string, anonKey: string) {
-  // Check if ACE-Step integration is enabled
   const aceStepEnabled = await isIntegrationEnabledServer("acestep", supabaseUrl);
   if (!aceStepEnabled) {
     return { error: "ACE-Step integration is disabled. Enable it in the Integrations panel to analyze tracks." };
   }
   const acestepProxy = `${supabaseUrl}/functions/v1/acestep-proxy`;
-  const extractRes = await fetch(acestepProxy, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` },
-    body: JSON.stringify({ endpoint: "/release_task", method: "POST", body: { task_type: "extract", audio_url: args.audio_url, audio_duration: 60, batch_size: 1, inference_steps: 100 } })
-  });
-  if (!extractRes.ok) return { error: "Extract submission failed", note: "Analysis unavailable" };
-  const extractData = await extractRes.json();
-  return { analysis: extractData, note: "Check BPM, key, and caption fields for quality verification." };
+  const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` };
+
+  const extracted = await analyzeAudioViaExtract(acestepProxy, headers, args.audio_url);
+  if (!extracted) {
+    return { error: "Analysis failed — ACE-Step extract did not return results." };
+  }
+
+  return {
+    success: true,
+    bpm: extracted.bpm,
+    key: extracted.keyScale,
+    time_signature: extracted.timeSignature,
+    caption: extracted.caption,
+    note: "Real analysis via ACE-Step extract endpoint.",
+  };
 }
 
 async function executeSave(args: any, supabaseUrl: string) {
