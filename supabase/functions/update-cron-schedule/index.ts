@@ -11,7 +11,6 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const sb = createClient(supabaseUrl, serviceKey);
 
   try {
@@ -33,31 +32,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Unschedule existing job
-    await sb.rpc("exec_sql" as any, {} as any).catch(() => {});
-    
-    // Use raw SQL via the service client to update cron
-    const { error: unscheduleErr } = await sb.from("_cron_unschedule" as any)
-      .select("*").limit(0); // dummy — we'll use direct SQL
-
-    // Direct approach: use pg_net to call cron.unschedule and cron.schedule
-    // Since we can't run arbitrary SQL from edge functions, we'll use a DB function
-    
-    // Call the update_cron_schedule DB function
-    const { data, error } = await sb.rpc("update_agent_cron_schedule", {
+    // Call the DB function to update pg_cron
+    const { error } = await sb.rpc("update_agent_cron_schedule", {
       new_schedule: schedule,
     });
 
     if (error) throw error;
 
-    // Also save to site_settings for UI display
-    const { error: settingsErr } = await sb.from("site_settings")
-      .upsert(
-        { key: "agent-cron-schedule", value: JSON.stringify({ schedule, updated_at: new Date().toISOString() }) },
-        { onConflict: "key" }
-      );
-
-    if (settingsErr) console.error("Failed to save setting:", settingsErr);
+    // Save to site_settings for UI
+    await sb.from("site_settings").upsert(
+      { key: "agent-cron-schedule", value: { schedule, updated_at: new Date().toISOString() } },
+      { onConflict: "key" }
+    );
 
     return new Response(JSON.stringify({ success: true, schedule }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
