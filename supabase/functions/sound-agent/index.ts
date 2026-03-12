@@ -2058,6 +2058,7 @@ Deno.serve(async (req) => {
                 case "analyze_play_logs": result = await executeAnalyzePlayLogs(args, supabaseUrl); break;
                 case "proactive_scan": result = await executeProactiveScan(args, supabaseUrl, userId); break;
                 case "update_featured_tracks": result = await executeUpdateFeaturedTracks(args, supabaseUrl); break;
+                case "notify_admin": result = userId ? await executeNotifyAdmin(args, supabaseUrl, userId) : { error: "No user context" }; break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) { result = { error: `Tool error: ${e.message}` }; }
