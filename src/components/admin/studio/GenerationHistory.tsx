@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
-import { Play, Trash2, CheckCircle } from "lucide-react";
+import { Play, Trash2, CheckCircle, Music2, Key, Clock3, Gauge } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
