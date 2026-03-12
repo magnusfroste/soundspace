@@ -57,6 +57,39 @@ export function GenerationHistory({
                     <CheckCircle className="h-3 w-3 text-primary" />
                   )}
                 </div>
+                {(item.bpm || item.keyScale || item.timeSignature || item.qualityScore != null) && (
+                  <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                    {item.qualityScore != null && (
+                      <span className={cn(
+                        "inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium",
+                        item.qualityScore >= 0.8 ? "bg-primary/10 text-primary" :
+                        item.qualityScore >= 0.5 ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" :
+                        "bg-destructive/10 text-destructive"
+                      )}>
+                        <Gauge className="h-2.5 w-2.5" />
+                        {Math.round(item.qualityScore * 100)}%
+                      </span>
+                    )}
+                    {item.bpm && (
+                      <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px]">
+                        <Music2 className="h-2.5 w-2.5" />
+                        {item.bpm}
+                      </span>
+                    )}
+                    {item.keyScale && (
+                      <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px]">
+                        <Key className="h-2.5 w-2.5" />
+                        {item.keyScale}
+                      </span>
+                    )}
+                    {item.timeSignature && (
+                      <span className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-[10px]">
+                        <Clock3 className="h-2.5 w-2.5" />
+                        {item.timeSignature}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <p className="text-[10px] text-muted-foreground mt-1">
                   {formatDistanceToNow(item.createdAt, { addSuffix: true })}
                 </p>
