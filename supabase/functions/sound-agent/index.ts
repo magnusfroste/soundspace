@@ -1981,6 +1981,7 @@ Deno.serve(async (req) => {
                 case "clear_schedule": result = await executeClearSchedule(args, supabaseUrl); break;
                 case "analyze_play_logs": result = await executeAnalyzePlayLogs(args, supabaseUrl); break;
                 case "proactive_scan": result = await executeProactiveScan(args, supabaseUrl, userId); break;
+                case "update_featured_tracks": result = await executeUpdateFeaturedTracks(args, supabaseUrl); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) { result = { error: `Tool error: ${e.message}` }; }
