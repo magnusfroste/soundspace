@@ -21,9 +21,15 @@ Deno.serve(async (req) => {
     .eq("key", "module:sound-agent")
     .maybeSingle();
 
-  const settings = (settingsRow?.value as Record<string, any>) || {
+  const baseSettings = (settingsRow?.value as Record<string, any>) || {
     chatModel: "google/gemini-3-flash-preview",
     sttProvider: "elevenlabs",
+  };
+
+  // Override model for autonomous mode — needs strong reasoning for multi-step tool chaining
+  const settings = {
+    ...baseSettings,
+    chatModel: "google/gemini-2.5-flash",
   };
 
   const results: any[] = [];
@@ -44,15 +50,28 @@ Deno.serve(async (req) => {
     for (const obj of objectives) {
       const progressSummary = obj.progress ? JSON.stringify(obj.progress) : "No progress yet";
 
-      const prompt = `[AUTOMATED OBJECTIVE EXECUTION]
+      const prompt = `[AUTOMATED OBJECTIVE EXECUTION — AUTONOMOUS MODE]
 
-You are running in autonomous mode. Work toward this objective:
+You are running in fully autonomous mode. You MUST use tools to take action. Do NOT just describe what you would do — actually DO it by calling tools.
 
 **Objective:** ${obj.title}
 **Description:** ${obj.description || "No description"}
 **Current Progress:** ${progressSummary}
 
-Analyze what's needed, take concrete actions (generate tracks, fix metadata, fill gaps), and update the objective progress when done. Be efficient — focus on the highest-impact actions first. When done, summarize what you accomplished.`;
+## CRITICAL RULES:
+1. After EVERY generate_track call, you MUST call save_to_library with the returned audio_url to persist the track
+2. After saving tracks, call update_objective_progress to record what you did
+3. Focus on highest-impact actions first
+4. Generate 2-3 tracks maximum per run to stay within time limits
+
+## WORKFLOW:
+1. Call analyze_library to understand current state
+2. Call generate_track for each new track needed
+3. Call save_to_library for EACH generated track (with full metadata: title, artist, genre, mood, bpm)
+4. Call update_objective_progress with a summary
+5. Call notify_admin with what you accomplished
+
+DO NOT skip save_to_library. A track that isn't saved is wasted work.`;
 
       try {
         fetch(`${supabaseUrl}/functions/v1/sound-agent`, {
@@ -123,20 +142,26 @@ Analyze what's needed, take concrete actions (generate tracks, fix metadata, fil
     const adminUserId = adminRole.user_id;
     console.log(`[agent-cron] Starting proactive cycle for admin ${adminUserId}`);
 
-    const proactivePrompt = `[AUTONOMOUS PROACTIVE CYCLE]
+    const proactivePrompt = `[AUTONOMOUS PROACTIVE CYCLE — TOOL USE REQUIRED]
 
-You are running in fully autonomous mode at the scheduled daily maintenance time. Execute the following workflow WITHOUT asking questions — just act on data:
+You are running in fully autonomous mode. You MUST call tools to take action. Do NOT just describe what you would do.
 
-1. **Trend Analysis**: Call analyze_play_logs(days=7) to see what's trending this week
-2. **Library Check**: Call analyze_library to find gaps and opportunities  
-3. **Generate Content**: Based on trends and gaps, generate 2-3 new tracks in popular or underrepresented genres. Choose creative titles, appropriate BPM/key for the genre.
-4. **Save Everything**: Save all generated tracks to the library with full metadata
-5. **Playlist Curation**: Create or update a "Fresh Drops" playlist with the newest high-quality tracks (last 7 days)
-6. **Landing Promotion**: Call update_featured_tracks with the best 4-6 tracks (mix of new and trending) labeled "Trending Now"
-7. **Health Check**: Run proactive_scan and fix any critical issues (missing metadata, empty schedules)
+## CRITICAL RULES:
+- After EVERY generate_track call, you MUST call save_to_library with the audio_url to persist it
+- A generated track that isn't saved is WASTED. Always save.
+- Generate max 2-3 tracks to stay within time limits
 
-Be creative with track names and prompts. Think like a music curator — what would delight listeners?
-After completing, save a skill with what worked well.`;
+## STEP-BY-STEP WORKFLOW (execute in order):
+
+**Step 1 — Analyze**: Call analyze_play_logs(days=7) and analyze_library
+**Step 2 — Generate**: Based on gaps/trends, call generate_track 2-3 times with creative prompts, good BPM/key choices
+**Step 3 — SAVE**: For EACH generated track, call save_to_library with: audio_url (from generate_track result), title, artist="SomHonesto AI", genre, mood, bpm, duration
+**Step 4 — Playlist**: Create or update a "Fresh Drops" playlist with newest tracks
+**Step 5 — Promote**: Call update_featured_tracks with 4-6 best track IDs labeled "Trending Now"
+**Step 6 — Health**: Call proactive_scan and fix critical issues
+**Step 7 — Report**: Call notify_admin summarizing what you did, then call save_skill if you learned something
+
+Think like a music curator. Be creative with names and prompts.`;
 
     try {
       fetch(`${supabaseUrl}/functions/v1/sound-agent`, {
