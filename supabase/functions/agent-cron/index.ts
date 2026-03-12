@@ -50,15 +50,28 @@ Deno.serve(async (req) => {
     for (const obj of objectives) {
       const progressSummary = obj.progress ? JSON.stringify(obj.progress) : "No progress yet";
 
-      const prompt = `[AUTOMATED OBJECTIVE EXECUTION]
+      const prompt = `[AUTOMATED OBJECTIVE EXECUTION — AUTONOMOUS MODE]
 
-You are running in autonomous mode. Work toward this objective:
+You are running in fully autonomous mode. You MUST use tools to take action. Do NOT just describe what you would do — actually DO it by calling tools.
 
 **Objective:** ${obj.title}
 **Description:** ${obj.description || "No description"}
 **Current Progress:** ${progressSummary}
 
-Analyze what's needed, take concrete actions (generate tracks, fix metadata, fill gaps), and update the objective progress when done. Be efficient — focus on the highest-impact actions first. When done, summarize what you accomplished.`;
+## CRITICAL RULES:
+1. After EVERY generate_track call, you MUST call save_to_library with the returned audio_url to persist the track
+2. After saving tracks, call update_objective_progress to record what you did
+3. Focus on highest-impact actions first
+4. Generate 2-3 tracks maximum per run to stay within time limits
+
+## WORKFLOW:
+1. Call analyze_library to understand current state
+2. Call generate_track for each new track needed
+3. Call save_to_library for EACH generated track (with full metadata: title, artist, genre, mood, bpm)
+4. Call update_objective_progress with a summary
+5. Call notify_admin with what you accomplished
+
+DO NOT skip save_to_library. A track that isn't saved is wasted work.`;
 
       try {
         fetch(`${supabaseUrl}/functions/v1/sound-agent`, {
