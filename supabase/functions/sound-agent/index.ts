@@ -1775,6 +1775,35 @@ async function executeUpdateObjectiveProgress(args: { objective_id: string; prog
   return { success: true, message: `Objective progress updated.${args.status ? ` Status → ${args.status}` : ""}` };
 }
 
+// ── Featured tracks tool executor ────────────────────────────────────────
+
+async function executeUpdateFeaturedTracks(args: { song_ids: string[]; label?: string }, supabaseUrl: string) {
+  const sb = getServiceClient(supabaseUrl);
+  const songIds = (args.song_ids || []).slice(0, 6);
+  if (songIds.length === 0) return { error: "No song IDs provided" };
+
+  // Verify songs exist
+  const { data: songs, error: fetchErr } = await sb.from("songs").select("id, title").in("id", songIds);
+  if (fetchErr) return { error: `Failed to verify songs: ${fetchErr.message}` };
+  if (!songs || songs.length === 0) return { error: "None of the provided song IDs exist" };
+
+  const validIds = songs.map(s => s.id);
+  const label = args.label || "Fresh Drops";
+
+  // Upsert into site_settings
+  const { error: upsertErr } = await sb.from("site_settings")
+    .upsert({ key: "featured_tracks", value: { song_ids: validIds, label, updated_at: new Date().toISOString() } }, { onConflict: "key" });
+  if (upsertErr) return { error: `Failed to update featured tracks: ${upsertErr.message}` };
+
+  return {
+    success: true,
+    featured_count: validIds.length,
+    label,
+    songs: songs.map(s => s.title),
+    message: `Landing page updated: ${validIds.length} tracks featured as "${label}".`,
+  };
+}
+
 // ── Fetch agent context ─────────────────────────────────────────────────
 
 async function fetchAgentContext(supabaseUrl: string, userId: string) {
