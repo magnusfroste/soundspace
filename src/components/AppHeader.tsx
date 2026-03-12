@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { NavLink } from "react-router-dom";
 import { useProfile } from "@/hooks/useProfile";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificationBell } from "@/components/NotificationBell";
 
 interface AppHeaderProps {
   viewMode: "dashboard" | "chat";
