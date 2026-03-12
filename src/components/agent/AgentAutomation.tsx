@@ -29,7 +29,7 @@ export function AgentAutomation() {
     try {
       const res = await supabase.functions.invoke("agent-cron");
       if (res.error) throw res.error;
-      toast.success(`Cron completed — processed ${res.data?.processed ?? 0} objective(s)`);
+      toast.success(`Cron fired ${res.data?.fired ?? 0} task(s) — running in background`);
       queryClient.invalidateQueries({ queryKey: ["cron-logs"] });
     } catch (e: any) { toast.error("Cron failed: " + (e.message || "Unknown error")); }
     finally { setRunning(false); }
