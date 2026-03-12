@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.normalize-metadata]
 verify_jwt = false
+
+[functions.update-cron-schedule]
+verify_jwt = false
