@@ -666,6 +666,23 @@ const TOOLS = [
       }
     }
   },
+  {
+    type: "function",
+    function: {
+      name: "notify_admin",
+      description: "Send a notification to the admin dashboard. Use after completing significant autonomous work (e.g. tracks generated, playlists created, landing page updated).",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string", description: "Short notification title" },
+          message: { type: "string", description: "Detailed message about what was done" },
+          category: { type: "string", description: "Category: generation, playlist, promotion, analytics, agent" },
+        },
+        required: ["title", "message"],
+        additionalProperties: false
+      }
+    }
+  },
 ];
 
 // ── Knowledge base ──────────────────────────────────────────────────────
