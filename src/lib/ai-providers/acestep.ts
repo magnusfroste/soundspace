@@ -286,6 +286,7 @@ function computeClientQualityScore(
 }
 
 
+export const aceStepProvider: AIProvider = {
   id: "acestep",
   name: "ACE-Step",
   description: "Open-source music generation (self-hosted ACE-Step v1.5)",
@@ -297,7 +298,6 @@ function computeClientQualityScore(
 
     const payload = buildPayload(options, model, 1);
 
-    // Include source audio as base64 for cover/repaint/complete
     const taskType = options.taskType || "text2music";
     if (options.sourceAudioBlob && ["cover", "repaint", "complete"].includes(taskType)) {
       payload.src_audio_base64 = await blobToBase64(options.sourceAudioBlob);
@@ -347,15 +347,13 @@ function computeClientQualityScore(
           const extracted = await extractAudioFeatures(v.audioBlob);
           v.qualityScore = computeClientQualityScore(extracted, options);
         } catch {
-          v.qualityScore = 0.75; // Default if analysis fails
+          v.qualityScore = 0.75;
         }
         return v;
       })
     );
 
-    // Sort by real quality score descending
     scored.sort((a, b) => (b.qualityScore ?? 0) - (a.qualityScore ?? 0));
-
     return scored;
   },
 
@@ -427,41 +425,6 @@ export async function extractAudioFeatures(audioBlob: Blob): Promise<AudioExtrac
   const taskId = releaseData?.task_id || releaseData?.data?.task_id;
   if (!taskId) throw new Error("ACE-Step did not return a task_id for extract");
 
-/** Compute quality score by comparing extracted features vs requested params */
-function computeClientQualityScore(
-  extracted: AudioExtractResult,
-  options: GenerateOptions,
-): number {
-  let score = 1.0;
-
-  // BPM accuracy (40%)
-  if (extracted.bpm && options.bpm) {
-    const deviation = Math.abs(extracted.bpm - options.bpm) / options.bpm;
-    if (deviation > 0.20) score -= 0.40;
-    else if (deviation > 0.10) score -= 0.20;
-    else if (deviation > 0.05) score -= 0.05;
-  }
-
-  // Key match (35%)
-  if (extracted.keyScale && options.keyScale) {
-    const eKey = extracted.keyScale.toLowerCase().trim();
-    const rKey = options.keyScale.toLowerCase().trim();
-    if (eKey !== rKey) {
-      const eRoot = eKey.split(" ")[0];
-      const rRoot = rKey.split(" ")[0];
-      score -= eRoot === rRoot ? 0.15 : 0.35;
-    }
-  }
-
-  // Time signature (25%)
-  if (extracted.timeSignature && options.timeSignature) {
-    if (extracted.timeSignature.trim() !== options.timeSignature.trim()) {
-      score -= 0.25;
-    }
-  }
-
-  return Math.max(0, Math.round(score * 100) / 100);
-}
   const results = await pollResult(taskId);
   const item = Array.isArray(results) ? results[0] : results;
 
