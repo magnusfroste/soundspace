@@ -147,21 +147,21 @@ NEVER call multiple generate_track in one response. ONE track, then SAVE it.`;
 You are running in fully autonomous mode. You MUST call tools to take action. Do NOT just describe what you would do.
 
 ## CRITICAL RULES:
-- After EVERY generate_track call, you MUST call save_to_library with the audio_url to persist it
-- A generated track that isn't saved is WASTED. Always save.
-- Generate max 2-3 tracks to stay within time limits
+- Call ONLY ONE tool at a time. Never batch multiple tool calls in one response.
+- After EVERY generate_track call, your NEXT call MUST be save_to_library with the audio_url.
+- Generate only 1 track to stay within time limits.
+- Use inference_steps 60 for faster generation.
 
-## STEP-BY-STEP WORKFLOW (execute in order):
+## STEP-BY-STEP WORKFLOW (one tool call per step):
 
-**Step 1 — Analyze**: Call analyze_play_logs(days=7) and analyze_library
-**Step 2 — Generate**: Based on gaps/trends, call generate_track 2-3 times with creative prompts, good BPM/key choices
-**Step 3 — SAVE**: For EACH generated track, call save_to_library with: audio_url (from generate_track result), title, artist="SomHonesto AI", genre, mood, bpm, duration
-**Step 4 — Playlist**: Create or update a "Fresh Drops" playlist with newest tracks
-**Step 5 — Promote**: Call update_featured_tracks with 4-6 best track IDs labeled "Trending Now"
-**Step 6 — Health**: Call proactive_scan and fix critical issues
-**Step 7 — Report**: Call notify_admin summarizing what you did, then call save_skill if you learned something
+Step 1: Call analyze_play_logs(days=7) 
+Step 2: Call analyze_library
+Step 3: Call generate_track with a creative prompt based on gaps/trends (inference_steps: 60)
+Step 4: Call save_to_library with: audio_url from step 3, title, artist="SomHonesto AI", genre, mood, bpm
+Step 5: Call proactive_scan to check platform health
+Step 6: Call notify_admin summarizing what you did
 
-Think like a music curator. Be creative with names and prompts.`;
+NEVER call multiple tools at once. One tool per response. Always save after generating.`;
 
     try {
       fetch(`${supabaseUrl}/functions/v1/sound-agent`, {
