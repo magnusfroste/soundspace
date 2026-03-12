@@ -886,6 +886,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      update_agent_cron_schedule: {
+        Args: { new_schedule: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "business"
