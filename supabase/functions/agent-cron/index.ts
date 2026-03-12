@@ -142,20 +142,26 @@ DO NOT skip save_to_library. A track that isn't saved is wasted work.`;
     const adminUserId = adminRole.user_id;
     console.log(`[agent-cron] Starting proactive cycle for admin ${adminUserId}`);
 
-    const proactivePrompt = `[AUTONOMOUS PROACTIVE CYCLE]
+    const proactivePrompt = `[AUTONOMOUS PROACTIVE CYCLE — TOOL USE REQUIRED]
 
-You are running in fully autonomous mode at the scheduled daily maintenance time. Execute the following workflow WITHOUT asking questions — just act on data:
+You are running in fully autonomous mode. You MUST call tools to take action. Do NOT just describe what you would do.
 
-1. **Trend Analysis**: Call analyze_play_logs(days=7) to see what's trending this week
-2. **Library Check**: Call analyze_library to find gaps and opportunities  
-3. **Generate Content**: Based on trends and gaps, generate 2-3 new tracks in popular or underrepresented genres. Choose creative titles, appropriate BPM/key for the genre.
-4. **Save Everything**: Save all generated tracks to the library with full metadata
-5. **Playlist Curation**: Create or update a "Fresh Drops" playlist with the newest high-quality tracks (last 7 days)
-6. **Landing Promotion**: Call update_featured_tracks with the best 4-6 tracks (mix of new and trending) labeled "Trending Now"
-7. **Health Check**: Run proactive_scan and fix any critical issues (missing metadata, empty schedules)
+## CRITICAL RULES:
+- After EVERY generate_track call, you MUST call save_to_library with the audio_url to persist it
+- A generated track that isn't saved is WASTED. Always save.
+- Generate max 2-3 tracks to stay within time limits
 
-Be creative with track names and prompts. Think like a music curator — what would delight listeners?
-After completing, save a skill with what worked well.`;
+## STEP-BY-STEP WORKFLOW (execute in order):
+
+**Step 1 — Analyze**: Call analyze_play_logs(days=7) and analyze_library
+**Step 2 — Generate**: Based on gaps/trends, call generate_track 2-3 times with creative prompts, good BPM/key choices
+**Step 3 — SAVE**: For EACH generated track, call save_to_library with: audio_url (from generate_track result), title, artist="SomHonesto AI", genre, mood, bpm, duration
+**Step 4 — Playlist**: Create or update a "Fresh Drops" playlist with newest tracks
+**Step 5 — Promote**: Call update_featured_tracks with 4-6 best track IDs labeled "Trending Now"
+**Step 6 — Health**: Call proactive_scan and fix critical issues
+**Step 7 — Report**: Call notify_admin summarizing what you did, then call save_skill if you learned something
+
+Think like a music curator. Be creative with names and prompts.`;
 
     try {
       fetch(`${supabaseUrl}/functions/v1/sound-agent`, {
