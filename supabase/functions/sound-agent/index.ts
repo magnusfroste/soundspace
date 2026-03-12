@@ -2062,8 +2062,9 @@ Deno.serve(async (req) => {
                 case "notify_admin": result = userId ? await executeNotifyAdmin(args, supabaseUrl, userId) : { error: "No user context" }; break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
-            } catch (e) { result = { error: `Tool error: ${e.message}` }; }
+            } catch (e) { result = { error: `Tool error: ${e.message}` }; console.error(`[sound-agent] Tool ${fn} error:`, e.message); }
 
+            console.log(`[sound-agent] Tool ${fn} result: ${JSON.stringify(result).slice(0, 300)}`);
             llmMessages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
           }
         }
