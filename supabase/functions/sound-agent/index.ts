@@ -962,54 +962,58 @@ async function generateWithBatch(
   const taskId = unwrapped?.task_id || unwrapped?.taskId || unwrapped?.id;
   if (!taskId) return { error: `No task_id returned. Response: ${JSON.stringify(releaseData).slice(0, 300)}` };
 
-  // Poll for results
-  let resultData: any = null;
-  for (let i = 0; i < 120; i++) {
-    await new Promise(r => setTimeout(r, 3000));
-    const pollRes = await fetch(acestepProxy, { method: "POST", headers, body: JSON.stringify({ endpoint: "/query_result", method: "POST", body: { task_id_list: [taskId] } }) });
-    if (!pollRes.ok) continue;
-    let pollData = await pollRes.json();
-    if (pollData && typeof pollData === "object" && "code" in pollData && "data" in pollData) pollData = pollData.data;
-    const tasks = Array.isArray(pollData) ? pollData : pollData?.data || [pollData];
-    const task = Array.isArray(tasks) ? tasks[0] : tasks;
-    if (!task) continue;
-    console.log(`Poll ${i}: status=${task.status}`);
-    if (task.status === 1) { resultData = typeof task.result === "string" ? JSON.parse(task.result) : task.result; break; }
-    if (task.status === 2) return { error: "ACE-Step generation failed" };
+  // Poll for results using shared helper
+  let resultData: any;
+  try {
+    resultData = await pollAceStepTask(acestepProxy, headers, taskId, 120, 3000);
+  } catch (e: any) {
+    return { error: e.message || "Generation timed out" };
   }
 
-  if (!resultData) return { error: "Generation timed out after 360 seconds" };
-
-  // Select best variation by quality_score
   const resultItems = Array.isArray(resultData) ? resultData : [resultData];
   console.log(`Batch returned ${resultItems.length} variations`);
-  
-  // Sort by quality_score descending
-  resultItems.sort((a, b) => (b.quality_score ?? -1) - (a.quality_score ?? -1));
+
+  // Download first variation's audio, then analyze it for real quality scoring
   const bestItem = resultItems[0];
-  // If ACE-Step doesn't return a quality_score, treat as passing (1.0) to avoid pointless retries
-  const qualityScore = (bestItem.quality_score !== undefined && bestItem.quality_score !== null) ? bestItem.quality_score : 1.0;
-  
-  console.log(`Best variation quality_score: ${qualityScore}`);
-  
   const audioPath = bestItem?.url || bestItem?.file;
   if (!audioPath) return { error: `No audio path in result: ${JSON.stringify(resultData).slice(0, 300)}` };
 
-  // Download best audio
   const audioRes = await fetch(acestepProxy, { method: "POST", headers, body: JSON.stringify({ endpoint: audioPath, method: "GET" }) });
   if (!audioRes.ok) return { error: `Failed to download audio (${audioRes.status})` };
 
   const audioBlob = await audioRes.arrayBuffer();
   if (audioBlob.byteLength < 1000) return { error: `Audio too small (${audioBlob.byteLength} bytes)` };
 
+  // Upload temporarily to get a URL for analysis
+  const sb = getServiceClient(acestepProxy.replace("/functions/v1/acestep-proxy", ""));
+  const tempFileName = `agent/tmp-analysis-${crypto.randomUUID()}.wav`;
+  await sb.storage.from("songs").upload(tempFileName, new Uint8Array(audioBlob), { contentType: "audio/wav", upsert: true });
+  const { data: tempUrlData } = sb.storage.from("songs").getPublicUrl(tempFileName);
+
+  // Run real quality analysis via extract endpoint
+  console.log("Running extract analysis for real quality scoring...");
+  const extracted = await analyzeAudioViaExtract(acestepProxy, headers, tempUrlData.publicUrl);
+
+  // Clean up temp file (fire & forget)
+  sb.storage.from("songs").remove([tempFileName]).catch(() => {});
+
+  const qualityScore = computeRealQualityScore(extracted, {
+    bpm: params.bpm,
+    keyScale: params.keyScale,
+    timeSig: params.timeSig,
+  });
+  
+  console.log(`Real quality assessment: score=${qualityScore}, extracted=`, JSON.stringify(extracted));
+
   return {
     audioBlob,
     qualityScore,
     metadata: {
-      bpm: bestItem.bpm ?? params.bpm,
-      key_scale: bestItem.keyscale ?? params.keyScale,
-      time_signature: bestItem.timesignature ?? params.timeSig,
+      bpm: extracted?.bpm ?? bestItem.bpm ?? params.bpm,
+      key_scale: extracted?.keyScale ?? bestItem.keyscale ?? params.keyScale,
+      time_signature: extracted?.timeSignature ?? bestItem.timesignature ?? params.timeSig,
       variations_generated: resultItems.length,
+      analysis: extracted ? { extracted_bpm: extracted.bpm, extracted_key: extracted.keyScale, extracted_time_sig: extracted.timeSignature, caption: extracted.caption } : null,
     }
   };
 }
