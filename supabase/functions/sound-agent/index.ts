@@ -1,4 +1,95 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import lamejs from "https://esm.sh/lamejs@1.2.1";
+
+/**
+ * Convert a WAV ArrayBuffer to MP3 (128 kbps).
+ * Parses the WAV header to extract sample rate, channels, and bit depth,
+ * then encodes PCM samples via lamejs.
+ */
+function wavToMp3(wavBuffer: ArrayBuffer): Uint8Array {
+  const dv = new DataView(wavBuffer);
+
+  // Parse WAV header
+  const numChannels = dv.getUint16(22, true);
+  const sampleRate = dv.getUint32(24, true);
+  const bitsPerSample = dv.getUint16(34, true);
+
+  // Find "data" sub-chunk
+  let dataOffset = 12;
+  while (dataOffset < dv.byteLength - 8) {
+    const chunkId = String.fromCharCode(
+      dv.getUint8(dataOffset), dv.getUint8(dataOffset + 1),
+      dv.getUint8(dataOffset + 2), dv.getUint8(dataOffset + 3),
+    );
+    const chunkSize = dv.getUint32(dataOffset + 4, true);
+    if (chunkId === "data") {
+      dataOffset += 8;
+      break;
+    }
+    dataOffset += 8 + chunkSize;
+  }
+
+  const bytesPerSample = bitsPerSample / 8;
+  const totalSamples = Math.floor((wavBuffer.byteLength - dataOffset) / bytesPerSample);
+  const samplesPerChannel = Math.floor(totalSamples / numChannels);
+
+  // Extract interleaved PCM → per-channel Int16 arrays
+  const left = new Int16Array(samplesPerChannel);
+  const right = numChannels > 1 ? new Int16Array(samplesPerChannel) : left;
+
+  for (let i = 0; i < samplesPerChannel; i++) {
+    const offset = dataOffset + i * numChannels * bytesPerSample;
+    if (bitsPerSample === 16) {
+      left[i] = dv.getInt16(offset, true);
+      if (numChannels > 1) right[i] = dv.getInt16(offset + 2, true);
+    } else if (bitsPerSample === 32) {
+      // 32-bit float → 16-bit int
+      const lf = dv.getFloat32(offset, true);
+      left[i] = Math.max(-32768, Math.min(32767, Math.round(lf * 32767)));
+      if (numChannels > 1) {
+        const rf = dv.getFloat32(offset + 4, true);
+        right[i] = Math.max(-32768, Math.min(32767, Math.round(rf * 32767)));
+      }
+    } else {
+      // 24-bit → 16-bit (shift down 8 bits)
+      const b0 = dv.getUint8(offset);
+      const b1 = dv.getUint8(offset + 1);
+      const b2 = dv.getUint8(offset + 2);
+      let val = (b2 << 16) | (b1 << 8) | b0;
+      if (val & 0x800000) val |= ~0xFFFFFF; // sign extend
+      left[i] = val >> 8;
+      if (numChannels > 1) {
+        const o2 = offset + 3;
+        let v2 = (dv.getUint8(o2 + 2) << 16) | (dv.getUint8(o2 + 1) << 8) | dv.getUint8(o2);
+        if (v2 & 0x800000) v2 |= ~0xFFFFFF;
+        right[i] = v2 >> 8;
+      }
+    }
+  }
+
+  // Encode to MP3 128 kbps
+  const mp3Encoder = new lamejs.Mp3Encoder(numChannels, sampleRate, 128);
+  const mp3Parts: Uint8Array[] = [];
+  const BLOCK = 1152;
+
+  for (let i = 0; i < samplesPerChannel; i += BLOCK) {
+    const lChunk = left.subarray(i, i + BLOCK);
+    const rChunk = numChannels > 1 ? right.subarray(i, i + BLOCK) : lChunk;
+    const mp3buf = numChannels > 1
+      ? mp3Encoder.encodeBuffer(lChunk, rChunk)
+      : mp3Encoder.encodeBuffer(lChunk);
+    if (mp3buf.length > 0) mp3Parts.push(new Uint8Array(mp3buf));
+  }
+  const flush = mp3Encoder.flush();
+  if (flush.length > 0) mp3Parts.push(new Uint8Array(flush));
+
+  // Concat
+  const totalLen = mp3Parts.reduce((s, p) => s + p.length, 0);
+  const result = new Uint8Array(totalLen);
+  let off = 0;
+  for (const p of mp3Parts) { result.set(p, off); off += p.length; }
+  return result;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
