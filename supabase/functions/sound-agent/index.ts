@@ -2,9 +2,36 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import lamejs from "https://esm.sh/lamejs@1.2.1";
 
 /**
+ * Detect audio format from raw bytes and return format info + optimized data.
+ * ACE-Step returns FLAC data (not WAV), so we detect and handle both.
+ */
+function detectAudioFormat(buffer: ArrayBuffer): { ext: string; mime: string; data: Uint8Array } {
+  const bytes = new Uint8Array(buffer);
+  const magic = String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]);
+  
+  if (magic === "fLaC") {
+    // FLAC — store as-is (browsers support natively, ~50% smaller than WAV)
+    return { ext: "flac", mime: "audio/flac", data: bytes };
+  }
+  
+  if (magic === "RIFF") {
+    // Actual WAV — convert to MP3
+    return { ext: "mp3", mime: "audio/mpeg", data: wavToMp3(buffer) };
+  }
+  
+  // Check for MP3 (ID3 header or sync word)
+  if ((bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) || // ID3
+      (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0)) { // sync
+    return { ext: "mp3", mime: "audio/mpeg", data: bytes };
+  }
+  
+  // Unknown — store as FLAC (most likely from ACE-Step)
+  console.warn(`Unknown audio format magic: ${magic}, treating as FLAC`);
+  return { ext: "flac", mime: "audio/flac", data: bytes };
+}
+
+/**
  * Convert a WAV ArrayBuffer to MP3 (128 kbps).
- * Parses the WAV header to extract sample rate, channels, and bit depth,
- * then encodes PCM samples via lamejs.
  */
 function wavToMp3(wavBuffer: ArrayBuffer): Uint8Array {
   const dv = new DataView(wavBuffer);
@@ -1130,11 +1157,11 @@ async function generateWithBatch(
   const audioBlob = await audioRes.arrayBuffer();
   if (audioBlob.byteLength < 1000) return { error: `Audio too small (${audioBlob.byteLength} bytes)` };
 
-  // Convert WAV→MP3 before uploading temp analysis file
+  // Convert audio before uploading temp analysis file
   const sb = getServiceClient(acestepProxy.replace("/functions/v1/acestep-proxy", ""));
-  const tempMp3 = wavToMp3(audioBlob);
-  const tempFileName = `agent/tmp-analysis-${crypto.randomUUID()}.mp3`;
-  await sb.storage.from("songs").upload(tempFileName, tempMp3, { contentType: "audio/mpeg", upsert: true });
+  const tempAudio = detectAudioFormat(audioBlob);
+  const tempFileName = `agent/tmp-analysis-${crypto.randomUUID()}.${tempAudio.ext}`;
+  await sb.storage.from("songs").upload(tempFileName, tempAudio.data, { contentType: tempAudio.mime, upsert: true });
   const { data: tempUrlData } = sb.storage.from("songs").getPublicUrl(tempFileName);
 
   // Run real quality analysis via extract endpoint
@@ -1249,11 +1276,11 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
     return { error: "All generation attempts failed" };
   }
   
-  // Convert WAV→MP3 before final upload (~10x smaller)
-  const mp3Data = wavToMp3(bestResult.audioBlob);
-  console.log(`WAV→MP3 conversion: ${bestResult.audioBlob.byteLength} → ${mp3Data.length} bytes (${Math.round(mp3Data.length / bestResult.audioBlob.byteLength * 100)}%)`);
-  const fileName = `agent/${crypto.randomUUID()}.mp3`;
-  const { error: uploadErr } = await sb.storage.from("songs").upload(fileName, mp3Data, { contentType: "audio/mpeg", upsert: true });
+  // Convert audio for storage (WAV→MP3, FLAC kept as-is)
+  const audioOut = detectAudioFormat(bestResult.audioBlob);
+  console.log(`Audio conversion: ${bestResult.audioBlob.byteLength} → ${audioOut.data.length} bytes (${audioOut.ext})`);
+  const fileName = `agent/${crypto.randomUUID()}.${audioOut.ext}`;
+  const { error: uploadErr } = await sb.storage.from("songs").upload(fileName, audioOut.data, { contentType: audioOut.mime, upsert: true });
   if (uploadErr) return { error: `Upload failed: ${uploadErr.message}` };
 
   const { data: urlData } = sb.storage.from("songs").getPublicUrl(fileName);
