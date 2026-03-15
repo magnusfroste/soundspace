@@ -13,34 +13,49 @@ function wavToMp3(wavBuffer: ArrayBuffer): Uint8Array {
   const sampleRate = dv.getUint32(24, true);
   const bitsPerSample = dv.getUint16(34, true);
 
-  // Find "data" chunk robustly — scan byte-by-byte if structured scan fails
+  // Find "data" chunk — walk chunks from offset 12
   let dataOffset = -1;
   let dataSize = 0;
 
-  // First try structured chunk walk starting after RIFF header (12 bytes)
+  // Log first 4 bytes to verify RIFF header
+  const magic = String.fromCharCode(dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3));
+  console.log(`WAV header: magic="${magic}", ch=${numChannels}, sr=${sampleRate}, bps=${bitsPerSample}, fileSize=${wavBuffer.byteLength}`);
+
+  // Structured chunk walk
   let pos = 12;
-  while (pos < dv.byteLength - 8) {
+  let chunkCount = 0;
+  while (pos < dv.byteLength - 8 && chunkCount < 100) {
     const c0 = dv.getUint8(pos), c1 = dv.getUint8(pos+1), c2 = dv.getUint8(pos+2), c3 = dv.getUint8(pos+3);
     const chunkId = String.fromCharCode(c0, c1, c2, c3);
     const chunkSize = dv.getUint32(pos + 4, true);
+    console.log(`  Chunk "${chunkId}" at ${pos}, size=${chunkSize}`);
+    chunkCount++;
+
     if (chunkId === "data") {
       dataOffset = pos + 8;
       dataSize = chunkSize;
       break;
     }
-    // Move to next chunk (chunks are word-aligned)
-    const advance = 8 + chunkSize + (chunkSize % 2);
-    if (advance <= 0) break; // prevent infinite loop
-    pos += advance;
+
+    // Validate chunkSize to prevent infinite loop
+    if (chunkSize > wavBuffer.byteLength || chunkSize < 0) {
+      console.log(`  Invalid chunk size, falling back to byte scan`);
+      break;
+    }
+
+    // Move to next chunk (word-aligned)
+    pos += 8 + chunkSize + (chunkSize % 2);
   }
 
-  // Fallback: scan for "data" marker
+  // Fallback: full byte scan for "data"
   if (dataOffset < 0) {
-    for (let i = 12; i < Math.min(dv.byteLength - 8, 1000); i++) {
+    console.log(`Structured walk failed, scanning entire file for 'data' marker...`);
+    for (let i = 12; i < dv.byteLength - 8; i++) {
       if (dv.getUint8(i) === 0x64 && dv.getUint8(i+1) === 0x61 &&
           dv.getUint8(i+2) === 0x74 && dv.getUint8(i+3) === 0x61) {
         dataSize = dv.getUint32(i + 4, true);
         dataOffset = i + 8;
+        console.log(`  Found 'data' at byte ${i}, size=${dataSize}`);
         break;
       }
     }
