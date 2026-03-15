@@ -12,43 +12,97 @@ function wavToMp3(wavBuffer: ArrayBuffer): Uint8Array {
   const numChannels = dv.getUint16(22, true);
   const sampleRate = dv.getUint32(24, true);
   const bitsPerSample = dv.getUint16(34, true);
-  let dataOffset = 12;
-  while (dataOffset < dv.byteLength - 8) {
-    const id = String.fromCharCode(dv.getUint8(dataOffset), dv.getUint8(dataOffset+1), dv.getUint8(dataOffset+2), dv.getUint8(dataOffset+3));
-    const sz = dv.getUint32(dataOffset + 4, true);
-    if (id === "data") { dataOffset += 8; break; }
-    dataOffset += 8 + sz;
+
+  // Find "data" chunk robustly — scan byte-by-byte if structured scan fails
+  let dataOffset = -1;
+  let dataSize = 0;
+
+  // First try structured chunk walk starting after RIFF header (12 bytes)
+  let pos = 12;
+  while (pos < dv.byteLength - 8) {
+    const c0 = dv.getUint8(pos), c1 = dv.getUint8(pos+1), c2 = dv.getUint8(pos+2), c3 = dv.getUint8(pos+3);
+    const chunkId = String.fromCharCode(c0, c1, c2, c3);
+    const chunkSize = dv.getUint32(pos + 4, true);
+    if (chunkId === "data") {
+      dataOffset = pos + 8;
+      dataSize = chunkSize;
+      break;
+    }
+    // Move to next chunk (chunks are word-aligned)
+    const advance = 8 + chunkSize + (chunkSize % 2);
+    if (advance <= 0) break; // prevent infinite loop
+    pos += advance;
   }
-  const bps = bitsPerSample / 8;
-  const samplesPerCh = Math.floor((wavBuffer.byteLength - dataOffset) / bps / numChannels);
-  const left = new Int16Array(samplesPerCh);
-  const right = numChannels > 1 ? new Int16Array(samplesPerCh) : left;
-  for (let i = 0; i < samplesPerCh; i++) {
-    const off = dataOffset + i * numChannels * bps;
+
+  // Fallback: scan for "data" marker
+  if (dataOffset < 0) {
+    for (let i = 12; i < Math.min(dv.byteLength - 8, 1000); i++) {
+      if (dv.getUint8(i) === 0x64 && dv.getUint8(i+1) === 0x61 &&
+          dv.getUint8(i+2) === 0x74 && dv.getUint8(i+3) === 0x61) {
+        dataSize = dv.getUint32(i + 4, true);
+        dataOffset = i + 8;
+        break;
+      }
+    }
+  }
+
+  if (dataOffset < 0 || dataOffset >= dv.byteLength) {
+    throw new Error(`WAV data chunk not found (fileSize=${wavBuffer.byteLength})`);
+  }
+
+  // Use dataSize if valid, otherwise use remaining bytes
+  const availableBytes = wavBuffer.byteLength - dataOffset;
+  const pcmBytes = (dataSize > 0 && dataSize <= availableBytes) ? dataSize : availableBytes;
+
+  const bytesPerSample = bitsPerSample / 8;
+  if (bytesPerSample <= 0 || numChannels <= 0) {
+    throw new Error(`Invalid WAV: bps=${bitsPerSample}, ch=${numChannels}`);
+  }
+  const samplesPerChannel = Math.floor(pcmBytes / (bytesPerSample * numChannels));
+  if (samplesPerChannel <= 0) {
+    throw new Error(`No PCM samples: pcmBytes=${pcmBytes}, bps=${bytesPerSample}, ch=${numChannels}`);
+  }
+
+  const left = new Int16Array(samplesPerChannel);
+  const right = numChannels > 1 ? new Int16Array(samplesPerChannel) : left;
+
+  for (let i = 0; i < samplesPerChannel; i++) {
+    const off = dataOffset + i * numChannels * bytesPerSample;
+    if (off + numChannels * bytesPerSample > dv.byteLength) break;
+
     if (bitsPerSample === 16) {
       left[i] = dv.getInt16(off, true);
       if (numChannels > 1) right[i] = dv.getInt16(off + 2, true);
     } else if (bitsPerSample === 32) {
       left[i] = Math.max(-32768, Math.min(32767, Math.round(dv.getFloat32(off, true) * 32767)));
       if (numChannels > 1) right[i] = Math.max(-32768, Math.min(32767, Math.round(dv.getFloat32(off + 4, true) * 32767)));
-    } else {
-      const b = off; let v = (dv.getUint8(b+2)<<16)|(dv.getUint8(b+1)<<8)|dv.getUint8(b);
-      if (v & 0x800000) v |= ~0xFFFFFF; left[i] = v >> 8;
-      if (numChannels > 1) { const b2=off+3; let v2=(dv.getUint8(b2+2)<<16)|(dv.getUint8(b2+1)<<8)|dv.getUint8(b2); if(v2&0x800000)v2|=~0xFFFFFF; right[i]=v2>>8; }
+    } else if (bitsPerSample === 24) {
+      let v = (dv.getUint8(off+2) << 16) | (dv.getUint8(off+1) << 8) | dv.getUint8(off);
+      if (v & 0x800000) v |= ~0xFFFFFF;
+      left[i] = v >> 8;
+      if (numChannels > 1) {
+        const o2 = off + 3;
+        let v2 = (dv.getUint8(o2+2) << 16) | (dv.getUint8(o2+1) << 8) | dv.getUint8(o2);
+        if (v2 & 0x800000) v2 |= ~0xFFFFFF;
+        right[i] = v2 >> 8;
+      }
     }
   }
+
   const enc = new lamejs.Mp3Encoder(numChannels, sampleRate, 128);
   const parts: Uint8Array[] = [];
-  for (let i = 0; i < samplesPerCh; i += 1152) {
-    const l = left.subarray(i, i+1152);
-    const r = numChannels > 1 ? right.subarray(i, i+1152) : l;
+  for (let i = 0; i < samplesPerChannel; i += 1152) {
+    const l = left.subarray(i, i + 1152);
+    const r = numChannels > 1 ? right.subarray(i, i + 1152) : l;
     const buf = numChannels > 1 ? enc.encodeBuffer(l, r) : enc.encodeBuffer(l);
     if (buf.length > 0) parts.push(new Uint8Array(buf));
   }
   const flush = enc.flush();
   if (flush.length > 0) parts.push(new Uint8Array(flush));
+
   const total = parts.reduce((s, p) => s + p.length, 0);
-  const out = new Uint8Array(total); let o = 0;
+  const out = new Uint8Array(total);
+  let o = 0;
   for (const p of parts) { out.set(p, o); o += p.length; }
   return out;
 }
@@ -62,7 +116,6 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const sb = createClient(supabaseUrl, serviceKey);
 
-  // Find all songs with .wav URLs
   const { data: wavSongs, error } = await sb
     .from("songs")
     .select("id, title, file_url")
@@ -81,12 +134,10 @@ Deno.serve(async (req) => {
   }
 
   console.log(`Found ${wavSongs.length} WAV files to convert`);
-
   const results: { id: string; title: string; status: string; wavSize?: number; mp3Size?: number }[] = [];
 
   for (const song of wavSongs) {
     try {
-      // Extract storage path from public URL
       const urlParts = song.file_url.split("/storage/v1/object/public/songs/");
       if (urlParts.length < 2) {
         results.push({ id: song.id, title: song.title, status: "skip: can't parse path" });
@@ -94,7 +145,6 @@ Deno.serve(async (req) => {
       }
       const storagePath = decodeURIComponent(urlParts[1]);
 
-      // Download WAV
       console.log(`Downloading: ${song.title} (${storagePath})`);
       const { data: wavData, error: dlErr } = await sb.storage.from("songs").download(storagePath);
       if (dlErr || !wavData) {
@@ -105,27 +155,21 @@ Deno.serve(async (req) => {
       const wavBuffer = await wavData.arrayBuffer();
       const wavSize = wavBuffer.byteLength;
 
-      // Convert to MP3
-      console.log(`Converting: ${song.title} (${wavSize} bytes)`);
+      console.log(`Converting: ${song.title} (${wavSize} bytes, ch=${new DataView(wavBuffer).getUint16(22,true)}, sr=${new DataView(wavBuffer).getUint32(24,true)}, bps=${new DataView(wavBuffer).getUint16(34,true)})`);
       const mp3Data = wavToMp3(wavBuffer);
       const mp3Size = mp3Data.length;
       console.log(`Converted: ${wavSize} → ${mp3Size} bytes (${Math.round(mp3Size / wavSize * 100)}%)`);
 
-      // Upload MP3 with new path
       const mp3Path = storagePath.replace(/\.wav$/, ".mp3");
       const { error: upErr } = await sb.storage.from("songs").upload(mp3Path, mp3Data, {
-        contentType: "audio/mpeg",
-        upsert: true,
+        contentType: "audio/mpeg", upsert: true,
       });
       if (upErr) {
         results.push({ id: song.id, title: song.title, status: `upload error: ${upErr.message}` });
         continue;
       }
 
-      // Get new public URL
       const { data: urlData } = sb.storage.from("songs").getPublicUrl(mp3Path);
-
-      // Update database
       const { error: updateErr } = await sb
         .from("songs")
         .update({ file_url: urlData.publicUrl })
@@ -136,13 +180,12 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // Delete old WAV file
       await sb.storage.from("songs").remove([storagePath]);
-
       results.push({ id: song.id, title: song.title, status: "converted", wavSize, mp3Size });
-      console.log(`✓ ${song.title}: ${wavSize} → ${mp3Size}`);
+      console.log(`✓ ${song.title}`);
     } catch (e) {
       results.push({ id: song.id, title: song.title, status: `error: ${e.message}` });
+      console.error(`✗ ${song.title}: ${e.message}`);
     }
   }
 
@@ -151,15 +194,10 @@ Deno.serve(async (req) => {
     .filter(r => r.status === "converted")
     .reduce((s, r) => s + ((r.wavSize || 0) - (r.mp3Size || 0)), 0);
 
-  console.log(`Done! Converted ${converted}/${wavSongs.length}, saved ${Math.round(totalSaved / 1024 / 1024)} MB`);
-
   return new Response(JSON.stringify({
-    converted,
-    total: wavSongs.length,
+    converted, total: wavSongs.length,
     savedBytes: totalSaved,
     savedMB: Math.round(totalSaved / 1024 / 1024),
     results,
-  }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 });
