@@ -128,8 +128,19 @@ Deno.serve(async (req) => {
     }
 
     const audioBlob = await audioRes.arrayBuffer();
-    const fileExt = audioUrl.includes('.wav') ? 'wav' : 'mp3';
-    const fileName = `suno-${songId}.${fileExt}`;
+    const isWav = audioUrl.includes('.wav') || audioRes.headers.get('content-type')?.includes('audio/wav');
+
+    let uploadData: Uint8Array | ArrayBuffer = audioBlob;
+    let contentType = 'audio/mpeg';
+    const fileName = `suno-${songId}.mp3`;
+
+    if (isWav) {
+      console.log(`Converting WAV (${audioBlob.byteLength} bytes) to MP3...`);
+      uploadData = wavToMp3(audioBlob);
+      console.log(`Converted to MP3: ${(uploadData as Uint8Array).length} bytes`);
+    } else {
+      uploadData = new Uint8Array(audioBlob);
+    }
 
     // Upload to Supabase Storage
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
@@ -139,8 +150,8 @@ Deno.serve(async (req) => {
 
     const { error: uploadError } = await supabase.storage
       .from('songs')
-      .upload(fileName, audioBlob, {
-        contentType: fileExt === 'wav' ? 'audio/wav' : 'audio/mpeg',
+      .upload(fileName, uploadData, {
+        contentType,
         upsert: true,
       });
 
