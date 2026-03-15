@@ -1276,11 +1276,11 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
     return { error: "All generation attempts failed" };
   }
   
-  // Convert WAV→MP3 before final upload (~10x smaller)
-  const mp3Data = wavToMp3(bestResult.audioBlob);
-  console.log(`WAV→MP3 conversion: ${bestResult.audioBlob.byteLength} → ${mp3Data.length} bytes (${Math.round(mp3Data.length / bestResult.audioBlob.byteLength * 100)}%)`);
-  const fileName = `agent/${crypto.randomUUID()}.mp3`;
-  const { error: uploadErr } = await sb.storage.from("songs").upload(fileName, mp3Data, { contentType: "audio/mpeg", upsert: true });
+  // Convert audio for storage (WAV→MP3, FLAC kept as-is)
+  const audioOut = detectAudioFormat(bestResult.audioBlob);
+  console.log(`Audio conversion: ${bestResult.audioBlob.byteLength} → ${audioOut.data.length} bytes (${audioOut.ext})`);
+  const fileName = `agent/${crypto.randomUUID()}.${audioOut.ext}`;
+  const { error: uploadErr } = await sb.storage.from("songs").upload(fileName, audioOut.data, { contentType: audioOut.mime, upsert: true });
   if (uploadErr) return { error: `Upload failed: ${uploadErr.message}` };
 
   const { data: urlData } = sb.storage.from("songs").getPublicUrl(fileName);
