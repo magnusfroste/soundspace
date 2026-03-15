@@ -47,7 +47,7 @@ export function TrimEditor({ audioUrl, onTrimmed, onCancel }: TrimEditorProps) {
       if (!containerRef.current) return;
 
       const WaveSurfer = (await import("wavesurfer.js")).default;
-      const RegionsPlugin = (await import("wavesurfer.js/dist/plugins/regions.esm.js")).default;
+      const RegionsPlugin = (await import("wavesurfer.js/dist/plugins/regions")).default;
 
       if (cancelled) return;
 
