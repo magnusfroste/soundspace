@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { FLACDecoder } from "https://esm.sh/@wasm-audio-decoders/flac@0.4.3";
+import { FLACDecoder } from "https://esm.sh/@nickytonline/flac-decoder@0.4.3";
 import lamejs from "https://esm.sh/lamejs@1.2.1";
 
 const corsHeaders = {
