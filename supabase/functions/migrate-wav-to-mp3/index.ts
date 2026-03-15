@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { FLACDecoder } from "https://esm.sh/@nickytonline/flac-decoder@0.4.3";
+// @deno-types="https://esm.sh/@types/emscripten@1.39.10"
+import { FLACDecoder } from "https://cdn.jsdelivr.net/npm/@nickytonline/wasm-audio-decoders@0.0.2/src/flac-decoder/index.js";
 import lamejs from "https://esm.sh/lamejs@1.2.1";
 
 const corsHeaders = {
