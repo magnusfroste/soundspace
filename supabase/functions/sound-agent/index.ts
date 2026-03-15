@@ -1130,10 +1130,11 @@ async function generateWithBatch(
   const audioBlob = await audioRes.arrayBuffer();
   if (audioBlob.byteLength < 1000) return { error: `Audio too small (${audioBlob.byteLength} bytes)` };
 
-  // Upload temporarily to get a URL for analysis
+  // Convert WAV→MP3 before uploading temp analysis file
   const sb = getServiceClient(acestepProxy.replace("/functions/v1/acestep-proxy", ""));
-  const tempFileName = `agent/tmp-analysis-${crypto.randomUUID()}.wav`;
-  await sb.storage.from("songs").upload(tempFileName, new Uint8Array(audioBlob), { contentType: "audio/wav", upsert: true });
+  const tempMp3 = wavToMp3(audioBlob);
+  const tempFileName = `agent/tmp-analysis-${crypto.randomUUID()}.mp3`;
+  await sb.storage.from("songs").upload(tempFileName, tempMp3, { contentType: "audio/mpeg", upsert: true });
   const { data: tempUrlData } = sb.storage.from("songs").getPublicUrl(tempFileName);
 
   // Run real quality analysis via extract endpoint
