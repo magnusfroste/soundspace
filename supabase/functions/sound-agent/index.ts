@@ -1388,15 +1388,27 @@ async function executeAnalyze(args: { audio_url: string }, supabaseUrl: string, 
 
 async function executeSave(args: any, supabaseUrl: string) {
   const sb = getServiceClient(supabaseUrl);
+  // Normalize genre/mood and convert quality score to 0-100 scale
+  const genre = normalizeGenre(args.genre);
+  const mood = normalizeMood(args.mood);
+  let qualityScore = args.quality_score ?? null;
+  // If score is decimal (0-1), convert to percentage (0-100)
+  if (qualityScore !== null && qualityScore > 0 && qualityScore <= 1) {
+    qualityScore = Math.round(qualityScore * 100);
+  }
+  // Quality gate: reject tracks under 70
+  if (qualityScore !== null && qualityScore < 70) {
+    return { error: `Quality score ${qualityScore} is below minimum threshold (70). Track not saved. Try regenerating with different parameters.`, quality_score: qualityScore };
+  }
   const { data, error } = await sb.from("songs").insert({
-    title: args.title, file_url: args.audio_url, genre: args.genre || null, mood: args.mood || null,
+    title: args.title, file_url: args.audio_url, genre, mood,
     bpm: args.bpm ? Math.round(args.bpm) : null, key_scale: args.key_scale || null,
     time_signature: args.time_signature || null, duration: Math.round(args.duration || 60),
-    lyrics: args.lyrics || null, prompt: args.prompt || null, quality_score: args.quality_score ?? null,
+    lyrics: args.lyrics || null, prompt: args.prompt || null, quality_score: qualityScore,
     artist: "SoundAgent AI", origin_source: "sound_agent",
   }).select("id").single();
   if (error) return { error: `Save failed: ${error.message}` };
-  return { success: true, song_id: data.id, title: args.title, message: `"${args.title}" saved to song library.` };
+  return { success: true, song_id: data.id, title: args.title, genre, mood, quality_score: qualityScore, message: `"${args.title}" saved to song library.` };
 }
 
 async function executeUpdateSong(args: any, supabaseUrl: string) {
