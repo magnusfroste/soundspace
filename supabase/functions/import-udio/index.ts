@@ -105,6 +105,9 @@ Deno.serve(async (req) => {
     const coverUrl = song.image_path || null;
     const duration = Math.round(song.duration || 0);
     const tags = song.tags || [];
+    const prompt = song.prompt || null;
+
+    console.log('Udio metadata:', JSON.stringify({ title, artist, duration, tags, prompt: prompt?.slice(0, 100) }));
 
     if (!audioUrl) {
       return new Response(
@@ -183,6 +186,7 @@ Deno.serve(async (req) => {
         duration,
         genre,
         mood,
+        prompt,
         origin_source: 'udio_import',
       })
       .select('id')
