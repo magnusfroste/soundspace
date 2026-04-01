@@ -1412,17 +1412,21 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
 
   const sb = getServiceClient(supabaseUrl);
   
-  // 4. Quality gate with auto-regeneration
-  let bestResult: { audioBlob: ArrayBuffer; qualityScore: number; metadata: any } | null = null;
+  // 4. Quality gate with auto-regeneration, inference escalation & prompt refinement
+  let bestResult: { audioBlob: ArrayBuffer; qualityScore: number; metadata: any; lastAnalysis?: any } | null = null;
   let attempts = 0;
+  let lastAnalysis: any = null;
   
   while (attempts < MAX_REGENERATION_ATTEMPTS) {
     attempts++;
-    console.log(`Generation attempt ${attempts}/${MAX_REGENERATION_ATTEMPTS}, inference_steps=${inferenceSteps}`);
+    const escalatedSteps = getInferenceStepsForAttempt(inferenceSteps, attempts);
+    const refinedCaption = refinePromptForRetry(caption, attempts, { bpm, keyScale, timeSig }, lastAnalysis);
+    
+    console.log(`Generation attempt ${attempts}/${MAX_REGENERATION_ATTEMPTS}, inference_steps=${escalatedSteps}, prompt_refined=${attempts > 1}`);
     
     const result = await generateWithBatch(acestepProxy, headers, {
-      caption, lyrics, duration, bpm, keyScale, timeSig, referenceAudioUrl,
-      inferenceSteps, coverStrength, taskType, repaintingStart, repaintingEnd
+      caption: refinedCaption, lyrics, duration, bpm, keyScale, timeSig, referenceAudioUrl,
+      inferenceSteps: escalatedSteps, coverStrength, taskType, repaintingStart, repaintingEnd
     });
     
     if ("error" in result) {
@@ -1431,9 +1435,12 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
       continue;
     }
     
+    // Track last analysis for prompt refinement on next retry
+    lastAnalysis = result.lastAnalysis || null;
+    
     // Check quality gate
     if (result.qualityScore >= QUALITY_THRESHOLD) {
-      console.log(`Quality threshold met (${result.qualityScore} >= ${QUALITY_THRESHOLD})`);
+      console.log(`Quality threshold met (${result.qualityScore} >= ${QUALITY_THRESHOLD}) on attempt ${attempts}`);
       bestResult = result;
       break;
     }
@@ -1444,7 +1451,7 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
     }
     
     if (attempts < MAX_REGENERATION_ATTEMPTS) {
-      console.log(`Quality ${result.qualityScore} below threshold ${QUALITY_THRESHOLD}, retrying...`);
+      console.log(`Quality ${result.qualityScore} below threshold ${QUALITY_THRESHOLD}, escalating inference_steps and refining prompt...`);
     }
   }
   
