@@ -1026,44 +1026,90 @@ async function analyzeAudioViaExtract(
   }
 }
 
+/** Simple keyword-based caption similarity (0-1) */
+function computeCaptionSimilarity(extractedCaption: string | undefined, originalPrompt: string): number {
+  if (!extractedCaption || !originalPrompt) return 1.0; // No penalty if unavailable
+  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 2);
+  const promptWords = new Set(normalize(originalPrompt));
+  const captionWords = normalize(extractedCaption);
+  if (promptWords.size === 0 || captionWords.length === 0) return 1.0;
+  const matches = captionWords.filter(w => promptWords.has(w)).length;
+  return matches / Math.max(promptWords.size, 1);
+}
+
+/** Refine prompt on retry — add more specific musical instructions */
+function refinePromptForRetry(
+  originalPrompt: string,
+  attempt: number,
+  requested: { bpm: number; keyScale: string; timeSig: string },
+  lastAnalysis?: { bpm?: number; keyScale?: string; caption?: string } | null,
+): string {
+  const additions: string[] = [];
+  if (attempt >= 2) {
+    additions.push(`IMPORTANT: Must be exactly ${requested.bpm} BPM in ${requested.keyScale}, ${requested.timeSig} time signature`);
+  }
+  if (attempt >= 3 && lastAnalysis) {
+    if (lastAnalysis.bpm && Math.abs(lastAnalysis.bpm - requested.bpm) > requested.bpm * 0.1) {
+      additions.push(`Previous attempt was ${lastAnalysis.bpm} BPM which is wrong — target exactly ${requested.bpm} BPM`);
+    }
+    if (lastAnalysis.keyScale && lastAnalysis.keyScale.toLowerCase() !== requested.keyScale.toLowerCase()) {
+      additions.push(`Previous attempt was in ${lastAnalysis.keyScale} — must be ${requested.keyScale}`);
+    }
+  }
+  return additions.length > 0 ? `${originalPrompt}. ${additions.join(". ")}` : originalPrompt;
+}
+
+/** Inference steps escalation per attempt */
+function getInferenceStepsForAttempt(baseSteps: number, attempt: number): number {
+  // attempt 1 → base, attempt 2 → base*1.5, attempt 3 → base*2
+  const multiplier = 1 + (attempt - 1) * 0.5;
+  return Math.min(Math.round(baseSteps * multiplier), 250);
+}
+
 /** Compute a real quality score by comparing extracted features vs requested params */
 function computeRealQualityScore(
-  extracted: { bpm?: number; keyScale?: string; timeSignature?: string } | null,
-  requested: { bpm: number; keyScale: string; timeSig: string },
+  extracted: { bpm?: number; keyScale?: string; timeSignature?: string; caption?: string } | null,
+  requested: { bpm: number; keyScale: string; timeSig: string; prompt?: string },
 ): number {
   if (!extracted) return 0.75; // Default passing score if analysis unavailable
 
   let score = 1.0;
 
-  // BPM accuracy (weight: 40%)
+  // BPM accuracy (weight: 35%)
   if (extracted.bpm && requested.bpm) {
     const bpmDeviation = Math.abs(extracted.bpm - requested.bpm) / requested.bpm;
-    if (bpmDeviation > 0.20) score -= 0.40;       // >20% off → full penalty
-    else if (bpmDeviation > 0.10) score -= 0.20;   // >10% off → half penalty
-    else if (bpmDeviation > 0.05) score -= 0.05;   // >5% off → minor penalty
+    if (bpmDeviation > 0.20) score -= 0.35;
+    else if (bpmDeviation > 0.10) score -= 0.18;
+    else if (bpmDeviation > 0.05) score -= 0.05;
   }
 
-  // Key match (weight: 35%)
+  // Key match (weight: 30%)
   if (extracted.keyScale && requested.keyScale) {
     const extractedKey = extracted.keyScale.toLowerCase().trim();
     const requestedKey = requested.keyScale.toLowerCase().trim();
     if (extractedKey !== requestedKey) {
-      // Check if same root note (partial match)
       const extractedRoot = extractedKey.split(" ")[0];
       const requestedRoot = requestedKey.split(" ")[0];
       if (extractedRoot === requestedRoot) {
-        score -= 0.15; // Same root, different mode (e.g. C major vs C minor)
+        score -= 0.12;
       } else {
-        score -= 0.35; // Completely different key
+        score -= 0.30;
       }
     }
   }
 
-  // Time signature match (weight: 25%)
+  // Time signature match (weight: 20%)
   if (extracted.timeSignature && requested.timeSig) {
     if (extracted.timeSignature.trim() !== requested.timeSig.trim()) {
-      score -= 0.25;
+      score -= 0.20;
     }
+  }
+
+  // Caption similarity (weight: 15%) — does the output sound like what was requested?
+  if (requested.prompt) {
+    const captionSim = computeCaptionSimilarity(extracted.caption, requested.prompt);
+    if (captionSim < 0.3) score -= 0.15;       // Very different
+    else if (captionSim < 0.5) score -= 0.08;   // Somewhat different
   }
 
   return Math.max(0, Math.round(score * 100) / 100);
