@@ -49,7 +49,7 @@ export const moduleRegistry: Module[] = [
     version: "1.0.0",
     defaultSettings: {
       chatProvider: "lovable",
-      chatModel: "google/gemini-3-flash-preview",
+      chatModel: "google/gemini-2.5-pro",
       sttProvider: "elevenlabs",
       analysisProvider: "acestep",
       generationProvider: "acestep",

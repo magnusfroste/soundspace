@@ -78,7 +78,7 @@ export function SoundAgentSettings() {
       if (error) throw error;
       return (data?.value as unknown as ModuleSettings) || {
         chatProvider: "lovable",
-        chatModel: "google/gemini-3-flash-preview",
+        chatModel: "google/gemini-2.5-pro",
         sttProvider: "elevenlabs",
         analysisProvider: "acestep",
         generationProvider: "acestep",
