@@ -139,7 +139,7 @@ export function useAudioEngine({ onEnded }: UseAudioEngineOptions): AudioEngineS
     const audio = audioRef.current;
     if (!audio) return;
     if (audio.paused) {
-      audio.play().catch(() => {});
+      audio.play().catch((err) => console.warn("Play failed:", err));
     } else {
       audio.pause();
     }
