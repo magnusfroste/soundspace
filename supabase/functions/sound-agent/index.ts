@@ -276,6 +276,20 @@ When running in automated mode (via cron), you should be fully autonomous and pr
 
 Be decisive — don't ask questions in autonomous mode, just act based on data.
 
+### Genre Diversification Rules
+When generating new tracks autonomously, you MUST vary genres. Follow these rules:
+1. **Check library distribution first** — call analyze_library before generating
+2. **Never generate the same genre twice in a row** — if the last generated track was Jazz, the next must be different
+3. **Target genre balance** — aim for roughly equal coverage across: Jazz, Ambient, Acoustic, Electronic, Classical, Lo-Fi, World, Soul, Bossa Nova, Downtempo
+4. **Prioritize underrepresented genres** — if you have 20 Jazz tracks and 2 Electronic tracks, generate Electronic
+5. **Use standardized genre names** — always use exact names: "Jazz", "Lounge Jazz", "Ambient", "Lo-Fi", "Electronic", "Classical", "Acoustic", "World", "Soul", "Bossa Nova", "Downtempo", "Trip-Hop", "Smooth Jazz", "Neo-Classical", "R&B", "Funk", "Blues"
+6. **Use standardized mood names** — always use exact names: "Relaxed", "Calm", "Energetic", "Upbeat", "Focused", "Uplifting", "Romantic", "Dreamy", "Warm", "Reflective"
+
+### Quality Standards
+- Quality scores use a 0-100 scale. 70 is minimum acceptable.
+- Tracks below 70 quality will be REJECTED by the save function — regenerate with adjusted parameters.
+- Always pass the quality_score from generate_track to save_to_library.
+
 ## PROACTIVE BEHAVIOR
 
 **You should actively look for opportunities to help.** When the conversation starts or when appropriate:
@@ -860,6 +874,66 @@ async function isIntegrationEnabledServer(integrationId: string, supabaseUrl: st
   }
 }
 
+// ── Genre normalization ─────────────────────────────────────────────────
+
+const GENRE_NORMALIZATION_MAP: Record<string, string> = {
+  // Lounge variants
+  "lounge": "Lounge Jazz", "lounge jazz": "Lounge Jazz", "lounge_jazz": "Lounge Jazz",
+  "jazz lounge": "Lounge Jazz", "jazzy lounge": "Lounge Jazz",
+  "ambient lounge": "Ambient Lounge", "ambient_lounge": "Ambient Lounge",
+  "chill lounge": "Ambient Lounge", "lounge ambient": "Ambient Lounge",
+  // Jazz variants
+  "jazz": "Jazz", "smooth jazz": "Smooth Jazz", "smooth_jazz": "Smooth Jazz",
+  "bossa nova": "Bossa Nova", "bossa": "Bossa Nova",
+  "latin jazz": "Latin Jazz", "latin_jazz": "Latin Jazz",
+  // Ambient variants
+  "ambient": "Ambient", "ambient electronic": "Ambient Electronic",
+  "ambient_electronic": "Ambient Electronic", "dark ambient": "Dark Ambient",
+  // Lo-Fi variants
+  "lo-fi": "Lo-Fi", "lofi": "Lo-Fi", "lo fi": "Lo-Fi", "lo-fi hip hop": "Lo-Fi",
+  "lo-fi beats": "Lo-Fi", "lofi hip hop": "Lo-Fi", "chillhop": "Lo-Fi",
+  // Electronic variants
+  "electronic": "Electronic", "electronica": "Electronic", "synth": "Electronic",
+  "downtempo": "Downtempo", "trip-hop": "Trip-Hop", "trip hop": "Trip-Hop",
+  // Acoustic
+  "acoustic": "Acoustic", "folk": "Acoustic Folk", "singer-songwriter": "Acoustic",
+  // Classical
+  "classical": "Classical", "neo-classical": "Neo-Classical", "neoclassical": "Neo-Classical",
+  "piano": "Classical Piano", "orchestral": "Classical",
+  // World
+  "world": "World", "world music": "World", "ethnic": "World",
+  // Other
+  "soul": "Soul", "r&b": "R&B", "rnb": "R&B", "funk": "Funk",
+  "blues": "Blues", "reggae": "Reggae", "pop": "Pop",
+};
+
+const MOOD_NORMALIZATION_MAP: Record<string, string> = {
+  "relaxed": "Relaxed", "relaxing": "Relaxed", "chill": "Relaxed", "mellow": "Relaxed",
+  "calm": "Calm", "peaceful": "Calm", "serene": "Calm", "tranquil": "Calm",
+  "energetic": "Energetic", "upbeat": "Upbeat", "lively": "Energetic",
+  "focused": "Focused", "concentration": "Focused", "study": "Focused",
+  "uplifting": "Uplifting", "happy": "Uplifting", "joyful": "Uplifting",
+  "romantic": "Romantic", "intimate": "Romantic", "sensual": "Romantic",
+  "dreamy": "Dreamy", "ethereal": "Dreamy", "floating": "Dreamy",
+  "warm": "Warm", "cozy": "Warm", "nostalgic": "Nostalgic",
+  "melancholic": "Melancholic", "sad": "Melancholic", "reflective": "Reflective",
+};
+
+function normalizeGenre(genre: string | null | undefined): string | null {
+  if (!genre) return null;
+  const key = genre.toLowerCase().trim();
+  if (GENRE_NORMALIZATION_MAP[key]) return GENRE_NORMALIZATION_MAP[key];
+  // Capitalize first letter of each word if no match
+  return genre.trim().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function normalizeMood(mood: string | null | undefined): string | null {
+  if (!mood) return null;
+  const key = mood.toLowerCase().trim();
+  if (MOOD_NORMALIZATION_MAP[key]) return MOOD_NORMALIZATION_MAP[key];
+  return mood.trim().replace(/\b\w/g, c => c.toUpperCase());
+}
+
 // ── Enhanced generation with real quality assessment ────────────────────
 
 const QUALITY_THRESHOLD = 0.7;
@@ -1293,7 +1367,7 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
     bpm: bestResult.metadata.bpm,
     key_scale: bestResult.metadata.key_scale,
     time_signature: bestResult.metadata.time_signature,
-    quality_score: bestResult.qualityScore,
+    quality_score: Math.round(bestResult.qualityScore <= 1 ? bestResult.qualityScore * 100 : bestResult.qualityScore),
     quality_analysis: bestResult.metadata.analysis || null,
     prompt: caption,
     attempts,
@@ -1328,15 +1402,27 @@ async function executeAnalyze(args: { audio_url: string }, supabaseUrl: string, 
 
 async function executeSave(args: any, supabaseUrl: string) {
   const sb = getServiceClient(supabaseUrl);
+  // Normalize genre/mood and convert quality score to 0-100 scale
+  const genre = normalizeGenre(args.genre);
+  const mood = normalizeMood(args.mood);
+  let qualityScore = args.quality_score ?? null;
+  // If score is decimal (0-1), convert to percentage (0-100)
+  if (qualityScore !== null && qualityScore > 0 && qualityScore <= 1) {
+    qualityScore = Math.round(qualityScore * 100);
+  }
+  // Quality gate: reject tracks under 70
+  if (qualityScore !== null && qualityScore < 70) {
+    return { error: `Quality score ${qualityScore} is below minimum threshold (70). Track not saved. Try regenerating with different parameters.`, quality_score: qualityScore };
+  }
   const { data, error } = await sb.from("songs").insert({
-    title: args.title, file_url: args.audio_url, genre: args.genre || null, mood: args.mood || null,
+    title: args.title, file_url: args.audio_url, genre, mood,
     bpm: args.bpm ? Math.round(args.bpm) : null, key_scale: args.key_scale || null,
     time_signature: args.time_signature || null, duration: Math.round(args.duration || 60),
-    lyrics: args.lyrics || null, prompt: args.prompt || null, quality_score: args.quality_score ?? null,
+    lyrics: args.lyrics || null, prompt: args.prompt || null, quality_score: qualityScore,
     artist: "SoundAgent AI", origin_source: "sound_agent",
   }).select("id").single();
   if (error) return { error: `Save failed: ${error.message}` };
-  return { success: true, song_id: data.id, title: args.title, message: `"${args.title}" saved to song library.` };
+  return { success: true, song_id: data.id, title: args.title, genre, mood, quality_score: qualityScore, message: `"${args.title}" saved to song library.` };
 }
 
 async function executeUpdateSong(args: any, supabaseUrl: string) {
@@ -1344,13 +1430,17 @@ async function executeUpdateSong(args: any, supabaseUrl: string) {
   const updates: Record<string, any> = {};
   if (args.title !== undefined) updates.title = args.title;
   if (args.artist !== undefined) updates.artist = args.artist;
-  if (args.genre !== undefined) updates.genre = args.genre;
-  if (args.mood !== undefined) updates.mood = args.mood;
+  if (args.genre !== undefined) updates.genre = normalizeGenre(args.genre);
+  if (args.mood !== undefined) updates.mood = normalizeMood(args.mood);
   if (args.bpm !== undefined) updates.bpm = Math.round(args.bpm);
   if (args.key_scale !== undefined) updates.key_scale = args.key_scale;
   if (args.time_signature !== undefined) updates.time_signature = args.time_signature;
   if (args.lyrics !== undefined) updates.lyrics = args.lyrics;
-  if (args.quality_score !== undefined) updates.quality_score = args.quality_score;
+  if (args.quality_score !== undefined) {
+    let qs = args.quality_score;
+    if (qs > 0 && qs <= 1) qs = Math.round(qs * 100);
+    updates.quality_score = qs;
+  }
 
   if (Object.keys(updates).length === 0) return { error: "No fields to update" };
 
@@ -1367,13 +1457,17 @@ async function executeBulkUpdateSongs(args: { updates: any[] }, supabaseUrl: str
     const updates: Record<string, any> = {};
     if (item.title !== undefined) updates.title = item.title;
     if (item.artist !== undefined) updates.artist = item.artist;
-    if (item.genre !== undefined) updates.genre = item.genre;
-    if (item.mood !== undefined) updates.mood = item.mood;
+    if (item.genre !== undefined) updates.genre = normalizeGenre(item.genre);
+    if (item.mood !== undefined) updates.mood = normalizeMood(item.mood);
     if (item.bpm !== undefined) updates.bpm = Math.round(item.bpm);
     if (item.key_scale !== undefined) updates.key_scale = item.key_scale;
     if (item.time_signature !== undefined) updates.time_signature = item.time_signature;
     if (item.lyrics !== undefined) updates.lyrics = item.lyrics;
-    if (item.quality_score !== undefined) updates.quality_score = item.quality_score;
+    if (item.quality_score !== undefined) {
+      let qs = item.quality_score;
+      if (qs > 0 && qs <= 1) qs = Math.round(qs * 100);
+      updates.quality_score = qs;
+    }
 
     if (Object.keys(updates).length === 0) {
       results.push({ song_id: item.song_id, success: false, error: "No fields to update" });
