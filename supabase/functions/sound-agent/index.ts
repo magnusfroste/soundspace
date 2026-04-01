@@ -1416,13 +1416,17 @@ async function executeUpdateSong(args: any, supabaseUrl: string) {
   const updates: Record<string, any> = {};
   if (args.title !== undefined) updates.title = args.title;
   if (args.artist !== undefined) updates.artist = args.artist;
-  if (args.genre !== undefined) updates.genre = args.genre;
-  if (args.mood !== undefined) updates.mood = args.mood;
+  if (args.genre !== undefined) updates.genre = normalizeGenre(args.genre);
+  if (args.mood !== undefined) updates.mood = normalizeMood(args.mood);
   if (args.bpm !== undefined) updates.bpm = Math.round(args.bpm);
   if (args.key_scale !== undefined) updates.key_scale = args.key_scale;
   if (args.time_signature !== undefined) updates.time_signature = args.time_signature;
   if (args.lyrics !== undefined) updates.lyrics = args.lyrics;
-  if (args.quality_score !== undefined) updates.quality_score = args.quality_score;
+  if (args.quality_score !== undefined) {
+    let qs = args.quality_score;
+    if (qs > 0 && qs <= 1) qs = Math.round(qs * 100);
+    updates.quality_score = qs;
+  }
 
   if (Object.keys(updates).length === 0) return { error: "No fields to update" };
 
