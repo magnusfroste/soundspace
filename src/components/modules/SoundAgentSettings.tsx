@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import type { ModuleSettings } from "@/lib/modules";
-import { isIntegrationEnabled } from "@/lib/integrations-state";
+import { isIntegrationEnabled, type IntegrationId } from "@/lib/integrations-state";
 
 const SETTINGS_KEY = "module:sound-agent";
 
