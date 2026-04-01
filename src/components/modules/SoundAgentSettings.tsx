@@ -41,8 +41,12 @@ const MODELS_BY_PROVIDER: Record<ChatProvider, { value: string; label: string }[
   ],
 };
 
-const GENERATION_PROVIDERS = [
-  { value: "acestep", label: "ACE-Step" },
+const GENERATION_PROVIDERS: { value: string; label: string; integration: IntegrationId }[] = [
+  { value: "elevenlabs", label: "ElevenLabs", integration: "elevenlabs" },
+  { value: "acestep", label: "ACE-Step", integration: "acestep" },
+  { value: "musicgen", label: "MusicGen (Replicate)", integration: "musicgen" },
+  { value: "mubert", label: "Mubert", integration: "mubert" },
+  { value: "local", label: "Local AI", integration: "local" },
 ];
 
 const STT_PROVIDERS = [
