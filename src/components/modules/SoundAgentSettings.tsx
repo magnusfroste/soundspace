@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import type { ModuleSettings } from "@/lib/modules";
-import { isIntegrationEnabled } from "@/lib/integrations-state";
+import { isIntegrationEnabled, type IntegrationId } from "@/lib/integrations-state";
 
 const SETTINGS_KEY = "module:sound-agent";
 
@@ -41,8 +41,12 @@ const MODELS_BY_PROVIDER: Record<ChatProvider, { value: string; label: string }[
   ],
 };
 
-const GENERATION_PROVIDERS = [
-  { value: "acestep", label: "ACE-Step" },
+const GENERATION_PROVIDERS: { value: string; label: string; integration: IntegrationId }[] = [
+  { value: "elevenlabs", label: "ElevenLabs", integration: "elevenlabs" },
+  { value: "acestep", label: "ACE-Step", integration: "acestep" },
+  { value: "musicgen", label: "MusicGen (Replicate)", integration: "musicgen" },
+  { value: "mubert", label: "Mubert", integration: "mubert" },
+  { value: "local", label: "Local AI", integration: "local" },
 ];
 
 const STT_PROVIDERS = [
@@ -126,6 +130,14 @@ export function SoundAgentSettings() {
   const currentProvider = (settings?.chatProvider || "lovable") as ChatProvider;
   const currentModels = MODELS_BY_PROVIDER[currentProvider] || [];
 
+  // Filter generation providers by enabled integrations + configured keys
+  const availableGenProviders = GENERATION_PROVIDERS.filter((p) => {
+    if (!isIntegrationEnabled(p.integration)) return false;
+    if (p.value === "elevenlabs") return keyStatus?.elevenlabs === true;
+    if (p.value === "musicgen") return keyStatus?.replicate === true;
+    return true;
+  });
+
   // When provider changes, auto-select the first model of that provider
   const handleProviderChange = (provider: string) => {
     const models = MODELS_BY_PROVIDER[provider as ChatProvider] || [];
@@ -178,7 +190,7 @@ export function SoundAgentSettings() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {GENERATION_PROVIDERS.map((p) => (
+            {availableGenProviders.map((p) => (
               <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
             ))}
           </SelectContent>
