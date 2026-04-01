@@ -1217,7 +1217,7 @@ async function getSkillParameters(supabaseUrl: string, userId: string, genre?: s
   return params;
 }
 
-/** Core generation logic (returns best variation from batch) */
+/** Core generation logic — analyzes ALL batch variations and picks the best */
 async function generateWithBatch(
   acestepProxy: string,
   headers: Record<string, string>,
@@ -1235,7 +1235,7 @@ async function generateWithBatch(
     repaintingStart?: number;
     repaintingEnd?: number;
   }
-): Promise<{ audioBlob: ArrayBuffer; qualityScore: number; metadata: any } | { error: string }> {
+): Promise<{ audioBlob: ArrayBuffer; qualityScore: number; metadata: any; lastAnalysis?: any } | { error: string }> {
   const taskType = params.taskType || (params.referenceAudioUrl ? "cover" : "text2music");
   const body: Record<string, any> = {
     task_type: taskType,
@@ -1250,13 +1250,11 @@ async function generateWithBatch(
     thinking: true,
   };
   
-  // Add reference audio for Cover mode
   if (params.referenceAudioUrl) {
     body.audio_url = params.referenceAudioUrl;
     body.audio_cover_strength = params.coverStrength ?? 0.5;
   }
   
-  // Repaint parameters
   if (taskType === "repaint") {
     if (params.repaintingStart !== undefined) body.repainting_start = params.repaintingStart;
     if (params.repaintingEnd !== undefined) body.repainting_end = params.repaintingEnd;
@@ -1278,7 +1276,6 @@ async function generateWithBatch(
   const taskId = unwrapped?.task_id || unwrapped?.taskId || unwrapped?.id;
   if (!taskId) return { error: `No task_id returned. Response: ${JSON.stringify(releaseData).slice(0, 300)}` };
 
-  // Poll for results using shared helper
   let resultData: any;
   try {
     resultData = await pollAceStepTask(acestepProxy, headers, taskId, 120, 3000);
@@ -1287,50 +1284,86 @@ async function generateWithBatch(
   }
 
   const resultItems = Array.isArray(resultData) ? resultData : [resultData];
-  console.log(`Batch returned ${resultItems.length} variations`);
+  console.log(`Batch returned ${resultItems.length} variations — analyzing ALL`);
 
-  // Download first variation's audio, then analyze it for real quality scoring
-  const bestItem = resultItems[0];
-  const audioPath = bestItem?.url || bestItem?.file;
-  if (!audioPath) return { error: `No audio path in result: ${JSON.stringify(resultData).slice(0, 300)}` };
-
-  const audioRes = await fetch(acestepProxy, { method: "POST", headers, body: JSON.stringify({ endpoint: audioPath, method: "GET" }) });
-  if (!audioRes.ok) return { error: `Failed to download audio (${audioRes.status})` };
-
-  const audioBlob = await audioRes.arrayBuffer();
-  if (audioBlob.byteLength < 1000) return { error: `Audio too small (${audioBlob.byteLength} bytes)` };
-
-  // Convert audio before uploading temp analysis file
   const sb = getServiceClient(acestepProxy.replace("/functions/v1/acestep-proxy", ""));
-  const tempAudio = detectAudioFormat(audioBlob);
-  const tempFileName = `agent/tmp-analysis-${crypto.randomUUID()}.${tempAudio.ext}`;
-  await sb.storage.from("songs").upload(tempFileName, tempAudio.data, { contentType: tempAudio.mime, upsert: true });
-  const { data: tempUrlData } = sb.storage.from("songs").getPublicUrl(tempFileName);
 
-  // Run real quality analysis via extract endpoint
-  console.log("Running extract analysis for real quality scoring...");
-  const extracted = await analyzeAudioViaExtract(acestepProxy, headers, tempUrlData.publicUrl);
+  // Analyze ALL variations in parallel and pick the best
+  const candidates: { audioBlob: ArrayBuffer; qualityScore: number; extracted: any; item: any; index: number }[] = [];
 
-  // Clean up temp file (fire & forget)
-  sb.storage.from("songs").remove([tempFileName]).catch(() => {});
+  const analysisTasks = resultItems.map(async (item: any, index: number) => {
+    const audioPath = item?.url || item?.file;
+    if (!audioPath) {
+      console.log(`Variation ${index}: no audio path, skipping`);
+      return;
+    }
 
-  const qualityScore = computeRealQualityScore(extracted, {
-    bpm: params.bpm,
-    keyScale: params.keyScale,
-    timeSig: params.timeSig,
+    try {
+      const audioRes = await fetch(acestepProxy, { method: "POST", headers, body: JSON.stringify({ endpoint: audioPath, method: "GET" }) });
+      if (!audioRes.ok) {
+        console.log(`Variation ${index}: download failed (${audioRes.status})`);
+        return;
+      }
+
+      const audioBlob = await audioRes.arrayBuffer();
+      if (audioBlob.byteLength < 1000) {
+        console.log(`Variation ${index}: audio too small (${audioBlob.byteLength})`);
+        return;
+      }
+
+      // Upload temp file for extract analysis
+      const tempAudio = detectAudioFormat(audioBlob);
+      const tempFileName = `agent/tmp-analysis-${crypto.randomUUID()}.${tempAudio.ext}`;
+      await sb.storage.from("songs").upload(tempFileName, tempAudio.data, { contentType: tempAudio.mime, upsert: true });
+      const { data: tempUrlData } = sb.storage.from("songs").getPublicUrl(tempFileName);
+
+      const extracted = await analyzeAudioViaExtract(acestepProxy, headers, tempUrlData.publicUrl);
+      sb.storage.from("songs").remove([tempFileName]).catch(() => {});
+
+      const qualityScore = computeRealQualityScore(extracted, {
+        bpm: params.bpm,
+        keyScale: params.keyScale,
+        timeSig: params.timeSig,
+        prompt: params.caption,
+      });
+
+      console.log(`Variation ${index}: quality=${qualityScore}, BPM=${extracted?.bpm}, key=${extracted?.keyScale}, caption_match=${extracted?.caption ? 'yes' : 'no'}`);
+      candidates.push({ audioBlob, qualityScore, extracted, item, index });
+    } catch (e: any) {
+      console.log(`Variation ${index}: analysis error: ${e.message}`);
+    }
   });
-  
-  console.log(`Real quality assessment: score=${qualityScore}, extracted=`, JSON.stringify(extracted));
+
+  await Promise.all(analysisTasks);
+
+  if (candidates.length === 0) {
+    // Fallback: just download first item without analysis
+    const fallbackPath = resultItems[0]?.url || resultItems[0]?.file;
+    if (!fallbackPath) return { error: `No audio path in any result` };
+    const audioRes = await fetch(acestepProxy, { method: "POST", headers, body: JSON.stringify({ endpoint: fallbackPath, method: "GET" }) });
+    if (!audioRes.ok) return { error: `Failed to download audio (${audioRes.status})` };
+    const audioBlob = await audioRes.arrayBuffer();
+    return { audioBlob, qualityScore: 0.75, metadata: { bpm: params.bpm, key_scale: params.keyScale, time_signature: params.timeSig, variations_generated: resultItems.length, variations_analyzed: 0, analysis: null } };
+  }
+
+  // Sort by quality score, pick best
+  candidates.sort((a, b) => b.qualityScore - a.qualityScore);
+  const best = candidates[0];
+  console.log(`Best variation: #${best.index} with quality=${best.qualityScore} (analyzed ${candidates.length}/${resultItems.length})`);
 
   return {
-    audioBlob,
-    qualityScore,
+    audioBlob: best.audioBlob,
+    qualityScore: best.qualityScore,
+    lastAnalysis: best.extracted,
     metadata: {
-      bpm: extracted?.bpm ?? bestItem.bpm ?? params.bpm,
-      key_scale: extracted?.keyScale ?? bestItem.keyscale ?? params.keyScale,
-      time_signature: extracted?.timeSignature ?? bestItem.timesignature ?? params.timeSig,
+      bpm: best.extracted?.bpm ?? best.item.bpm ?? params.bpm,
+      key_scale: best.extracted?.keyScale ?? best.item.keyscale ?? params.keyScale,
+      time_signature: best.extracted?.timeSignature ?? best.item.timesignature ?? params.timeSig,
       variations_generated: resultItems.length,
-      analysis: extracted ? { extracted_bpm: extracted.bpm, extracted_key: extracted.keyScale, extracted_time_sig: extracted.timeSignature, caption: extracted.caption } : null,
+      variations_analyzed: candidates.length,
+      selected_variation: best.index,
+      all_scores: candidates.map(c => ({ variation: c.index, score: c.qualityScore })),
+      analysis: best.extracted ? { extracted_bpm: best.extracted.bpm, extracted_key: best.extracted.keyScale, extracted_time_sig: best.extracted.timeSignature, caption: best.extracted.caption } : null,
     }
   };
 }
