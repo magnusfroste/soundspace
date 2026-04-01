@@ -186,6 +186,7 @@ Deno.serve(async (req) => {
         duration,
         genre,
         mood,
+        prompt,
         origin_source: 'udio_import',
       })
       .select('id')
