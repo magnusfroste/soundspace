@@ -2213,9 +2213,12 @@ Deno.serve(async (req) => {
       const push = (event: string, data: any) => { controller.enqueue(encoder.encode(sseEvent(event, data))); };
 
       try {
-        // Fetch persistent context
-        const context = userId ? await fetchAgentContext(supabaseUrl, userId) : { objectives: [], skills: [], memories: [] };
-        const systemPrompt = buildSystemPrompt(context);
+        // Fetch persistent context + listening trends in parallel
+        const [context, listeningTrends] = await Promise.all([
+          userId ? fetchAgentContext(supabaseUrl, userId) : Promise.resolve({ objectives: [], skills: [], memories: [] }),
+          fetchListeningTrends(supabaseUrl),
+        ]);
+        const systemPrompt = buildSystemPrompt(context, listeningTrends);
 
         const llmMessages: any[] = [{ role: "system", content: systemPrompt }, ...messages];
         const collectedAudioUrls: string[] = [];
