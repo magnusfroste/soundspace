@@ -190,7 +190,7 @@ export function SoundAgentSettings() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {GENERATION_PROVIDERS.map((p) => (
+            {availableGenProviders.map((p) => (
               <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
             ))}
           </SelectContent>
