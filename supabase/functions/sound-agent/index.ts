@@ -256,14 +256,33 @@ const TOOLS = [
     type: "function",
     function: {
       name: "research_music_style",
-      description: "Get curated knowledge about what background music works best for a specific venue type.",
+      description: "Get AI-powered recommendations for what background music works best for ANY venue type and atmosphere. Uses AI reasoning to provide tailored BPM, genre, mood, key, and instrumentation suggestions.",
       parameters: {
         type: "object",
         properties: {
-          venue_type: { type: "string", description: "Type of venue, e.g. 'restaurant', 'hotel_lobby', 'cafe', 'spa', 'retail', 'bar', 'gym', 'office'" },
-          atmosphere: { type: "string", description: "Desired atmosphere, e.g. 'relaxed', 'upscale', 'energetic', 'intimate'" }
+          venue_type: { type: "string", description: "Type of venue — any type works: 'dental clinic', 'wine bar', 'yoga studio', 'bookshop', 'coworking space', etc." },
+          atmosphere: { type: "string", description: "Desired atmosphere, e.g. 'relaxed', 'upscale', 'energetic', 'intimate', 'professional'" },
+          time_of_day: { type: "string", description: "Optional: 'morning', 'afternoon', 'evening', 'night'" },
+          clientele: { type: "string", description: "Optional: target audience, e.g. 'young professionals', 'families', 'elderly'" }
         },
         required: ["venue_type"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "rate_suggestion",
+      description: "Record user feedback on a suggestion or generated track. Use when the user expresses satisfaction/dissatisfaction.",
+      parameters: {
+        type: "object",
+        properties: {
+          score: { type: "number", description: "Rating 1-10 (1=terrible, 10=perfect)" },
+          feedback: { type: "string", description: "What the user said about the suggestion" },
+          context: { type: "string", description: "What was being rated (e.g. 'generated jazz track', 'venue recommendation')" }
+        },
+        required: ["score", "feedback"],
         additionalProperties: false
       }
     }
