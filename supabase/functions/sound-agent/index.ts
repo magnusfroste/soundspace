@@ -2168,7 +2168,7 @@ Deno.serve(async (req) => {
   }
 
   const { messages, conversation_id, settings, user_id: bodyUserId } = reqBody;
-  const chatModel = settings?.chatModel || "google/gemini-3-flash-preview";
+  const chatModel = settings?.chatModel || "google/gemini-2.5-pro";
   const sttProvider = settings?.sttProvider || "elevenlabs";
 
   // Resolve user_id securely:
