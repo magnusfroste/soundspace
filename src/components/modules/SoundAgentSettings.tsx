@@ -130,6 +130,14 @@ export function SoundAgentSettings() {
   const currentProvider = (settings?.chatProvider || "lovable") as ChatProvider;
   const currentModels = MODELS_BY_PROVIDER[currentProvider] || [];
 
+  // Filter generation providers by enabled integrations + configured keys
+  const availableGenProviders = GENERATION_PROVIDERS.filter((p) => {
+    if (!isIntegrationEnabled(p.integration)) return false;
+    if (p.value === "elevenlabs") return keyStatus?.elevenlabs === true;
+    if (p.value === "musicgen") return keyStatus?.replicate === true;
+    return true;
+  });
+
   // When provider changes, auto-select the first model of that provider
   const handleProviderChange = (provider: string) => {
     const models = MODELS_BY_PROVIDER[provider as ChatProvider] || [];
