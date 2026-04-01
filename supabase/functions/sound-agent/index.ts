@@ -733,47 +733,89 @@ const TOOLS = [
 ];
 
 // ── Knowledge base ──────────────────────────────────────────────────────
-const VENUE_KNOWLEDGE: Record<string, any> = {
-  restaurant: {
-    general: { bpm: [80, 120], genres: ["Jazz", "Acoustic", "Lo-Fi", "Ambient"], moods: ["Relaxed", "Uplifting", "Romantic"], keys: ["C major", "G major", "F major", "Bb major", "Eb major"], instrumentation: "Piano, acoustic guitar, light percussion, soft bass, brushed drums" },
-    upscale: { bpm: [70, 100], genres: ["Jazz", "Classical", "Ambient"], moods: ["Relaxed", "Romantic"], instrumentation: "Piano, cello, soft strings, brushed jazz drums, upright bass" },
-    casual: { bpm: [90, 125], genres: ["Acoustic", "Lo-Fi", "World"], moods: ["Uplifting", "Relaxed"], instrumentation: "Acoustic guitar, light percussion, ukulele, soft synths" },
-  },
-  hotel_lobby: {
-    general: { bpm: [70, 100], genres: ["Ambient", "Classical", "Jazz"], moods: ["Calm", "Relaxed"], keys: ["C major", "G major", "D major", "A minor"], instrumentation: "Piano, ambient pads, soft strings, gentle harp, light reverb" },
-    luxury: { bpm: [60, 90], genres: ["Classical", "Ambient"], moods: ["Calm"], instrumentation: "Grand piano, string quartet, ambient textures" },
-  },
-  cafe: {
-    general: { bpm: [85, 115], genres: ["Lo-Fi", "Acoustic", "Jazz"], moods: ["Relaxed", "Focused", "Uplifting"], keys: ["G major", "C major", "D major", "A major"], instrumentation: "Acoustic guitar, soft piano, lo-fi beats, light percussion, warm bass" },
-  },
-  spa: {
-    general: { bpm: [55, 80], genres: ["Ambient", "Classical", "World"], moods: ["Calm", "Relaxed"], keys: ["C major", "G major", "F major", "D minor"], instrumentation: "Ambient pads, nature sounds, gentle piano, singing bowls, soft flute" },
-  },
-  retail: {
-    general: { bpm: [100, 130], genres: ["Electronic", "Lo-Fi", "Acoustic"], moods: ["Uplifting", "Energetic"], keys: ["C major", "G major", "A major", "E major"], instrumentation: "Synth pads, light drums, bass guitar, electronic beats, bright melodies" },
-  },
-  bar: {
-    general: { bpm: [90, 130], genres: ["Jazz", "Lo-Fi", "Electronic", "Acoustic"], moods: ["Relaxed", "Energetic", "Uplifting"], instrumentation: "Electric guitar, bass, drums, piano, synths" },
-    cocktail: { bpm: [80, 110], genres: ["Jazz", "Lo-Fi"], moods: ["Relaxed", "Romantic"], instrumentation: "Smooth jazz ensemble, piano trio, soft trumpet" },
-  },
-  gym: {
-    general: { bpm: [120, 160], genres: ["Electronic", "Lo-Fi"], moods: ["Energetic"], instrumentation: "Heavy drums, synth bass, electronic leads, driving percussion" },
-  },
-  office: {
-    general: { bpm: [70, 100], genres: ["Ambient", "Lo-Fi", "Classical"], moods: ["Focused", "Calm"], instrumentation: "Ambient pads, soft piano, lo-fi textures, minimal percussion" },
-  },
-};
-
 // ── Tool executors ──────────────────────────────────────────────────────
 
-function executeResearch(args: { venue_type: string; atmosphere?: string }) {
-  const venue = VENUE_KNOWLEDGE[args.venue_type] || VENUE_KNOWLEDGE["restaurant"];
-  const sub = args.atmosphere && venue[args.atmosphere] ? venue[args.atmosphere] : venue.general;
+/** Dynamic AI-powered venue research — works for ANY venue type */
+async function executeResearch(args: { venue_type: string; atmosphere?: string; time_of_day?: string; clientele?: string }): Promise<any> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    // Fallback to basic heuristics
+    return { venue_type: args.venue_type, atmosphere: args.atmosphere || "general", recommendations: { bpm: [80, 110], genres: ["Jazz", "Ambient", "Lo-Fi"], moods: ["Relaxed", "Calm"], instrumentation: "Piano, soft guitar, ambient pads" }, tips: "Default recommendations (AI unavailable)." };
+  }
+
+  try {
+    const prompt = `You are a music curation expert. Recommend background music for:
+- Venue: ${args.venue_type}${args.atmosphere ? `, ${args.atmosphere} atmosphere` : ""}${args.time_of_day ? `, ${args.time_of_day} time` : ""}${args.clientele ? `, clientele: ${args.clientele}` : ""}
+
+Return ONLY a JSON object (no markdown):
+{"bpm_range":[min,max],"genres":["Genre1","Genre2","Genre3"],"moods":["Mood1","Mood2"],"keys":["C major","G major"],"instrumentation":"description of instruments","tips":"one sentence of advice","energy_level":"low|medium|high"}`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!res.ok) throw new Error(`AI error ${res.status}`);
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content || "";
+    
+    // Parse JSON from response (handle markdown wrapping)
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        venue_type: args.venue_type,
+        atmosphere: args.atmosphere || "general",
+        time_of_day: args.time_of_day,
+        clientele: args.clientele,
+        recommendations: {
+          bpm: parsed.bpm_range || [80, 110],
+          genres: parsed.genres || [],
+          moods: parsed.moods || [],
+          keys: parsed.keys || [],
+          instrumentation: parsed.instrumentation || "",
+          energy_level: parsed.energy_level || "medium",
+        },
+        tips: parsed.tips || "",
+        source: "ai_generated",
+      };
+    }
+    throw new Error("Could not parse AI response");
+  } catch (e: any) {
+    console.log("Dynamic venue research failed, using heuristic:", e.message);
+    return { venue_type: args.venue_type, atmosphere: args.atmosphere || "general", recommendations: { bpm: [80, 110], genres: ["Jazz", "Ambient", "Lo-Fi"], moods: ["Relaxed", "Calm"], instrumentation: "Piano, soft guitar, ambient pads" }, tips: "Heuristic recommendations (AI lookup failed).", source: "fallback" };
+  }
+}
+
+/** Record user feedback and save as memory for future reference */
+async function executeRateSuggestion(args: { score: number; feedback: string; context?: string }, supabaseUrl: string, userId: string | null): Promise<any> {
+  const score = Math.max(1, Math.min(10, Math.round(args.score)));
+  const direction = score <= 3 ? "significantly_change" : score <= 6 ? "fine_tune" : "continue";
+  
+  // Save as memory if user is authenticated
+  if (userId) {
+    const sb = getServiceClient(supabaseUrl);
+    await sb.from("agent_memories").insert({
+      user_id: userId,
+      category: "feedback",
+      content: `Rating ${score}/10 on ${args.context || "suggestion"}: "${args.feedback}". Direction: ${direction}.`,
+      importance: score <= 3 ? 9 : score <= 6 ? 6 : 3,
+    }).catch(() => {});
+  }
+
   return {
-    venue_type: args.venue_type,
-    atmosphere: args.atmosphere || "general",
-    recommendations: sub,
-    tips: `For ${args.venue_type}, aim for BPM ${sub.bpm[0]}-${sub.bpm[1]}. Best genres: ${sub.genres.join(", ")}. Mood: ${sub.moods.join(", ")}. Instrumentation: ${sub.instrumentation}.`
+    score,
+    direction,
+    acknowledged: true,
+    message: score <= 3 
+      ? "Understood — I'll take a significantly different approach."
+      : score <= 6 
+        ? "Got it — I'll fine-tune my approach." 
+        : "Great — I'll continue in this direction.",
   };
 }
 
