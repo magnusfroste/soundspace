@@ -1443,13 +1443,17 @@ async function executeBulkUpdateSongs(args: { updates: any[] }, supabaseUrl: str
     const updates: Record<string, any> = {};
     if (item.title !== undefined) updates.title = item.title;
     if (item.artist !== undefined) updates.artist = item.artist;
-    if (item.genre !== undefined) updates.genre = item.genre;
-    if (item.mood !== undefined) updates.mood = item.mood;
+    if (item.genre !== undefined) updates.genre = normalizeGenre(item.genre);
+    if (item.mood !== undefined) updates.mood = normalizeMood(item.mood);
     if (item.bpm !== undefined) updates.bpm = Math.round(item.bpm);
     if (item.key_scale !== undefined) updates.key_scale = item.key_scale;
     if (item.time_signature !== undefined) updates.time_signature = item.time_signature;
     if (item.lyrics !== undefined) updates.lyrics = item.lyrics;
-    if (item.quality_score !== undefined) updates.quality_score = item.quality_score;
+    if (item.quality_score !== undefined) {
+      let qs = item.quality_score;
+      if (qs > 0 && qs <= 1) qs = Math.round(qs * 100);
+      updates.quality_score = qs;
+    }
 
     if (Object.keys(updates).length === 0) {
       results.push({ song_id: item.song_id, success: false, error: "No fields to update" });
