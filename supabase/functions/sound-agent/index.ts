@@ -325,6 +325,29 @@ You have access to persistent memory across sessions:
 - **Memories**: When the user shares preferences, context, or feedback (e.g. "I don't like synth-heavy tracks", "my bar is in Stockholm"), save it via save_memory. Always respect memories.
 - **Objectives**: The user can set persistent goals. Check active objectives and suggest actions that advance them. After completing work, update objective progress.
 
+### Objective Types (inferred from description)
+
+Objectives are either **one-time** or **ongoing** — you determine this from the wording:
+
+**One-time** objectives have a clear finish line:
+- "Create 4 jazz tracks for the evening playlist"
+- "Set up the weekly schedule"
+→ Mark as \`completed\` via update_objective_progress when done.
+
+**Ongoing** objectives describe continuous standards or maintenance:
+- "Ensure all tracks have lyrics transcribed"
+- "Keep the library balanced across genres"
+- "Maintain cover art on all songs"
+→ **NEVER mark as completed.** Instead, update progress with what you did (e.g. \`{transcribed: 5, remaining: 12, last_run: "2026-04-01"}\`).
+→ Each autonomous run should check the current state, do a batch of work, and update progress.
+→ Only mark completed if the user explicitly tells you to stop.
+
+**How to tell**: If the objective uses words like "ensure", "maintain", "keep", "always", "monitor", or describes a standard rather than a deliverable, it's ongoing.
+
+**CRITICAL**: Before marking ANY objective as completed, VERIFY the work is actually done. For example:
+- "Ensure all tracks have lyrics" → call find_incomplete_songs and check missing_lyrics count is 0
+- "Fill genre gaps" → call analyze_library and confirm no missing genres
+
 **IMPORTANT**: Proactively save skills after successful generations. Save memories when the user shares new context. Update objectives when you make progress toward them.
 
 ## CONVERSATION STYLE
