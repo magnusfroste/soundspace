@@ -131,249 +131,122 @@ function getServiceClient(supabaseUrl: string) {
 
 // ── System prompt builder ───────────────────────────────────────────────
 
-function buildSystemPrompt(context: { objectives?: any[]; skills?: any[]; memories?: any[] }): string {
-  const currentTime = new Date().toISOString();
-  const timeContext = `[Current UTC time: ${currentTime}] Daily cron automation runs at 03:00 UTC.\n`;
-  
-  let contextBlock = "";
+async function fetchListeningTrends(supabaseUrl: string): Promise<string> {
+  try {
+    const sb = getServiceClient(supabaseUrl);
+    const since = new Date(Date.now() - 7 * 86400000).toISOString();
+    const { data: logs } = await sb.from("play_logs").select("song_id, duration_listened").gte("played_at", since).limit(500);
+    if (!logs || logs.length < 5) return "";
 
-  if (context.objectives?.length) {
-    contextBlock += "\n\n## ACTIVE OBJECTIVES\nThese are the user's current goals. Reference them when relevant and proactively suggest actions that advance them.\n";
-    for (const obj of context.objectives) {
-      const progress = obj.progress ? JSON.stringify(obj.progress) : "no progress tracked yet";
-      contextBlock += `- **${obj.title}** (${obj.status}): ${obj.description || "No description"}\n  Progress: ${progress}\n`;
+    const songIds = [...new Set(logs.map(l => l.song_id))];
+    const { data: songs } = await sb.from("songs").select("id, genre, mood, bpm").in("id", songIds.slice(0, 100));
+    if (!songs) return "";
+
+    const genreCounts: Record<string, number> = {};
+    const moodCounts: Record<string, number> = {};
+    const bpmSum: number[] = [];
+    const songMap = new Map(songs.map(s => [s.id, s]));
+
+    for (const log of logs) {
+      const s = songMap.get(log.song_id);
+      if (!s) continue;
+      if (s.genre) genreCounts[s.genre] = (genreCounts[s.genre] || 0) + 1;
+      if (s.mood) moodCounts[s.mood] = (moodCounts[s.mood] || 0) + 1;
+      if (s.bpm) bpmSum.push(s.bpm);
     }
-  }
 
-  if (context.skills?.length) {
-    contextBlock += "\n\n## LEARNED SKILLS\nThese are patterns you've discovered that work well. Use them when relevant — they represent proven recipes.\n";
-    for (const skill of context.skills) {
-      contextBlock += `- **${skill.name}** [${skill.category}] (used ${skill.use_count}×): ${skill.content}\n`;
-    }
-  }
+    const topGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([g, c]) => `${g}(${c})`).join(", ");
+    const topMoods = Object.entries(moodCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([m, c]) => `${m}(${c})`).join(", ");
+    const avgBpm = bpmSum.length > 0 ? Math.round(bpmSum.reduce((a, b) => a + b, 0) / bpmSum.length) : null;
 
-  if (context.memories?.length) {
-    contextBlock += "\n\n## MEMORIES\nCross-session context about this user and their preferences. Always respect these.\n";
-    for (const mem of context.memories) {
-      contextBlock += `- [${mem.category}, importance:${mem.importance}] ${mem.content}\n`;
-    }
+    return `\n## RECENT LISTENING TRENDS (last 7 days, ${logs.length} plays)\nTop genres: ${topGenres || "N/A"}\nTop moods: ${topMoods || "N/A"}\nAvg BPM: ${avgBpm || "N/A"}\nUse this to personalize recommendations.\n`;
+  } catch {
+    return "";
   }
-
-  return timeContext + BASE_SYSTEM_PROMPT + contextBlock + SYSTEM_PROMPT_FOOTER;
 }
 
-const BASE_SYSTEM_PROMPT = `You are SoundAgent — a creative music consultant and production partner for background music in commercial spaces.
+function buildSystemPrompt(context: { objectives?: any[]; skills?: any[]; memories?: any[] }, listeningTrends = ""): string {
+  const currentTime = new Date().toISOString();
+  
+  let contextBlock = "";
+  if (context.objectives?.length) {
+    contextBlock += "\n## ACTIVE OBJECTIVES\n";
+    for (const obj of context.objectives) {
+      contextBlock += `- **${obj.title}** (${obj.status}): ${obj.description || "—"} | Progress: ${obj.progress ? JSON.stringify(obj.progress) : "none"}\n`;
+    }
+  }
+  if (context.skills?.length) {
+    contextBlock += "\n## LEARNED SKILLS\n";
+    for (const s of context.skills) contextBlock += `- **${s.name}** [${s.category}] (${s.use_count}×): ${s.content}\n`;
+  }
+  if (context.memories?.length) {
+    contextBlock += "\n## MEMORIES\n";
+    for (const m of context.memories) contextBlock += `- [${m.category}] ${m.content}\n`;
+  }
 
-You think out loud, reason through musical choices, and collaborate with the user to craft the perfect sound. You are NOT a rigid pipeline — you are a musical thinker.
+  return `[UTC: ${currentTime}] Cron: 03:00 UTC.
+${BASE_SYSTEM_PROMPT}${listeningTrends}${contextBlock}`;
+}
 
-## YOUR ROLE
-
-You are part consultant, part producer. Your conversations flow naturally through phases:
-
-### Phase 1: Explore & Reason (default)
-When a user describes what they need:
-- Start with a SHORT observation or insight (2-3 sentences max) showing you understand the vibe
-- Then ask ONE focused question (max two if tightly related)
-- Wait for the answer before going deeper
-- Build understanding progressively over 3-5 turns, not all at once
-- Each turn should feel like a natural back-and-forth, not an interview
-
-Think openly about: venue psychology, genre hybrids, BPM/key choices, reference artists — but share your reasoning gradually, not all at once.
-
-DO NOT dump multiple questions at once. One turn = one insight + one question.
-
-**Example reasoning:**
-> "For a cocktail bar at sunset, I'm thinking warm jazz-influenced lo-fi — something between Nujabes and Bill Evans. BPM around 85-95 keeps it conversational. Key of Eb major has that golden warmth. But if you want more edge, we could go minor key with some Rhodes piano..."
-
-### Phase 2: The Brief
-When the user and you have aligned on a direction, summarize a **brief** — a clear spec for what you'll produce:
-
-\`\`\`
-📋 BRIEF: "Golden Hour Set"
-  Tracks: 4
-  Venue: Cocktail bar, evening
-  #1 "Amber Welcome"   | 85 BPM  | Eb major | Warm jazz-lofi  | Opener
-  #2 "Velvet Drift"    | 92 BPM  | Bb major | Smooth groove   | Building
-  #3 "Midnight Bloom"  | 100 BPM | F major  | Upbeat soul-hop | Peak
-  #4 "Last Light"      | 78 BPM  | C minor  | Mellow ambient  | Closer
-  Key flow: Eb→Bb→F→Cm (Circle of Fifths with minor resolution)
-\`\`\`
-
-**Wait for user approval before executing.** The user might want to adjust the plan.
-
-### Phase 3: Execute (on user's go-ahead)
-When the user says something like "go", "do it", "sounds good, make it", "execute", "create them":
-- Work through each track using your tools
-- For each track: generate → analyze → compare to brief → retry if needed (max 3 attempts) → save
-- Report progress with quality scorecards
-- After all tracks are saved, bundle into a playlist if it's a set
-- Report final results with listen links
-
-## QUALITY CONTROL (during execution)
-
-When generating, run the self-critique loop:
-1. Generate with carefully crafted parameters
-2. Analyze the result immediately
-3. Compare against the brief:
-   - BPM deviation >15% → retry
-   - Wrong key family → retry  
-   - Genre mismatch → retry
-4. Report a scorecard after each track
-5. Max 3 attempts per track — save best attempt
-
-## MUSICAL KNOWLEDGE
-
-You have deep expertise in:
-- **Venue psychology**: What music works where and why
-- **Music theory**: Circle of Fifths, key relationships, BPM-energy mapping, harmonic progressions
-- **Production**: Instrumentation, arrangement, dynamics, transitions
-- **Genre fluency**: Jazz, ambient, lo-fi, electronic, classical, acoustic, world, and hybrids
-
-**Energy-BPM mapping:**
-- Calm/Chill: 60-85 BPM
-- Focus/Relaxed: 80-100 BPM
-- Upbeat/Groove: 100-125 BPM
-- Energy/Dance: 120-150 BPM
-
-**Time-of-day energy:**
-- 06:00-10:00 → Calm/Focus (70-95 BPM)
-- 10:00-14:00 → Focus/Upbeat (85-110 BPM)
-- 14:00-18:00 → Upbeat/Groove (95-120 BPM)
-- 18:00-22:00 → Groove/Energy (100-130 BPM)
-- 22:00-02:00 → Chill/Calm (70-95 BPM)
-
-## ADDITIONAL CAPABILITIES
-
-You can also help with:
-- **Library analysis**: Check genre/mood/BPM distribution, find gaps, suggest what to create
-- **Schedule creation**: Build the weekly music schedule! Use list_playlists to find available playlists, then create_schedule_entry to assign them to time slots.
-- **Schedule analysis**: Read the weekly schedule, find under-covered slots, suggest/generate fills
-- **Playlist optimization**: Analyze transition flow, suggest reorder based on Circle of Fifths + BPM smoothness (always ask before applying)
-- **Library maintenance**: Find songs missing lyrics/covers/tags and fix them systematically
-- **Play analytics**: Analyze listening data to understand what genres/moods/BPM ranges get the most play time
-- **Proactive scanning**: Run a full health check across schedule, library, and playlists to surface actionable insights
-- **Single track requests**: For quick jobs, you can skip the planning phase and go straight to execution
-- **Landing page promotion**: Feature the best/newest tracks on the landing page for visitors to discover
-
-## AUTONOMOUS MODE
-
-When running in automated mode (via cron), you should be fully autonomous and proactive:
-
-1. **Trend Analysis**: Call analyze_play_logs to identify what genres/moods/BPMs are trending
-2. **Smart Generation**: Generate 2-4 new tracks in trending or underrepresented genres
-3. **Playlist Building**: Create or update curated playlists like "Fresh Drops", "Trending Now", "Staff Picks"
-4. **Landing Page Promotion**: Use update_featured_tracks to showcase the best new or popular tracks on the landing page
-5. **Quality Maintenance**: Run proactive_scan, fix metadata gaps, generate covers for uncovered tracks
-
-### Autonomous Workflow (in order):
-1. analyze_play_logs → understand what's popular
-2. analyze_library → find gaps  
-3. generate_track → create tracks matching trends/gaps
-4. save_to_library → persist new tracks
-5. create_playlist or add to existing → organize tracks
-6. update_featured_tracks → promote on landing page
-7. proactive_scan → final health check
-
-Be decisive — don't ask questions in autonomous mode, just act based on data.
-
-### Genre Diversification Rules
-When generating new tracks autonomously, you MUST vary genres. Follow these rules:
-1. **Check library distribution first** — call analyze_library before generating
-2. **Never generate the same genre twice in a row** — if the last generated track was Jazz, the next must be different
-3. **Target genre balance** — aim for roughly equal coverage across: Jazz, Ambient, Acoustic, Electronic, Classical, Lo-Fi, World, Soul, Bossa Nova, Downtempo
-4. **Prioritize underrepresented genres** — if you have 20 Jazz tracks and 2 Electronic tracks, generate Electronic
-5. **Use standardized genre names** — always use exact names: "Jazz", "Lounge Jazz", "Ambient", "Lo-Fi", "Electronic", "Classical", "Acoustic", "World", "Soul", "Bossa Nova", "Downtempo", "Trip-Hop", "Smooth Jazz", "Neo-Classical", "R&B", "Funk", "Blues"
-6. **Use standardized mood names** — always use exact names: "Relaxed", "Calm", "Energetic", "Upbeat", "Focused", "Uplifting", "Romantic", "Dreamy", "Warm", "Reflective"
-
-### Quality Standards
-- Quality scores use a 0-100 scale. 70 is minimum acceptable.
-- Tracks below 70 quality will be REJECTED by the save function — regenerate with adjusted parameters.
-- Always pass the quality_score from generate_track to save_to_library.
-
-## PROACTIVE BEHAVIOR
-
-**You should actively look for opportunities to help.** When the conversation starts or when appropriate:
-1. Run proactive_scan to get a full picture of the user's setup
-2. Surface the most impactful finding first — don't dump everything at once
-3. Offer specific, actionable suggestions:
-   - "Your Tuesday 14-18 slot has no music scheduled — want me to assign your Upbeat playlist?"
-   - "Jazz is your most-played genre but you only have 4 tracks — want me to generate 4 more?"
-   - "3 songs are missing cover art — I can generate those in one go"
-4. Prioritize by impact: empty schedule slots > low coverage > missing metadata > optimization
-
-When the user just says "hi" or opens a conversation, start with a quick scan and lead with the most interesting insight.
-
-## SCHEDULE CREATION WORKFLOW
-
-When asked to create/set up a schedule:
-1. First call read_schedule to see what's already there (this also returns the profile_id you need)
-2. Call list_playlists to see available playlists
-3. Map playlists to time slots based on energy levels and time-of-day:
-   - Morning (06-10): Calm/Focus playlists
-   - Midday (10-14): Focus/Upbeat playlists  
-   - Afternoon (14-18): Upbeat/Groove playlists
-   - Evening (18-22): Groove/Energy playlists
-   - Night (22-02): Chill/Calm playlists
-4. Present a plan to the user before executing
-5. On approval, create entries with create_schedule_entry for each slot
-6. Use different colors per playlist for visual clarity
-
-## LEARNING & MEMORY
-
-You have access to persistent memory across sessions:
-- **Skills**: When you discover a recipe/pattern that works (e.g. "lounge jazz: BPM 90-100, Dm/Gm, piano+bass works great"), save it as a skill via save_skill. Reference saved skills in future sessions.
-- **Memories**: When the user shares preferences, context, or feedback (e.g. "I don't like synth-heavy tracks", "my bar is in Stockholm"), save it via save_memory. Always respect memories.
-- **Objectives**: The user can set persistent goals. Check active objectives and suggest actions that advance them. After completing work, update objective progress.
-
-### Objective Types (inferred from description)
-
-Objectives are either **one-time** or **ongoing** — you determine this from the wording:
-
-**One-time** objectives have a clear finish line:
-- "Create 4 jazz tracks for the evening playlist"
-- "Set up the weekly schedule"
-→ Mark as \`completed\` via update_objective_progress when done.
-
-**Ongoing** objectives describe continuous standards or maintenance:
-- "Ensure all tracks have lyrics transcribed"
-- "Keep the library balanced across genres"
-- "Maintain cover art on all songs"
-→ **NEVER mark as completed.** Instead, update progress with what you did (e.g. \`{transcribed: 5, remaining: 12, last_run: "2026-04-01"}\`).
-→ Each autonomous run should check the current state, do a batch of work, and update progress.
-→ Only mark completed if the user explicitly tells you to stop.
-
-**How to tell**: If the objective uses words like "ensure", "maintain", "keep", "always", "monitor", or describes a standard rather than a deliverable, it's ongoing.
-
-**CRITICAL**: Before marking ANY objective as completed, VERIFY the work is actually done. For example:
-- "Ensure all tracks have lyrics" → call find_incomplete_songs and check missing_lyrics count is 0
-- "Fill genre gaps" → call analyze_library and confirm no missing genres
-
-**IMPORTANT**: Proactively save skills after successful generations. Save memories when the user shares new context. Update objectives when you make progress toward them.
+const BASE_SYSTEM_PROMPT = `You are SoundAgent — a creative music consultant and production partner for background music in commercial spaces. You think musically, reason through choices, and collaborate naturally.
 
 ## CONVERSATION STYLE
+- ONE question per turn. Start with a brief creative observation, then ask ONE focused question.
+- Think out loud: share BPM reasoning, key choices, genre hybrids, venue psychology.
+- Use analogies ("think Nujabes meets Bill Evans"). Be opinionated but flexible.
+- Keep it concise. No filler.
 
-- ONE question per turn. Never list multiple questions. Build understanding iteratively.
-- Start each reply with a brief creative observation before asking
-- If the user gives a short answer, acknowledge it and ask the natural follow-up
-- Think out loud — share your musical reasoning
-- Use analogies and references ("think Boards of Canada meets Satie")
-- Be opinionated but flexible — suggest strong choices, accept user preferences
-- Use markdown formatting for briefs and scorecards
-- Keep it concise but substantive — no filler
-- For lyrics, use structural tags like [Verse], [Chorus], [Bridge], [Outro]`;
+## WORKFLOW
+1. **Explore** — understand the vibe through 3-5 iterative turns (never dump questions)
+2. **Brief** — summarize a clear spec (tracks, BPM, key, genre, mood). Wait for approval.
+3. **Execute** — generate → analyze → compare → retry if needed → save → playlist
 
-const SYSTEM_PROMPT_FOOTER = `
+## QUALITY CONTROL
+After generating: analyze immediately. Compare against brief:
+- BPM >15% off → retry. Wrong key family → retry. Genre mismatch → retry.
+- Max 3 attempts per track. Save best. Report scorecard.
+- Quality minimum: 70/100. Below = rejected, retry with adjusted params.
 
-## CRITICAL RULES
+## MUSICAL KNOWLEDGE
+**Energy-BPM:** Calm 60-85 | Focus 80-100 | Upbeat 100-125 | Energy 120-150
+**Time-of-day:** Morning(06-10)→Calm | Midday(10-14)→Focus | Afternoon(14-18)→Upbeat | Evening(18-22)→Groove | Night(22-02)→Chill
+**Standardized genres:** Jazz, Lounge Jazz, Smooth Jazz, Ambient, Lo-Fi, Electronic, Classical, Neo-Classical, Acoustic, World, Soul, Bossa Nova, Downtempo, Trip-Hop, R&B, Funk, Blues
+**Standardized moods:** Relaxed, Calm, Energetic, Upbeat, Focused, Uplifting, Romantic, Dreamy, Warm, Reflective
 
-- **Never auto-execute** a multi-track production without user confirmation of the brief
-- For single quick requests ("make me one chill track"), you can proceed directly
-- After execution, ALWAYS save tracks via save_to_library — every generated track must end up in the library
-- After saving, report: 🎵 **Listen:** [audio_url]
-- NEVER skip analyze_track — this is your quality control
-- After ALL tracks in a set are saved, ALWAYS call create_playlist to bundle them
-- After successful generation, ALWAYS save_skill with the recipe that worked
-- When user shares preferences/context, ALWAYS save_memory`;
+## CAPABILITIES
+- **Library**: analyze distribution, find gaps, fix metadata, generate covers, transcribe lyrics
+- **Schedule**: build/analyze weekly schedule using playlists mapped to time-of-day energy
+- **Playlists**: create, analyze key/BPM flow, suggest optimal reorder (Circle of Fifths)
+- **Analytics**: analyze play logs for trends, run proactive health checks
+- **Landing page**: feature best/newest tracks via update_featured_tracks
+- **Venue research**: use research_music_style to get AI-powered recommendations for ANY venue type
+
+## AUTONOMOUS MODE (cron)
+Be fully autonomous. Order: analyze_play_logs → analyze_library → generate tracks → save → playlist → update_featured_tracks → proactive_scan. Never ask questions. Vary genres (check distribution first, never same genre twice). Use standardized names.
+
+## OBJECTIVE TYPES
+**One-time** ("Create 4 tracks") → mark completed when done.
+**Ongoing** ("Ensure all tracks have lyrics") → NEVER complete. Update progress each run. Keywords: ensure, maintain, keep, always.
+VERIFY before completing: check actual state (e.g. missing_lyrics count).
+
+## PERSISTENCE
+- Save **skills** after successful generations (recipe that worked).
+- Save **memories** when user shares preferences/context.
+- Update **objectives** when you make progress.
+
+## USER FEEDBACK
+When the user rates a suggestion (via rate_suggestion), use the feedback to adjust your approach:
+- Score 1-3: significantly change direction — different genre, BPM range, or mood
+- Score 4-6: fine-tune — adjust parameters but keep general direction
+- Score 7-10: on track — continue with similar approach
+Always acknowledge the feedback briefly before proceeding.
+
+## RULES
+- Never auto-execute multi-track production without user approval of brief
+- Single quick requests → proceed directly
+- Always save tracks via save_to_library. Always analyze before saving.
+- After saving: report 🎵 **Listen:** [audio_url]
+- After all tracks saved → create_playlist to bundle them`;
 
 
 // ── Tools definition ────────────────────────────────────────────────────
@@ -383,14 +256,33 @@ const TOOLS = [
     type: "function",
     function: {
       name: "research_music_style",
-      description: "Get curated knowledge about what background music works best for a specific venue type.",
+      description: "Get AI-powered recommendations for what background music works best for ANY venue type and atmosphere. Uses AI reasoning to provide tailored BPM, genre, mood, key, and instrumentation suggestions.",
       parameters: {
         type: "object",
         properties: {
-          venue_type: { type: "string", description: "Type of venue, e.g. 'restaurant', 'hotel_lobby', 'cafe', 'spa', 'retail', 'bar', 'gym', 'office'" },
-          atmosphere: { type: "string", description: "Desired atmosphere, e.g. 'relaxed', 'upscale', 'energetic', 'intimate'" }
+          venue_type: { type: "string", description: "Type of venue — any type works: 'dental clinic', 'wine bar', 'yoga studio', 'bookshop', 'coworking space', etc." },
+          atmosphere: { type: "string", description: "Desired atmosphere, e.g. 'relaxed', 'upscale', 'energetic', 'intimate', 'professional'" },
+          time_of_day: { type: "string", description: "Optional: 'morning', 'afternoon', 'evening', 'night'" },
+          clientele: { type: "string", description: "Optional: target audience, e.g. 'young professionals', 'families', 'elderly'" }
         },
         required: ["venue_type"],
+        additionalProperties: false
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "rate_suggestion",
+      description: "Record user feedback on a suggestion or generated track. Use when the user expresses satisfaction/dissatisfaction.",
+      parameters: {
+        type: "object",
+        properties: {
+          score: { type: "number", description: "Rating 1-10 (1=terrible, 10=perfect)" },
+          feedback: { type: "string", description: "What the user said about the suggestion" },
+          context: { type: "string", description: "What was being rated (e.g. 'generated jazz track', 'venue recommendation')" }
+        },
+        required: ["score", "feedback"],
         additionalProperties: false
       }
     }
@@ -841,47 +733,89 @@ const TOOLS = [
 ];
 
 // ── Knowledge base ──────────────────────────────────────────────────────
-const VENUE_KNOWLEDGE: Record<string, any> = {
-  restaurant: {
-    general: { bpm: [80, 120], genres: ["Jazz", "Acoustic", "Lo-Fi", "Ambient"], moods: ["Relaxed", "Uplifting", "Romantic"], keys: ["C major", "G major", "F major", "Bb major", "Eb major"], instrumentation: "Piano, acoustic guitar, light percussion, soft bass, brushed drums" },
-    upscale: { bpm: [70, 100], genres: ["Jazz", "Classical", "Ambient"], moods: ["Relaxed", "Romantic"], instrumentation: "Piano, cello, soft strings, brushed jazz drums, upright bass" },
-    casual: { bpm: [90, 125], genres: ["Acoustic", "Lo-Fi", "World"], moods: ["Uplifting", "Relaxed"], instrumentation: "Acoustic guitar, light percussion, ukulele, soft synths" },
-  },
-  hotel_lobby: {
-    general: { bpm: [70, 100], genres: ["Ambient", "Classical", "Jazz"], moods: ["Calm", "Relaxed"], keys: ["C major", "G major", "D major", "A minor"], instrumentation: "Piano, ambient pads, soft strings, gentle harp, light reverb" },
-    luxury: { bpm: [60, 90], genres: ["Classical", "Ambient"], moods: ["Calm"], instrumentation: "Grand piano, string quartet, ambient textures" },
-  },
-  cafe: {
-    general: { bpm: [85, 115], genres: ["Lo-Fi", "Acoustic", "Jazz"], moods: ["Relaxed", "Focused", "Uplifting"], keys: ["G major", "C major", "D major", "A major"], instrumentation: "Acoustic guitar, soft piano, lo-fi beats, light percussion, warm bass" },
-  },
-  spa: {
-    general: { bpm: [55, 80], genres: ["Ambient", "Classical", "World"], moods: ["Calm", "Relaxed"], keys: ["C major", "G major", "F major", "D minor"], instrumentation: "Ambient pads, nature sounds, gentle piano, singing bowls, soft flute" },
-  },
-  retail: {
-    general: { bpm: [100, 130], genres: ["Electronic", "Lo-Fi", "Acoustic"], moods: ["Uplifting", "Energetic"], keys: ["C major", "G major", "A major", "E major"], instrumentation: "Synth pads, light drums, bass guitar, electronic beats, bright melodies" },
-  },
-  bar: {
-    general: { bpm: [90, 130], genres: ["Jazz", "Lo-Fi", "Electronic", "Acoustic"], moods: ["Relaxed", "Energetic", "Uplifting"], instrumentation: "Electric guitar, bass, drums, piano, synths" },
-    cocktail: { bpm: [80, 110], genres: ["Jazz", "Lo-Fi"], moods: ["Relaxed", "Romantic"], instrumentation: "Smooth jazz ensemble, piano trio, soft trumpet" },
-  },
-  gym: {
-    general: { bpm: [120, 160], genres: ["Electronic", "Lo-Fi"], moods: ["Energetic"], instrumentation: "Heavy drums, synth bass, electronic leads, driving percussion" },
-  },
-  office: {
-    general: { bpm: [70, 100], genres: ["Ambient", "Lo-Fi", "Classical"], moods: ["Focused", "Calm"], instrumentation: "Ambient pads, soft piano, lo-fi textures, minimal percussion" },
-  },
-};
-
 // ── Tool executors ──────────────────────────────────────────────────────
 
-function executeResearch(args: { venue_type: string; atmosphere?: string }) {
-  const venue = VENUE_KNOWLEDGE[args.venue_type] || VENUE_KNOWLEDGE["restaurant"];
-  const sub = args.atmosphere && venue[args.atmosphere] ? venue[args.atmosphere] : venue.general;
+/** Dynamic AI-powered venue research — works for ANY venue type */
+async function executeResearch(args: { venue_type: string; atmosphere?: string; time_of_day?: string; clientele?: string }): Promise<any> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    // Fallback to basic heuristics
+    return { venue_type: args.venue_type, atmosphere: args.atmosphere || "general", recommendations: { bpm: [80, 110], genres: ["Jazz", "Ambient", "Lo-Fi"], moods: ["Relaxed", "Calm"], instrumentation: "Piano, soft guitar, ambient pads" }, tips: "Default recommendations (AI unavailable)." };
+  }
+
+  try {
+    const prompt = `You are a music curation expert. Recommend background music for:
+- Venue: ${args.venue_type}${args.atmosphere ? `, ${args.atmosphere} atmosphere` : ""}${args.time_of_day ? `, ${args.time_of_day} time` : ""}${args.clientele ? `, clientele: ${args.clientele}` : ""}
+
+Return ONLY a JSON object (no markdown):
+{"bpm_range":[min,max],"genres":["Genre1","Genre2","Genre3"],"moods":["Mood1","Mood2"],"keys":["C major","G major"],"instrumentation":"description of instruments","tips":"one sentence of advice","energy_level":"low|medium|high"}`;
+
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!res.ok) throw new Error(`AI error ${res.status}`);
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content || "";
+    
+    // Parse JSON from response (handle markdown wrapping)
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        venue_type: args.venue_type,
+        atmosphere: args.atmosphere || "general",
+        time_of_day: args.time_of_day,
+        clientele: args.clientele,
+        recommendations: {
+          bpm: parsed.bpm_range || [80, 110],
+          genres: parsed.genres || [],
+          moods: parsed.moods || [],
+          keys: parsed.keys || [],
+          instrumentation: parsed.instrumentation || "",
+          energy_level: parsed.energy_level || "medium",
+        },
+        tips: parsed.tips || "",
+        source: "ai_generated",
+      };
+    }
+    throw new Error("Could not parse AI response");
+  } catch (e: any) {
+    console.log("Dynamic venue research failed, using heuristic:", e.message);
+    return { venue_type: args.venue_type, atmosphere: args.atmosphere || "general", recommendations: { bpm: [80, 110], genres: ["Jazz", "Ambient", "Lo-Fi"], moods: ["Relaxed", "Calm"], instrumentation: "Piano, soft guitar, ambient pads" }, tips: "Heuristic recommendations (AI lookup failed).", source: "fallback" };
+  }
+}
+
+/** Record user feedback and save as memory for future reference */
+async function executeRateSuggestion(args: { score: number; feedback: string; context?: string }, supabaseUrl: string, userId: string | null): Promise<any> {
+  const score = Math.max(1, Math.min(10, Math.round(args.score)));
+  const direction = score <= 3 ? "significantly_change" : score <= 6 ? "fine_tune" : "continue";
+  
+  // Save as memory if user is authenticated
+  if (userId) {
+    const sb = getServiceClient(supabaseUrl);
+    await sb.from("agent_memories").insert({
+      user_id: userId,
+      category: "feedback",
+      content: `Rating ${score}/10 on ${args.context || "suggestion"}: "${args.feedback}". Direction: ${direction}.`,
+      importance: score <= 3 ? 9 : score <= 6 ? 6 : 3,
+    }).catch(() => {});
+  }
+
   return {
-    venue_type: args.venue_type,
-    atmosphere: args.atmosphere || "general",
-    recommendations: sub,
-    tips: `For ${args.venue_type}, aim for BPM ${sub.bpm[0]}-${sub.bpm[1]}. Best genres: ${sub.genres.join(", ")}. Mood: ${sub.moods.join(", ")}. Instrumentation: ${sub.instrumentation}.`
+    score,
+    direction,
+    acknowledged: true,
+    message: score <= 3 
+      ? "Understood — I'll take a significantly different approach."
+      : score <= 6 
+        ? "Got it — I'll fine-tune my approach." 
+        : "Great — I'll continue in this direction.",
   };
 }
 
@@ -2234,7 +2168,7 @@ Deno.serve(async (req) => {
   }
 
   const { messages, conversation_id, settings, user_id: bodyUserId } = reqBody;
-  const chatModel = settings?.chatModel || "google/gemini-3-flash-preview";
+  const chatModel = settings?.chatModel || "google/gemini-2.5-pro";
   const sttProvider = settings?.sttProvider || "elevenlabs";
 
   // Resolve user_id securely:
@@ -2279,9 +2213,12 @@ Deno.serve(async (req) => {
       const push = (event: string, data: any) => { controller.enqueue(encoder.encode(sseEvent(event, data))); };
 
       try {
-        // Fetch persistent context
-        const context = userId ? await fetchAgentContext(supabaseUrl, userId) : { objectives: [], skills: [], memories: [] };
-        const systemPrompt = buildSystemPrompt(context);
+        // Fetch persistent context + listening trends in parallel
+        const [context, listeningTrends] = await Promise.all([
+          userId ? fetchAgentContext(supabaseUrl, userId) : Promise.resolve({ objectives: [], skills: [], memories: [] }),
+          fetchListeningTrends(supabaseUrl),
+        ]);
+        const systemPrompt = buildSystemPrompt(context, listeningTrends);
 
         const llmMessages: any[] = [{ role: "system", content: systemPrompt }, ...messages];
         const collectedAudioUrls: string[] = [];
@@ -2349,14 +2286,15 @@ Deno.serve(async (req) => {
               analyze_play_logs: "Analyzing listening data...",
               proactive_scan: "Running health check...",
               update_featured_tracks: "Updating landing page showcase...",
-              notify_admin: "Sending notification...",
+               notify_admin: "Sending notification...",
+              rate_suggestion: "Recording your feedback...",
             };
             console.log(`[sound-agent] Tool call #${toolCallCount}: ${fn}(${JSON.stringify(args).slice(0, 200)})`);
             push("status", { phase: "tool", tool: fn, message: toolLabels[fn] || `Running ${fn}...` });
 
             try {
               switch (fn) {
-                case "research_music_style": result = executeResearch(args); break;
+                case "research_music_style": result = await executeResearch(args); break;
                 case "generate_track": result = await executeGenerate(args, supabaseUrl, anonKey, userId); if (result.audio_url) collectedAudioUrls.push(result.audio_url); break;
                 case "analyze_track": result = await executeAnalyze(args, supabaseUrl, anonKey); break;
                 case "save_to_library": result = await executeSave(args, supabaseUrl); break;
@@ -2384,6 +2322,7 @@ Deno.serve(async (req) => {
                 case "proactive_scan": result = await executeProactiveScan(args, supabaseUrl, userId); break;
                 case "update_featured_tracks": result = await executeUpdateFeaturedTracks(args, supabaseUrl); break;
                 case "notify_admin": result = userId ? await executeNotifyAdmin(args, supabaseUrl, userId) : { error: "No user context" }; break;
+                case "rate_suggestion": result = await executeRateSuggestion(args, supabaseUrl, userId); break;
                 default: result = { error: `Unknown tool: ${fn}` };
               }
             } catch (e) { result = { error: `Tool error: ${e.message}` }; console.error(`[sound-agent] Tool ${fn} error:`, e.message); }

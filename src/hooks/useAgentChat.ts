@@ -45,7 +45,7 @@ export function useAgentChat() {
         .maybeSingle();
       if (error) throw error;
       return (data?.value as unknown as ModuleSettings) || {
-        chatModel: "google/gemini-3-flash-preview",
+        chatModel: "google/gemini-2.5-pro",
         analysisProvider: "acestep",
         generationProvider: "acestep",
       };
