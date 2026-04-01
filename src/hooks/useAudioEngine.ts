@@ -122,7 +122,14 @@ export function useAudioEngine({ onEnded }: UseAudioEngineOptions): AudioEngineS
 
       setCurrentSong(song);
       audio.src = song.file_url;
-      audio.play().catch(() => {});
+      audio.load(); // Ensures iOS Safari prepares the new source
+      try {
+        await audio.play();
+      } catch (err) {
+        // iOS Safari may block autoplay — keep song loaded so user can tap play
+        console.warn("Autoplay blocked (iOS?):", err);
+        setIsPlaying(false);
+      }
       logPlay(song.id);
     },
     [updatePlayDuration, logPlay]
@@ -132,7 +139,7 @@ export function useAudioEngine({ onEnded }: UseAudioEngineOptions): AudioEngineS
     const audio = audioRef.current;
     if (!audio) return;
     if (audio.paused) {
-      audio.play().catch(() => {});
+      audio.play().catch((err) => console.warn("Play failed:", err));
     } else {
       audio.pause();
     }

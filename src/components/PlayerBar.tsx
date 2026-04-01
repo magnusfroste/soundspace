@@ -61,7 +61,7 @@ export function PlayerBar() {
         </div>
 
         {/* Main controls */}
-        <div className="flex items-center px-3 pb-3 gap-3">
+        <div className="flex items-center px-3 pb-3 gap-2">
           {/* Song Info */}
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden shrink-0">
@@ -77,9 +77,21 @@ export function PlayerBar() {
             </div>
           </div>
 
+          {/* Shuffle */}
+          <button
+            onClick={() => setShuffle(!shuffle)}
+            className={cn(
+              "transition-colors p-1.5",
+              shuffle ? "text-primary" : "text-muted-foreground"
+            )}
+            aria-label={shuffle ? "Shuffle on" : "Shuffle off"}
+          >
+            <Shuffle className="h-4 w-4" />
+          </button>
+
           {/* Playback controls */}
-          <div className="flex items-center gap-1">
-            <button onClick={prevTrack} className="text-muted-foreground hover:text-foreground transition-colors p-2">
+          <div className="flex items-center gap-0.5">
+            <button onClick={prevTrack} className="text-muted-foreground hover:text-foreground transition-colors p-1.5">
               <SkipBack className="h-5 w-5" />
             </button>
             <button
@@ -92,37 +104,29 @@ export function PlayerBar() {
                 <Play className="h-5 w-5 text-primary-foreground ml-0.5" />
               )}
             </button>
-            <button onClick={nextTrack} className="text-muted-foreground hover:text-foreground transition-colors p-2">
+            <button onClick={nextTrack} className="text-muted-foreground hover:text-foreground transition-colors p-1.5">
               <SkipForward className="h-5 w-5" />
             </button>
           </div>
 
-          {/* Volume popover */}
-          <Popover>
-            <PopoverTrigger asChild>
-              <button className="text-muted-foreground hover:text-foreground transition-colors p-2">
-                {volume === 0 ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-              </button>
-            </PopoverTrigger>
-            <PopoverContent side="top" align="end" className="w-12 p-3">
-              <div className="flex flex-col items-center gap-2">
-                <Slider
-                  value={[volume]}
-                  max={1}
-                  step={0.01}
-                  onValueChange={([val]) => setVolume(val)}
-                  orientation="vertical"
-                  className="h-24"
-                />
-                <button 
-                  onClick={() => setVolume(volume > 0 ? 0 : 0.8)} 
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  {volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                </button>
-              </div>
-            </PopoverContent>
-          </Popover>
+          {/* Repeat */}
+          <button
+            onClick={cycleRepeatMode}
+            className={cn(
+              "transition-colors p-1.5",
+              repeatMode !== "off" ? "text-primary" : "text-muted-foreground"
+            )}
+            aria-label={
+              repeatMode === "off" ? "Repeat off" :
+              repeatMode === "all" ? "Repeat all" : "Repeat one"
+            }
+          >
+            {repeatMode === "one" ? (
+              <Repeat1 className="h-4 w-4" />
+            ) : (
+              <Repeat className="h-4 w-4" />
+            )}
+          </button>
         </div>
       </div>
     );
