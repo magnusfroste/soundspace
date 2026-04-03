@@ -3,14 +3,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Network, Globe, Key, Activity, Shield, Copy, Eye, EyeOff,
-  RefreshCw, CheckCircle2, Bot, ExternalLink,
+  RefreshCw, CheckCircle2, Bot,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -186,8 +184,6 @@ function ApiKeySection() {
 
 /* ─── Connected Agents ─── */
 function ConnectedAgentsSection() {
-  const endpointUrl = `${SUPABASE_URL}/functions/v1/upload-song`;
-
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -195,42 +191,13 @@ function ConnectedAgentsSection() {
           <Bot className="h-4 w-4 text-muted-foreground" />
           Connected Agents
         </CardTitle>
-        <CardDescription>External producer agents with access to your library</CardDescription>
+        <CardDescription>External A2A-compatible agents</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
-          <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 flex items-center justify-center">
-            <Bot className="h-5 w-5 text-white" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-sm">OpenClaw</span>
-              <Badge variant="outline" className="text-violet-600 border-violet-500/30 bg-violet-500/10 text-xs">Producer Agent</Badge>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">AI music producer — uploads tracks via REST endpoint</p>
-          </div>
-          <Badge variant="outline" className="text-green-600 border-green-600/30 bg-green-500/10">
-            <CheckCircle2 className="h-3 w-3 mr-1" />Active
-          </Badge>
-        </div>
-
-        <Separator />
-
-        <div className="space-y-2">
-          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Upload Endpoint</Label>
-          <div className="flex items-center gap-2">
-            <code className="text-xs bg-muted px-2 py-1.5 rounded flex-1 break-all font-mono">POST {endpointUrl}</code>
-            <Button variant="outline" size="icon" onClick={() => copyToClipboard(endpointUrl, "Endpoint")}>
-              <Copy className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="p-3 rounded-lg bg-violet-500/10 text-sm">
-          <p className="font-medium text-violet-600 dark:text-violet-400 mb-1">Required Fields</p>
-          <p className="text-xs text-violet-600/80 dark:text-violet-400/80">
-            <code>audio_url</code> (FLAC/MP3/WAV) + <code>title</code>. Optional: artist, genre, mood, bpm, key_scale, lyrics, prompt.
-          </p>
+      <CardContent>
+        <div className="text-center py-8 text-muted-foreground">
+          <Network className="h-8 w-8 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">No A2A agents connected yet.</p>
+          <p className="text-xs mt-1">Share your agent card endpoint to allow external agents to discover and connect.</p>
         </div>
       </CardContent>
     </Card>
