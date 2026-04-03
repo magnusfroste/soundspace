@@ -8,5 +8,4 @@ export { LovableAICard } from "./LovableAICard";
 export { RevelatorCard } from "./RevelatorCard";
 export { FugaCard } from "./FugaCard";
 export { DistroKidCard } from "./DistroKidCard";
-// index.ts — re-export integration cards
-export { OpenClawCard } from "./OpenClawCard";
+export { A2ACard } from "./A2ACard";
