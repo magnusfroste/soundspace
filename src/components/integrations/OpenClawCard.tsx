@@ -239,7 +239,7 @@ export function OpenClawCard() {
             </div>
 
             {/* API Key */}
-            {apiKey && (
+            {apiKey ? (
               <div className="space-y-1">
                 <span className="text-xs text-muted-foreground">Bearer Token</span>
                 <div className="flex items-center gap-1.5">
