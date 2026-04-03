@@ -170,18 +170,18 @@ export function OpenClawCard() {
     const { data: existing } = await supabase
       .from("site_settings")
       .select("id")
-      .eq("key", "a2a_bearer_token")
+      .eq("key", "openclaw_api_token")
       .maybeSingle();
 
     if (existing) {
       await supabase
         .from("site_settings")
         .update({ value: token as any, updated_at: new Date().toISOString() })
-        .eq("key", "a2a_bearer_token");
+        .eq("key", "openclaw_api_token");
     } else {
       await supabase
         .from("site_settings")
-        .insert({ key: "a2a_bearer_token", value: token as any });
+        .insert({ key: "openclaw_api_token", value: token as any });
     }
     await refetchKey();
     toast.success("Bearer token generated");
