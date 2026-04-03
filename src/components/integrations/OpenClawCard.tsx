@@ -254,6 +254,14 @@ export function OpenClawCard() {
                   </Button>
                 </div>
               </div>
+            ) : (
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground">Bearer Token</span>
+                <Button variant="outline" size="sm" className="w-full" onClick={generateToken}>
+                  <KeyRound className="h-3 w-3 mr-1.5" />
+                  Generate API Token
+                </Button>
+              </div>
             )}
 
             {/* Instructions Dialog */}
