@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plug, Sparkles, RefreshCw, CheckCircle2, XCircle, AlertCircle, Brain, Music, Truck, Network } from "lucide-react";
+import { Plug, Sparkles, RefreshCw, CheckCircle2, XCircle, AlertCircle, Brain, Music, Truck, Network, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { isIntegrationEnabled, setIntegrationEnabled, fetchIntegrationsState } from "@/lib/integrations-state";
