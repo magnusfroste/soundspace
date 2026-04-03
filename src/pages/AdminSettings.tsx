@@ -295,6 +295,7 @@ export default function AdminSettings() {
           </Card>
 
           {/* Landing Page Settings */}
+          <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Globe className="h-5 w-5 text-primary" />
