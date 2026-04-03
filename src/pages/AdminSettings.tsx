@@ -62,20 +62,6 @@ export default function AdminSettings() {
       return data;
     },
   });
-
-  // Fetch A2A bearer token
-  const { data: a2aTokenSetting } = useQuery({
-    queryKey: ["site-settings", "a2a_bearer_token"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("site_settings")
-        .select("*")
-        .eq("key", "a2a_bearer_token")
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
   const { data: playlists } = useQuery({
     queryKey: ["playlists"],
     queryFn: async () => {
