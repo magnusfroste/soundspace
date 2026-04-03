@@ -308,9 +308,10 @@ export default function AdminIntegrations() {
       <IntegrationSection
         icon={Network}
         title="A2A Protocol"
-        description="Agent-to-Agent integration for external music generation requests"
+        description="Agent-to-Agent integration and external producer access"
       >
         <A2ACard />
+        <OpenClawCard />
       </IntegrationSection>
     </div>
   );
