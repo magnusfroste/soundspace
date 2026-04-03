@@ -151,7 +151,7 @@ export function OpenClawCard() {
     setIntegrationEnabled("openclaw", checked);
   };
 
-  const { data: apiKey } = useQuery({
+  const { data: apiKey, refetch: refetchKey } = useQuery({
     queryKey: ["openclaw-api-key"],
     queryFn: async () => {
       const { data } = await supabase
@@ -164,6 +164,28 @@ export function OpenClawCard() {
       return typeof val === "string" ? val : (val as Record<string, string>).token || null;
     },
   });
+
+  const generateToken = async () => {
+    const token = crypto.randomUUID() + "-" + crypto.randomUUID();
+    const { data: existing } = await supabase
+      .from("site_settings")
+      .select("id")
+      .eq("key", "a2a_bearer_token")
+      .maybeSingle();
+
+    if (existing) {
+      await supabase
+        .from("site_settings")
+        .update({ value: token as any, updated_at: new Date().toISOString() })
+        .eq("key", "a2a_bearer_token");
+    } else {
+      await supabase
+        .from("site_settings")
+        .insert({ key: "a2a_bearer_token", value: token as any });
+    }
+    await refetchKey();
+    toast.success("Bearer token generated");
+  };
 
   const maskedKey = apiKey ? `${apiKey.slice(0, 6)}${"•".repeat(20)}${apiKey.slice(-4)}` : null;
   const endpoint = `${SUPABASE_URL}/functions/v1/upload-song`;
