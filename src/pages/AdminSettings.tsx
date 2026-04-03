@@ -180,6 +180,32 @@ export default function AdminSettings() {
     },
   });
 
+  // Save A2A token mutation
+  const saveTokenMutation = useMutation({
+    mutationFn: async (token: string) => {
+      const { error } = await supabase
+        .from("site_settings")
+        .upsert({ key: "a2a_bearer_token", value: JSON.parse(JSON.stringify({ token })) }, { onConflict: "key" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["site-settings", "a2a_bearer_token"] });
+      toast.success("API key saved");
+    },
+    onError: () => toast.error("Failed to save API key"),
+  });
+
+  const generateToken = () => {
+    const token = `sk_${crypto.randomUUID().replace(/-/g, "")}`;
+    setApiToken(token);
+    saveTokenMutation.mutate(token);
+  };
+
+  const copyToken = () => {
+    navigator.clipboard.writeText(apiToken);
+    toast.success("Copied to clipboard");
+  };
+
   const handleSave = () => {
     saveMutation.mutate(landingSettings);
   };
