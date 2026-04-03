@@ -157,7 +157,7 @@ export function OpenClawCard() {
       const { data } = await supabase
         .from("site_settings")
         .select("value")
-        .eq("key", "a2a_bearer_token")
+        .eq("key", "openclaw_api_token")
         .maybeSingle();
       if (!data?.value) return null;
       const val = data.value;

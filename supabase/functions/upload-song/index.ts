@@ -114,7 +114,7 @@ async function validateApiKey(req: Request, supabaseUrl: string): Promise<boolea
   const { data } = await sb
     .from("site_settings")
     .select("value")
-    .eq("key", "a2a_bearer_token")
+    .eq("key", "openclaw_api_token")
     .maybeSingle();
 
   if (!data?.value) return false;
