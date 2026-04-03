@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { CheckCircle2, XCircle, Copy, Eye, EyeOff, FileText, Clapperboard } from "lucide-react";
+import { CheckCircle2, XCircle, Copy, Eye, EyeOff, FileText, Clapperboard, KeyRound } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
