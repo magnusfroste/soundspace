@@ -113,6 +113,14 @@ export default function AdminSettings() {
     }
   }, [premiumSettings]);
 
+  // Load A2A token
+  useEffect(() => {
+    if (a2aTokenSetting?.value) {
+      const val = a2aTokenSetting.value as unknown as { token?: string } | string;
+      setApiToken(typeof val === "string" ? val : val.token || "");
+    }
+  }, [a2aTokenSetting]);
+
   // Save landing page mutation
   const saveMutation = useMutation({
     mutationFn: async (newSettings: LandingPageSettings) => {
