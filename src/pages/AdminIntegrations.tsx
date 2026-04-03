@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plug, Sparkles, RefreshCw, CheckCircle2, XCircle, AlertCircle, Brain, Music, Truck, Network } from "lucide-react";
+import { Plug, Sparkles, RefreshCw, CheckCircle2, XCircle, AlertCircle, Brain, Music, Truck, Network, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Switch } from "@/components/ui/switch";
 import { isIntegrationEnabled, setIntegrationEnabled, fetchIntegrationsState } from "@/lib/integrations-state";
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LocalAICard, MubertCard, MusicgenCard, AceStepCard, OpenAICard, GeminiCard, LovableAICard, RevelatorCard, FugaCard, DistroKidCard, A2ACard } from "@/components/integrations";
+import { LocalAICard, MubertCard, MusicgenCard, AceStepCard, OpenAICard, GeminiCard, LovableAICard, RevelatorCard, FugaCard, DistroKidCard, A2ACard, OpenClawCard } from "@/components/integrations";
 
 interface ElevenLabsStatus {
   connected: boolean;
@@ -306,9 +306,17 @@ export default function AdminIntegrations() {
       </IntegrationSection>
 
       <IntegrationSection
+        icon={Users}
+        title="External Producers"
+        description="Third-party agents that contribute tracks to your library"
+      >
+        <OpenClawCard />
+      </IntegrationSection>
+
+      <IntegrationSection
         icon={Network}
         title="A2A Protocol"
-        description="Agent-to-Agent integration and external producer access"
+        description="Agent-to-Agent protocol for agent discovery and communication"
       >
         <A2ACard />
       </IntegrationSection>
