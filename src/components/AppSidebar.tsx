@@ -55,14 +55,18 @@ export function AppSidebar() {
 
   const enabledModules: string[] = Array.isArray(moduleSettings?.enabled_modules) ? moduleSettings.enabled_modules : [];
   const soundAgentEnabled = enabledModules.includes("sound-agent");
+  const a2aEnabled = isIntegrationEnabled("a2a");
 
-  // Build admin nav — SoundAgent is a single consolidated entry
+  // Build admin nav — conditional entries based on modules/integrations
   const adminNav = [
     ...adminNavStatic.slice(0, 2), // Dashboard, AI Studio
     ...(soundAgentEnabled ? [
       { title: "SoundAgent", url: "/admin/agent", icon: Bot },
     ] : []),
     ...adminNavStatic.slice(2), // rest
+    ...(a2aEnabled ? [
+      { title: "A2A Protocol", url: "/admin/a2a", icon: Network },
+    ] : []),
   ];
 
   // Fetch user profile for avatar & display name
