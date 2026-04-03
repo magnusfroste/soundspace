@@ -33,6 +33,7 @@ export default function AdminSettings() {
     announcements_enabled: false,
     custom_playlists_enabled: false,
   });
+  const [apiToken, setApiToken] = useState("");
 
   // Fetch landing page settings
   const { data: settings, isLoading: settingsLoading } = useQuery({
