@@ -193,8 +193,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const sb = createClient(supabaseUrl, serviceKey);
+    const sb = sbAdmin;
 
     // ── Download audio ──
     console.log(`[upload-song] Downloading: ${audioUrl.slice(0, 120)}`);
