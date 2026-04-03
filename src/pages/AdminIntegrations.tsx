@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LocalAICard, MubertCard, MusicgenCard, AceStepCard, OpenAICard, GeminiCard, LovableAICard, RevelatorCard, FugaCard, DistroKidCard, A2ACard, OpenClawCard } from "@/components/integrations";
+import { LocalAICard, MubertCard, MusicgenCard, AceStepCard, OpenAICard, GeminiCard, LovableAICard, RevelatorCard, FugaCard, DistroKidCard, A2ACard } from "@/components/integrations";
 
 interface ElevenLabsStatus {
   connected: boolean;
@@ -311,7 +311,6 @@ export default function AdminIntegrations() {
         description="Agent-to-Agent integration and external producer access"
       >
         <A2ACard />
-        <OpenClawCard />
       </IntegrationSection>
     </div>
   );

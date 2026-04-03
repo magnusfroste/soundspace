@@ -9,4 +9,3 @@ export { RevelatorCard } from "./RevelatorCard";
 export { FugaCard } from "./FugaCard";
 export { DistroKidCard } from "./DistroKidCard";
 export { A2ACard } from "./A2ACard";
-export { OpenClawCard } from "./OpenClawCard";

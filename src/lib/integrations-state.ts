@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 const DB_SETTINGS_KEY = "integrations_enabled";
 const LOCAL_CACHE_KEY = "somhonesto_integrations_cache";
 
-export type IntegrationId = "elevenlabs" | "mubert" | "musicgen" | "acestep" | "local" | "openai" | "gemini" | "lovable" | "revelator" | "fuga" | "distrokid" | "openclaw";
+export type IntegrationId = "elevenlabs" | "mubert" | "musicgen" | "acestep" | "local" | "openai" | "gemini" | "lovable" | "revelator" | "fuga" | "distrokid" | "openclaw" | "a2a";
 
 /** In-memory cache updated from DB. Falls back to localStorage cache for offline/startup. */
 let memoryCache: Record<string, boolean> | null = null;
