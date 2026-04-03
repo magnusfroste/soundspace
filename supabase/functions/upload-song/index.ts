@@ -147,6 +147,23 @@ Deno.serve(async (req) => {
     );
   }
 
+  // Check if OpenClaw integration is enabled
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const sbAdmin = createClient(supabaseUrl, serviceKey);
+  const { data: integrationsData } = await sbAdmin
+    .from("site_settings")
+    .select("value")
+    .eq("key", "integrations_enabled")
+    .maybeSingle();
+
+  const integrations = (integrationsData?.value as Record<string, boolean>) || {};
+  if (integrations.openclaw === false) {
+    return new Response(
+      JSON.stringify({ error: "OpenClaw integration is disabled. Enable it in Integrations settings." }),
+      { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
   try {
     const body = await req.json();
 
@@ -176,8 +193,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const sb = createClient(supabaseUrl, serviceKey);
+    const sb = sbAdmin;
 
     // ── Download audio ──
     console.log(`[upload-song] Downloading: ${audioUrl.slice(0, 120)}`);

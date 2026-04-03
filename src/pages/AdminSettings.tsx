@@ -6,8 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Settings, Music, Globe, Save, Loader2, Mic, Crown, ListPlus, Key, Copy, RefreshCw } from "lucide-react";
+import { Settings, Music, Globe, Save, Loader2, Mic, Crown, ListPlus } from "lucide-react";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -33,7 +32,6 @@ export default function AdminSettings() {
     announcements_enabled: false,
     custom_playlists_enabled: false,
   });
-  const [apiToken, setApiToken] = useState("");
 
   // Fetch landing page settings
   const { data: settings, isLoading: settingsLoading } = useQuery({
@@ -60,20 +58,6 @@ export default function AdminSettings() {
         .eq("key", "premium_features")
         .maybeSingle();
 
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  // Fetch A2A bearer token
-  const { data: a2aTokenSetting } = useQuery({
-    queryKey: ["site-settings", "a2a_bearer_token"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("site_settings")
-        .select("*")
-        .eq("key", "a2a_bearer_token")
-        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -112,14 +96,6 @@ export default function AdminSettings() {
       });
     }
   }, [premiumSettings]);
-
-  // Load A2A token
-  useEffect(() => {
-    if (a2aTokenSetting?.value) {
-      const val = a2aTokenSetting.value as unknown as { token?: string } | string;
-      setApiToken(typeof val === "string" ? val : val.token || "");
-    }
-  }, [a2aTokenSetting]);
 
   // Save landing page mutation
   const saveMutation = useMutation({
@@ -179,32 +155,6 @@ export default function AdminSettings() {
       toast.error("Failed to save premium features");
     },
   });
-
-  // Save A2A token mutation
-  const saveTokenMutation = useMutation({
-    mutationFn: async (token: string) => {
-      const { error } = await supabase
-        .from("site_settings")
-        .upsert({ key: "a2a_bearer_token", value: JSON.parse(JSON.stringify({ token })) }, { onConflict: "key" });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["site-settings", "a2a_bearer_token"] });
-      toast.success("API key saved");
-    },
-    onError: () => toast.error("Failed to save API key"),
-  });
-
-  const generateToken = () => {
-    const token = `sk_${crypto.randomUUID().replace(/-/g, "")}`;
-    setApiToken(token);
-    saveTokenMutation.mutate(token);
-  };
-
-  const copyToken = () => {
-    navigator.clipboard.writeText(apiToken);
-    toast.success("Copied to clipboard");
-  };
 
   const handleSave = () => {
     saveMutation.mutate(landingSettings);
@@ -294,69 +244,7 @@ export default function AdminSettings() {
             </CardContent>
           </Card>
 
-          {/* API Key for External Agents */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Key className="h-5 w-5 text-primary" />
-                <CardTitle>External API Access</CardTitle>
-              </div>
-              <CardDescription>
-                API key for external agents (e.g. OpenClaw) to upload songs via REST endpoint
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>API Key</Label>
-                {apiToken ? (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      readOnly
-                      value={apiToken}
-                      className="font-mono text-sm"
-                    />
-                    <Button variant="outline" size="icon" onClick={copyToken} title="Copy">
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="icon" onClick={generateToken} title="Regenerate">
-                      <RefreshCw className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-muted-foreground">No API key generated yet</p>
-                    <Button variant="outline" size="sm" onClick={generateToken}>
-                      Generate Key
-                    </Button>
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Use this key as <code className="bg-muted px-1 rounded">Authorization: Bearer &lt;key&gt;</code> when posting to the upload endpoint
-                </p>
-              </div>
-
-              <div className="border-t pt-4 space-y-2">
-                <Label className="text-sm font-medium">Endpoint</Label>
-                <div className="flex items-center gap-2">
-                  <code className="text-xs bg-muted px-2 py-1.5 rounded flex-1 break-all">
-                    POST {import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-song
-                  </code>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-song`);
-                      toast.success("Endpoint copied");
-                    }}
-                    title="Copy endpoint"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
+          {/* Landing Page Settings */}
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
