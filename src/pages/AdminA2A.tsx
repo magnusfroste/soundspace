@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Network, Globe, Key, Activity, Shield, Copy, Eye, EyeOff,
-  RefreshCw, CheckCircle2, Bot, ExternalLink,
+  RefreshCw, CheckCircle2, Bot,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
