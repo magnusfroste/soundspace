@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Settings, Music, Globe, Save, Loader2, Mic, Crown, ListPlus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Settings, Music, Globe, Save, Loader2, Mic, Crown, ListPlus, Key, Copy, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 
