@@ -306,9 +306,17 @@ export default function AdminIntegrations() {
       </IntegrationSection>
 
       <IntegrationSection
+        icon={Users}
+        title="External Producers"
+        description="Third-party agents that contribute tracks to your library"
+      >
+        <OpenClawCard />
+      </IntegrationSection>
+
+      <IntegrationSection
         icon={Network}
         title="A2A Protocol"
-        description="Agent-to-Agent integration and external producer access"
+        description="Agent-to-Agent protocol for agent discovery and communication"
       >
         <A2ACard />
       </IntegrationSection>
