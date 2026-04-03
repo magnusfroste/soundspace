@@ -294,7 +294,69 @@ export default function AdminSettings() {
             </CardContent>
           </Card>
 
-          {/* Landing Page Settings */}
+          {/* API Key for External Agents */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Key className="h-5 w-5 text-primary" />
+                <CardTitle>External API Access</CardTitle>
+              </div>
+              <CardDescription>
+                API key for external agents (e.g. OpenClaw) to upload songs via REST endpoint
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>API Key</Label>
+                {apiToken ? (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      readOnly
+                      value={apiToken}
+                      className="font-mono text-sm"
+                    />
+                    <Button variant="outline" size="icon" onClick={copyToken} title="Copy">
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={generateToken} title="Regenerate">
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground">No API key generated yet</p>
+                    <Button variant="outline" size="sm" onClick={generateToken}>
+                      Generate Key
+                    </Button>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Use this key as <code className="bg-muted px-1 rounded">Authorization: Bearer &lt;key&gt;</code> when posting to the upload endpoint
+                </p>
+              </div>
+
+              <div className="border-t pt-4 space-y-2">
+                <Label className="text-sm font-medium">Endpoint</Label>
+                <div className="flex items-center gap-2">
+                  <code className="text-xs bg-muted px-2 py-1.5 rounded flex-1 break-all">
+                    POST {import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-song
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-song`);
+                      toast.success("Endpoint copied");
+                    }}
+                    title="Copy endpoint"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
