@@ -311,7 +311,6 @@ export default function AdminIntegrations() {
         description="Agent-to-Agent integration and external producer access"
       >
         <A2ACard />
-        <OpenClawCard />
       </IntegrationSection>
     </div>
   );
