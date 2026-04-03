@@ -32,6 +32,7 @@ const AdminSettings = lazy(() => import("@/pages/AdminSettings"));
 const AdminModules = lazy(() => import("@/pages/AdminModules"));
 const AdminUsers = lazy(() => import("@/pages/AdminUsers"));
 const AdminAgent = lazy(() => import("@/pages/AdminAgent"));
+const AdminA2A = lazy(() => import("@/pages/AdminA2A"));
 
 function LazyFallback() {
   return (
