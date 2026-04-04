@@ -326,16 +326,17 @@ const TOOLS = [
     type: "function",
     function: {
       name: "save_to_library",
-      description: "Save a generated track to the song library.",
+      description: "Save a generated track to the song library. IMPORTANT: quality_score is REQUIRED — you MUST analyze the track first and provide the score. Tracks below 70 are rejected.",
       parameters: {
         type: "object",
         properties: {
-          title: { type: "string" }, audio_url: { type: "string" }, genre: { type: "string" },
-          mood: { type: "string" }, bpm: { type: "number" }, key_scale: { type: "string" },
+          title: { type: "string" }, audio_url: { type: "string" }, genre: { type: "string", description: "MUST be one of: Jazz, Lounge Jazz, Smooth Jazz, Latin Jazz, Ambient, Ambient Electronic, Ambient Lounge, Lo-Fi, Electronic, Downtempo, Trip-Hop, Acoustic, Acoustic Folk, Classical, Neo-Classical, Classical Piano, World, Soul, R&B, Funk, Blues, Bossa Nova, Reggae, Pop" },
+          mood: { type: "string", description: "MUST be one of: Relaxed, Calm, Energetic, Upbeat, Focused, Uplifting, Romantic, Dreamy, Warm, Nostalgic, Melancholic, Reflective" },
+          bpm: { type: "number" }, key_scale: { type: "string" },
           time_signature: { type: "string" }, duration: { type: "number" }, lyrics: { type: "string" },
-          prompt: { type: "string" }, quality_score: { type: "number" }
+          prompt: { type: "string" }, quality_score: { type: "number", description: "REQUIRED. Quality score from analyze_track (0-1 or 0-100). Minimum 70 to save." }
         },
-        required: ["title", "audio_url", "duration"],
+        required: ["title", "audio_url", "duration", "quality_score", "genre", "mood"],
         additionalProperties: false
       }
     }
@@ -876,19 +877,29 @@ const MOOD_NORMALIZATION_MAP: Record<string, string> = {
   "melancholic": "Melancholic", "sad": "Melancholic", "reflective": "Reflective",
 };
 
+const VALID_GENRES = new Set(Object.values(GENRE_NORMALIZATION_MAP));
+const VALID_MOODS = new Set(Object.values(MOOD_NORMALIZATION_MAP));
+
 function normalizeGenre(genre: string | null | undefined): string | null {
   if (!genre) return null;
   const key = genre.toLowerCase().trim();
   if (GENRE_NORMALIZATION_MAP[key]) return GENRE_NORMALIZATION_MAP[key];
-  // Capitalize first letter of each word if no match
-  return genre.trim().replace(/\b\w/g, c => c.toUpperCase());
+  // Check if already a valid normalized value
+  const titleCase = genre.trim().replace(/\b\w/g, c => c.toUpperCase());
+  if (VALID_GENRES.has(titleCase)) return titleCase;
+  // No match — return null instead of allowing arbitrary text
+  console.warn(`[normalizeGenre] Unknown genre rejected: "${genre}"`);
+  return null;
 }
 
 function normalizeMood(mood: string | null | undefined): string | null {
   if (!mood) return null;
   const key = mood.toLowerCase().trim();
   if (MOOD_NORMALIZATION_MAP[key]) return MOOD_NORMALIZATION_MAP[key];
-  return mood.trim().replace(/\b\w/g, c => c.toUpperCase());
+  const titleCase = mood.trim().replace(/\b\w/g, c => c.toUpperCase());
+  if (VALID_MOODS.has(titleCase)) return titleCase;
+  console.warn(`[normalizeMood] Unknown mood rejected: "${mood}"`);
+  return null;
 }
 
 // ── Enhanced generation with real quality assessment ────────────────────
@@ -1005,7 +1016,7 @@ function computeRealQualityScore(
   extracted: { bpm?: number; keyScale?: string; timeSignature?: string; caption?: string } | null,
   requested: { bpm: number; keyScale: string; timeSig: string; prompt?: string },
 ): number {
-  if (!extracted) return 0.75; // Default passing score if analysis unavailable
+  if (!extracted) return 0.50; // Analysis unavailable — below threshold, agent must retry with analysis
 
   let score = 1.0;
 
@@ -1453,9 +1464,20 @@ async function executeSave(args: any, supabaseUrl: string) {
   if (qualityScore !== null && qualityScore > 0 && qualityScore <= 1) {
     qualityScore = Math.round(qualityScore * 100);
   }
+  // Quality gate: REQUIRE quality_score
+  if (qualityScore === null || qualityScore === undefined) {
+    return { error: "quality_score is REQUIRED. Analyze the track first using analyze_track, then provide the score. Tracks cannot be saved without a quality assessment." };
+  }
   // Quality gate: reject tracks under 70
-  if (qualityScore !== null && qualityScore < 70) {
-    return { error: `Quality score ${qualityScore} is below minimum threshold (70). Track not saved. Try regenerating with different parameters.`, quality_score: qualityScore };
+  if (qualityScore < 70) {
+    return { error: `Quality score ${qualityScore}/100 is below minimum threshold (70). Track NOT saved. Retry with different parameters or a refined prompt.`, quality_score: qualityScore };
+  }
+  // Validate genre/mood are from approved list
+  if (!genre) {
+    return { error: `Genre "${args.genre}" is not recognized. Use one of: ${[...VALID_GENRES].join(", ")}` };
+  }
+  if (!mood) {
+    return { error: `Mood "${args.mood}" is not recognized. Use one of: ${[...VALID_MOODS].join(", ")}` };
   }
   const { data, error } = await sb.from("songs").insert({
     title: args.title, file_url: args.audio_url, genre, mood,
@@ -1465,7 +1487,7 @@ async function executeSave(args: any, supabaseUrl: string) {
     artist: "SoundAgent AI", origin_source: "sound_agent",
   }).select("id").single();
   if (error) return { error: `Save failed: ${error.message}` };
-  return { success: true, song_id: data.id, title: args.title, genre, mood, quality_score: qualityScore, message: `"${args.title}" saved to song library.` };
+  return { success: true, song_id: data.id, title: args.title, genre, mood, quality_score: qualityScore, message: `"${args.title}" saved (quality: ${qualityScore}/100).` };
 }
 
 async function executeUpdateSong(args: any, supabaseUrl: string) {
