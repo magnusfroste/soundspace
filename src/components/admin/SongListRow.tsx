@@ -151,8 +151,8 @@ function EditableCell({
   );
 }
 
-export function SongListRow({ song, playlistNames, playlists }: SongListRowProps) {
-  const { currentSong, isPlaying, playSong, togglePlay } = usePlayer();
+export function SongListRow({ song, playlistNames, playlists, allSongs, songIndex }: SongListRowProps) {
+  const { currentSong, isPlaying, playQueue, togglePlay } = usePlayer();
   const addToPlaylist = useAddSongToPlaylist();
   const deleteSong = useDeleteSong();
   const navigate = useNavigate();
