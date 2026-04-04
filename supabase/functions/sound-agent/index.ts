@@ -877,19 +877,29 @@ const MOOD_NORMALIZATION_MAP: Record<string, string> = {
   "melancholic": "Melancholic", "sad": "Melancholic", "reflective": "Reflective",
 };
 
+const VALID_GENRES = new Set(Object.values(GENRE_NORMALIZATION_MAP));
+const VALID_MOODS = new Set(Object.values(MOOD_NORMALIZATION_MAP));
+
 function normalizeGenre(genre: string | null | undefined): string | null {
   if (!genre) return null;
   const key = genre.toLowerCase().trim();
   if (GENRE_NORMALIZATION_MAP[key]) return GENRE_NORMALIZATION_MAP[key];
-  // Capitalize first letter of each word if no match
-  return genre.trim().replace(/\b\w/g, c => c.toUpperCase());
+  // Check if already a valid normalized value
+  const titleCase = genre.trim().replace(/\b\w/g, c => c.toUpperCase());
+  if (VALID_GENRES.has(titleCase)) return titleCase;
+  // No match — return null instead of allowing arbitrary text
+  console.warn(`[normalizeGenre] Unknown genre rejected: "${genre}"`);
+  return null;
 }
 
 function normalizeMood(mood: string | null | undefined): string | null {
   if (!mood) return null;
   const key = mood.toLowerCase().trim();
   if (MOOD_NORMALIZATION_MAP[key]) return MOOD_NORMALIZATION_MAP[key];
-  return mood.trim().replace(/\b\w/g, c => c.toUpperCase());
+  const titleCase = mood.trim().replace(/\b\w/g, c => c.toUpperCase());
+  if (VALID_MOODS.has(titleCase)) return titleCase;
+  console.warn(`[normalizeMood] Unknown mood rejected: "${mood}"`);
+  return null;
 }
 
 // ── Enhanced generation with real quality assessment ────────────────────
