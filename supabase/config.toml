@@ -53,3 +53,6 @@ verify_jwt = false
 
 [functions.cleanup-trash]
 verify_jwt = false
+
+[functions.batch-generate-covers]
+verify_jwt = false
