@@ -423,9 +423,9 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete song</AlertDialogTitle>
+              <AlertDialogTitle>Move to trash</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete <strong>{song.title}</strong> by {song.artist} and remove it from all playlists.
+                <strong>{song.title}</strong> by {song.artist} will be moved to trash. You can restore it within 30 days.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -434,7 +434,7 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
                 onClick={() => deleteSong.mutate(song.id)}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                Delete
+                Move to Trash
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
