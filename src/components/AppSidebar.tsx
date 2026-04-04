@@ -39,6 +39,7 @@ const adminNavStatic = [
   { title: "AI Studio", url: "/admin/studio", icon: Sparkles },
   { title: "Song Library", url: "/admin/library", icon: Library },
   { title: "Manage Playlists", url: "/admin/playlists", icon: ListMusic },
+  { title: "Trash", url: "/admin/trash", icon: Trash2 },
   { title: "Integrations", url: "/admin/integrations", icon: Plug },
   { title: "Modules", url: "/admin/modules", icon: Puzzle },
   { title: "Users", url: "/admin/users", icon: Users },

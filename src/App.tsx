@@ -98,6 +98,7 @@ const App = () => (
                 <Route path="/admin/users" element={<Suspense fallback={<LazyFallback />}><AdminUsers /></Suspense>} />
                 <Route path="/admin/agent" element={<Suspense fallback={<LazyFallback />}><AdminAgent /></Suspense>} />
                 <Route path="/admin/a2a" element={<Suspense fallback={<LazyFallback />}><AdminA2A /></Suspense>} />
+                <Route path="/admin/trash" element={<Suspense fallback={<LazyFallback />}><AdminTrash /></Suspense>} />
                 {/* Legacy routes redirect to consolidated agent page */}
                 <Route path="/admin/objectives" element={<Navigate to="/admin/agent" replace />} />
                 <Route path="/admin/skills" element={<Navigate to="/admin/agent" replace />} />
