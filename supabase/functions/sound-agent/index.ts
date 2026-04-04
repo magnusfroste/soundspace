@@ -1464,9 +1464,20 @@ async function executeSave(args: any, supabaseUrl: string) {
   if (qualityScore !== null && qualityScore > 0 && qualityScore <= 1) {
     qualityScore = Math.round(qualityScore * 100);
   }
+  // Quality gate: REQUIRE quality_score
+  if (qualityScore === null || qualityScore === undefined) {
+    return { error: "quality_score is REQUIRED. Analyze the track first using analyze_track, then provide the score. Tracks cannot be saved without a quality assessment." };
+  }
   // Quality gate: reject tracks under 70
-  if (qualityScore !== null && qualityScore < 70) {
-    return { error: `Quality score ${qualityScore} is below minimum threshold (70). Track not saved. Try regenerating with different parameters.`, quality_score: qualityScore };
+  if (qualityScore < 70) {
+    return { error: `Quality score ${qualityScore}/100 is below minimum threshold (70). Track NOT saved. Retry with different parameters or a refined prompt.`, quality_score: qualityScore };
+  }
+  // Validate genre/mood are from approved list
+  if (!genre) {
+    return { error: `Genre "${args.genre}" is not recognized. Use one of: ${[...VALID_GENRES].join(", ")}` };
+  }
+  if (!mood) {
+    return { error: `Mood "${args.mood}" is not recognized. Use one of: ${[...VALID_MOODS].join(", ")}` };
   }
   const { data, error } = await sb.from("songs").insert({
     title: args.title, file_url: args.audio_url, genre, mood,
@@ -1476,7 +1487,7 @@ async function executeSave(args: any, supabaseUrl: string) {
     artist: "SoundAgent AI", origin_source: "sound_agent",
   }).select("id").single();
   if (error) return { error: `Save failed: ${error.message}` };
-  return { success: true, song_id: data.id, title: args.title, genre, mood, quality_score: qualityScore, message: `"${args.title}" saved to song library.` };
+  return { success: true, song_id: data.id, title: args.title, genre, mood, quality_score: qualityScore, message: `"${args.title}" saved (quality: ${qualityScore}/100).` };
 }
 
 async function executeUpdateSong(args: any, supabaseUrl: string) {
