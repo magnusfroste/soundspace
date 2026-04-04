@@ -695,6 +695,7 @@ export type Database = {
           bpm: number | null
           cover_url: string | null
           created_at: string
+          deleted_at: string | null
           duration: number
           file_url: string
           genre: string | null
@@ -713,6 +714,7 @@ export type Database = {
           bpm?: number | null
           cover_url?: string | null
           created_at?: string
+          deleted_at?: string | null
           duration?: number
           file_url: string
           genre?: string | null
@@ -731,6 +733,7 @@ export type Database = {
           bpm?: number | null
           cover_url?: string | null
           created_at?: string
+          deleted_at?: string | null
           duration?: number
           file_url?: string
           genre?: string | null

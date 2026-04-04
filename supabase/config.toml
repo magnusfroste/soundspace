@@ -50,3 +50,6 @@ verify_jwt = false
 
 [functions.update-cron-schedule]
 verify_jwt = false
+
+[functions.cleanup-trash]
+verify_jwt = false

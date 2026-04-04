@@ -29,6 +29,7 @@ export function useSongsLibrary() {
       const { data: songs, error: songsError } = await supabase
         .from("songs")
         .select("*")
+        .is("deleted_at", null)
         .order("created_at", { ascending: false });
 
       if (songsError) throw songsError;
@@ -173,8 +174,54 @@ export function useAddSongToPlaylist() {
   });
 }
 
-// Delete song
+// Soft-delete song (move to trash)
 export function useDeleteSong() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("songs")
+        .update({ deleted_at: new Date().toISOString() } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-songs-library"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-playlists-zones"] });
+      toast.success("Song moved to trash");
+    },
+    onError: () => {
+      toast.error("Failed to delete song");
+    },
+  });
+}
+
+// Restore song from trash
+export function useRestoreSong() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("songs")
+        .update({ deleted_at: null } as any)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-songs-library"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-trash"] });
+      toast.success("Song restored");
+    },
+    onError: () => {
+      toast.error("Failed to restore song");
+    },
+  });
+}
+
+// Permanently delete song
+export function usePermanentlyDeleteSong() {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -190,12 +237,28 @@ export function useDeleteSong() {
       if (error) throw error;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-trash"] });
       queryClient.invalidateQueries({ queryKey: ["admin-songs-library"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-playlists-zones"] });
-      toast.success("Song deleted");
+      toast.success("Song permanently deleted");
     },
     onError: () => {
       toast.error("Failed to delete song");
+    },
+  });
+}
+
+// Fetch trashed songs
+export function useTrashSongs() {
+  return useQuery({
+    queryKey: ["admin-trash"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("songs")
+        .select("*")
+        .not("deleted_at", "is", null)
+        .order("deleted_at", { ascending: false });
+      if (error) throw error;
+      return (data || []) as (Song & { deleted_at: string })[];
     },
   });
 }
