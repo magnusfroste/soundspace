@@ -29,6 +29,7 @@ export function useSongsLibrary() {
       const { data: songs, error: songsError } = await supabase
         .from("songs")
         .select("*")
+        .is("deleted_at", null)
         .order("created_at", { ascending: false });
 
       if (songsError) throw songsError;
