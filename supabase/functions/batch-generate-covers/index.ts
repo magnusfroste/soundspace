@@ -18,9 +18,10 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Get songs without covers (optionally filter by trashed only)
+    // Get songs without covers — small batch to stay within timeout
     const body = await req.json().catch(() => ({}));
-    const trashedOnly = body.trashed_only !== false; // default true
+    const trashedOnly = body.trashed_only !== false;
+    const batchSize = body.batch_size || 5;
 
     let query = supabase
       .from("songs")
@@ -31,7 +32,7 @@ Deno.serve(async (req) => {
       query = query.not("deleted_at", "is", null);
     }
 
-    const { data: songs, error: fetchError } = await query.limit(50);
+    const { data: songs, error: fetchError } = await query.limit(batchSize);
     if (fetchError) throw fetchError;
     if (!songs || songs.length === 0) {
       return new Response(JSON.stringify({ processed: 0, message: "No songs need covers" }), {
