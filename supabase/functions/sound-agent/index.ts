@@ -326,16 +326,17 @@ const TOOLS = [
     type: "function",
     function: {
       name: "save_to_library",
-      description: "Save a generated track to the song library.",
+      description: "Save a generated track to the song library. IMPORTANT: quality_score is REQUIRED — you MUST analyze the track first and provide the score. Tracks below 70 are rejected.",
       parameters: {
         type: "object",
         properties: {
-          title: { type: "string" }, audio_url: { type: "string" }, genre: { type: "string" },
-          mood: { type: "string" }, bpm: { type: "number" }, key_scale: { type: "string" },
+          title: { type: "string" }, audio_url: { type: "string" }, genre: { type: "string", description: "MUST be one of: Jazz, Lounge Jazz, Smooth Jazz, Latin Jazz, Ambient, Ambient Electronic, Ambient Lounge, Lo-Fi, Electronic, Downtempo, Trip-Hop, Acoustic, Acoustic Folk, Classical, Neo-Classical, Classical Piano, World, Soul, R&B, Funk, Blues, Bossa Nova, Reggae, Pop" },
+          mood: { type: "string", description: "MUST be one of: Relaxed, Calm, Energetic, Upbeat, Focused, Uplifting, Romantic, Dreamy, Warm, Nostalgic, Melancholic, Reflective" },
+          bpm: { type: "number" }, key_scale: { type: "string" },
           time_signature: { type: "string" }, duration: { type: "number" }, lyrics: { type: "string" },
-          prompt: { type: "string" }, quality_score: { type: "number" }
+          prompt: { type: "string" }, quality_score: { type: "number", description: "REQUIRED. Quality score from analyze_track (0-1 or 0-100). Minimum 70 to save." }
         },
-        required: ["title", "audio_url", "duration"],
+        required: ["title", "audio_url", "duration", "quality_score", "genre", "mood"],
         additionalProperties: false
       }
     }
