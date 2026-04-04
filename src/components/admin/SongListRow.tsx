@@ -46,6 +46,8 @@ interface SongListRowProps {
   song: SongWithPlaylists;
   playlistNames: Record<string, string>;
   playlists: PlaylistWithCount[];
+  allSongs?: SongWithPlaylists[];
+  songIndex?: number;
 }
 
 function formatDuration(seconds: number): string {
@@ -149,8 +151,8 @@ function EditableCell({
   );
 }
 
-export function SongListRow({ song, playlistNames, playlists }: SongListRowProps) {
-  const { currentSong, isPlaying, playSong, togglePlay } = usePlayer();
+export function SongListRow({ song, playlistNames, playlists, allSongs, songIndex }: SongListRowProps) {
+  const { currentSong, isPlaying, playQueue, togglePlay } = usePlayer();
   const addToPlaylist = useAddSongToPlaylist();
   const deleteSong = useDeleteSong();
   const navigate = useNavigate();
@@ -198,8 +200,10 @@ export function SongListRow({ song, playlistNames, playlists }: SongListRowProps
     e.stopPropagation();
     if (isCurrentSong) {
       togglePlay();
+    } else if (allSongs && songIndex !== undefined) {
+      playQueue(allSongs, songIndex);
     } else {
-      playSong(song);
+      playQueue([song], 0);
     }
   };
 
