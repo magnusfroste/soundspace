@@ -200,8 +200,10 @@ export function SongListRow({ song, playlistNames, playlists, allSongs, songInde
     e.stopPropagation();
     if (isCurrentSong) {
       togglePlay();
+    } else if (allSongs && songIndex !== undefined) {
+      playQueue(allSongs, songIndex);
     } else {
-      playSong(song);
+      playQueue([song], 0);
     }
   };
 
