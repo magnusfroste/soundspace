@@ -46,6 +46,8 @@ interface SongListRowProps {
   song: SongWithPlaylists;
   playlistNames: Record<string, string>;
   playlists: PlaylistWithCount[];
+  allSongs?: SongWithPlaylists[];
+  songIndex?: number;
 }
 
 function formatDuration(seconds: number): string {
