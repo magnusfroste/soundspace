@@ -1016,7 +1016,7 @@ function computeRealQualityScore(
   extracted: { bpm?: number; keyScale?: string; timeSignature?: string; caption?: string } | null,
   requested: { bpm: number; keyScale: string; timeSig: string; prompt?: string },
 ): number {
-  if (!extracted) return 0.75; // Default passing score if analysis unavailable
+  if (!extracted) return 0.50; // Analysis unavailable — below threshold, agent must retry with analysis
 
   let score = 1.0;
 
