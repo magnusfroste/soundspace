@@ -206,6 +206,7 @@ export default function AdminLibrary() {
               <div className="w-8" />
               <div className="w-8" />
               <div className="w-8" />
+              <div className="w-8" />
             </div>
             {filteredSongs.map((song, index) => (
               <SongListRow
