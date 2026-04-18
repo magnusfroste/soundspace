@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Play, Pause, Music2, Sparkles, Plus, Trash2, Type, Loader2, Wand2 } from "lucide-react";
+import { Play, Pause, Music2, Sparkles, Plus, Trash2, Type, Loader2, Wand2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -195,6 +195,33 @@ export function SongListRow({ song, playlistNames, playlists, allSongs, songInde
       toast.error(error.message);
     },
   });
+
+  const [downloading, setDownloading] = useState(false);
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!song.file_url) return;
+    setDownloading(true);
+    try {
+      const res = await fetch(song.file_url);
+      if (!res.ok) throw new Error("Failed to fetch file");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const ext = (song.file_url.split(".").pop() || "mp3").split("?")[0].toLowerCase();
+      const safeName = `${song.artist} - ${song.title}`.replace(/[^\w\s.-]/g, "_").trim();
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${safeName}.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Download started");
+    } catch (err) {
+      toast.error("Failed to download");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const handlePlayClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -411,6 +438,26 @@ export function SongListRow({ song, playlistNames, playlists, allSongs, songInde
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
+      </div>
+
+      {/* Download */}
+      <div className="w-8 flex-shrink-0">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
+              onClick={handleDownload}
+              disabled={downloading || !song.file_url}
+            >
+              {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p className="text-xs">Download</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Delete */}
