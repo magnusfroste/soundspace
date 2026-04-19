@@ -55,6 +55,15 @@ export const moduleRegistry: Module[] = [
       generationProvider: "acestep",
     },
   },
+  {
+    id: "mcp",
+    name: "MCP Server",
+    description:
+      "Exposes the entire platform as Model Context Protocol tools. External AI agents (Claude Desktop, Cursor, OpenClaw) can manage songs, playlists, lyrics, prompts and AI generation through a secure Bearer-token endpoint.",
+    icon: "Network",
+    category: "ai-agent",
+    version: "1.0.0",
+  },
 ];
 
 export function getModule(id: string): Module | undefined {
