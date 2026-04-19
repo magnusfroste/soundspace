@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.batch-generate-covers]
 verify_jwt = false
+
+[functions.mcp]
+verify_jwt = false

@@ -33,6 +33,7 @@ const AdminModules = lazy(() => import("@/pages/AdminModules"));
 const AdminUsers = lazy(() => import("@/pages/AdminUsers"));
 const AdminAgent = lazy(() => import("@/pages/AdminAgent"));
 const AdminA2A = lazy(() => import("@/pages/AdminA2A"));
+const AdminMCP = lazy(() => import("@/pages/AdminMCP"));
 const AdminTrash = lazy(() => import("@/pages/AdminTrash"));
 
 function LazyFallback() {
@@ -98,6 +99,7 @@ const App = () => (
                 <Route path="/admin/users" element={<Suspense fallback={<LazyFallback />}><AdminUsers /></Suspense>} />
                 <Route path="/admin/agent" element={<Suspense fallback={<LazyFallback />}><AdminAgent /></Suspense>} />
                 <Route path="/admin/a2a" element={<Suspense fallback={<LazyFallback />}><AdminA2A /></Suspense>} />
+                <Route path="/admin/mcp" element={<Suspense fallback={<LazyFallback />}><AdminMCP /></Suspense>} />
                 <Route path="/admin/trash" element={<Suspense fallback={<LazyFallback />}><AdminTrash /></Suspense>} />
                 {/* Legacy routes redirect to consolidated agent page */}
                 <Route path="/admin/objectives" element={<Navigate to="/admin/agent" replace />} />
