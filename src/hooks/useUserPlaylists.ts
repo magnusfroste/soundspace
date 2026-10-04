@@ -253,7 +253,7 @@ export function useUserPlaylistSongs(playlistId: string | undefined) {
         .order("position", { ascending: false })
         .limit(1);
 
-      let pos = (existing?.[0]?.position ?? -1) + 1;
+      const pos = (existing?.[0]?.position ?? -1) + 1;
 
       const inserts = songIds.map((songId, i) => ({
         user_playlist_id: playlistId,

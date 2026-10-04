@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
     const isWav = audioUrl.includes('.wav') || audioRes.headers.get('content-type')?.includes('audio/wav');
 
     let uploadData: Uint8Array | ArrayBuffer = audioBlob;
-    let contentType = 'audio/mpeg';
+    const contentType = 'audio/mpeg';
     const fileName = `suno-${songId}.mp3`;
 
     if (isWav) {

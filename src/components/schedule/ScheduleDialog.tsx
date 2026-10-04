@@ -182,7 +182,7 @@ export function ScheduleDialog({
     e.preventDefault();
     if (!playlistId) return;
 
-    let savedEntryId = entry?.id;
+    const savedEntryId = entry?.id;
 
     if (entry) {
       await onSave({

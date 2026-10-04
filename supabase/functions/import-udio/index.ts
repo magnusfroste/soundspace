@@ -132,7 +132,7 @@ Deno.serve(async (req) => {
 
     // Convert WAV→MP3 if needed, otherwise keep original
     let uploadData: Uint8Array | ArrayBuffer = audioBlob;
-    let contentType = 'audio/mpeg';
+    const contentType = 'audio/mpeg';
     const fileName = `udio-${songId}.mp3`;
 
     if (isWav) {

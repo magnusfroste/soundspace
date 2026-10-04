@@ -70,7 +70,7 @@ export function useAgentChat() {
   // Persist active conversation to sessionStorage
   const setActiveConv = useCallback((id: string | null) => {
     setActiveConversationId(id);
-    try { if (id) sessionStorage.setItem("agent-active-conv", id); else sessionStorage.removeItem("agent-active-conv"); } catch {}
+    try { if (id) sessionStorage.setItem("agent-active-conv", id); else sessionStorage.removeItem("agent-active-conv"); } catch { /* sessionStorage unavailable */ }
   }, []);
 
   // Auto-select most recent conversation if none active
