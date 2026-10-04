@@ -13,4 +13,4 @@ Allow: /
 User-agent: *
 Allow: /
 
-Sitemap: https://sound-space.lovable.app/sitemap.xml
+Sitemap: https://soundzone.lovable.app/sitemap.xml
