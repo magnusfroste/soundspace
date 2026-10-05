@@ -97,9 +97,9 @@ export function HeroSection() {
           transition={{ delay: 0.9 }}
         >
           {[
-            { value: "50K+", label: "Music tracks" },
-            { value: "2.5K+", label: "Businesses" },
-            { value: "24/7", label: "Active support" },
+            { value: "0", label: "Ads or interruptions" },
+            { value: "24h", label: "Automatic scheduling" },
+            { value: "Free", label: "To get started" },
           ].map((stat, i) => (
             <motion.div 
               key={i} 

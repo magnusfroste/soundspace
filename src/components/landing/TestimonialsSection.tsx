@@ -1,27 +1,21 @@
 import { motion } from "framer-motion";
-import { Star } from "lucide-react";
+import { Coffee, Dumbbell, UtensilsCrossed } from "lucide-react";
 
-const testimonials = [
+const useCases = [
   {
-    name: "Sarah Mitchell",
-    role: "Owner, Aroma Café",
-    location: "Brooklyn, NY",
-    quote: "The change in atmosphere was instant. Our customers love it and keep coming back.",
-    rating: 5,
+    icon: Coffee,
+    title: "Cafés",
+    description: "Calm acoustic mornings, upbeat afternoons — the playlist follows the rhythm of your day.",
   },
   {
-    name: "James Chen",
-    role: "Manager, Savour Restaurant",
-    location: "San Francisco, CA",
-    quote: "The automatic scheduling is incredible. Every time slot has the perfect soundtrack without me lifting a finger.",
-    rating: 5,
+    icon: UtensilsCrossed,
+    title: "Restaurants",
+    description: "Set a mood for lunch, dinner and late evening once, and let the schedule switch automatically.",
   },
   {
-    name: "Emily Rodriguez",
-    role: "CEO, FitLife Studios",
-    location: "Austin, TX",
-    quote: "We use it across 15 gyms. Brand consistency through music has made all the difference.",
-    rating: 5,
+    icon: Dumbbell,
+    title: "Gyms & studios",
+    description: "High-energy music for classes and open hours, with the same sound across every location.",
   },
 ];
 
@@ -45,7 +39,7 @@ export function TestimonialsSection() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ delay: 0.1 }}
           >
-            Loved by businesses
+            Built for spaces like yours
           </motion.h2>
           <motion.p 
             className="text-lg text-muted-foreground max-w-2xl mx-auto"
@@ -54,14 +48,14 @@ export function TestimonialsSection() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ delay: 0.2 }}
           >
-            Thousands of venues have already transformed their music experience
+            From the morning coffee rush to happy hour — music that fits every moment
           </motion.p>
         </motion.div>
 
         <div className="grid md:grid-cols-3 gap-8">
-          {testimonials.map((testimonial, i) => (
+          {useCases.map((useCase, i) => (
             <motion.div
-              key={i}
+              key={useCase.title}
               className="p-6 rounded-2xl glass"
               initial={{ opacity: 0, y: 50, scale: 0.9 }}
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
@@ -70,43 +64,13 @@ export function TestimonialsSection() {
               whileHover={{ y: -8, transition: { type: "spring", stiffness: 300 } }}
             >
               <motion.div 
-                className="flex gap-1 mb-4"
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.15 + 0.2 }}
+                className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground mb-5"
+                whileHover={{ scale: 1.1, rotate: 5 }}
               >
-                {[...Array(testimonial.rating)].map((_, j) => (
-                  <motion.div
-                    key={j}
-                    initial={{ opacity: 0, scale: 0 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.15 + 0.3 + j * 0.05 }}
-                  >
-                    <Star className="h-4 w-4 fill-primary text-primary" />
-                  </motion.div>
-                ))}
+                <useCase.icon className="h-6 w-6" />
               </motion.div>
-
-              <p className="text-foreground mb-6 leading-relaxed">
-                "{testimonial.quote}"
-              </p>
-
-              <div className="flex items-center gap-3">
-                <motion.div 
-                  className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold"
-                  whileHover={{ scale: 1.1, rotate: 5 }}
-                >
-                  {testimonial.name.charAt(0)}
-                </motion.div>
-                <div>
-                  <div className="font-medium text-foreground">{testimonial.name}</div>
-                  <div className="text-sm text-muted-foreground">
-                    {testimonial.role} · {testimonial.location}
-                  </div>
-                </div>
-              </div>
+              <div className="font-semibold text-lg text-foreground mb-2">{useCase.title}</div>
+              <p className="text-muted-foreground leading-relaxed">{useCase.description}</p>
             </motion.div>
           ))}
         </div>

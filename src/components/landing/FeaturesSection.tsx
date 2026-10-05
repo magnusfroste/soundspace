@@ -22,7 +22,7 @@ const features = [
   {
     icon: Music2,
     title: "Curated Library",
-    description: "Thousands of licensed tracks, perfect for commercial environments.",
+    description: "A hand-picked library of tracks made for commercial environments.",
   },
   {
     icon: Shield,
