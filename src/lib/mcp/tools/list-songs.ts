@@ -2,13 +2,13 @@ import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseAdmin, requireAuth } from "../supabase";
 
-type SongRow = Awaited<ReturnType<ReturnType<typeof supabaseAdmin>["from"] extends never ? never : () => Promise<{ data: import("@supabase/supabase-js").SupabaseClient extends never ? never : never }>>> extends never ? {
+interface SongRow {
   id: string; title: string; artist: string; genre: string | null; mood: string | null;
   duration: number; file_url: string; cover_url: string | null; bpm: number | null;
   key_scale: string | null; time_signature: string | null; quality_score: number | null;
   prompt: string | null; lyrics: string | null; origin_source: string | null;
   created_at: string; deleted_at: string | null;
-} : never;
+}
 
 const toSongJson = (s: SongRow) => ({
   id: s.id, title: s.title, artist: s.artist, genre: s.genre, mood: s.mood,
@@ -40,7 +40,7 @@ export default defineTool({
     if (mood) q = q.eq("mood", mood);
     const { data, error } = await q;
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
-    const songs = (data ?? []).map((s) => toSongJson(s as unknown as Record<string, unknown>));
+    const songs = (data ?? []).map((s) => toSongJson(s as SongRow));
     return { content: [{ type: "text", text: JSON.stringify(songs) }], structuredContent: { songs } };
   },
 });
