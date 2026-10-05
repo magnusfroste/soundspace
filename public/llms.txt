@@ -1,8 +1,8 @@
 # SoundSpace
 
-> AI-powered, royalty-free background music streaming for restaurants, cafés and retail spaces.
+> AI-powered background music streaming for restaurants, cafés and retail spaces.
 
-SoundSpace gives businesses the right soundtrack for their venue without licensing headaches. Pick curated playlists or create your own, schedule music for different times of day, play in-store announcements, and let AI generate royalty-free tracks that fit your brand and ambiance.
+SoundSpace gives businesses the right soundtrack for their venue with as little effort as possible. Pick curated playlists or create your own, schedule music for different times of day, play in-store announcements, and let AI generate tracks that fit your brand and ambiance.
 
 Built for restaurant, café and shop owners who want professional background music that just works.
 

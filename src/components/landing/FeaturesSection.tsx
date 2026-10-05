@@ -26,8 +26,8 @@ const features = [
   },
   {
     icon: Shield,
-    title: "100% Licensed",
-    description: "No copyright worries. Everything fully cleared and legal.",
+    title: "Made for Business",
+    description: "Music chosen and AI-generated with commercial venues in mind.",
   },
   {
     icon: Zap,
