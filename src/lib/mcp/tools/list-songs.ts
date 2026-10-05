@@ -2,7 +2,15 @@ import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { supabaseAdmin, requireAuth } from "../supabase";
 
-const toSongJson = (s: Record<string, unknown>) => ({
+type SongRow = Awaited<ReturnType<ReturnType<typeof supabaseAdmin>["from"] extends never ? never : () => Promise<{ data: import("@supabase/supabase-js").SupabaseClient extends never ? never : never }>>> extends never ? {
+  id: string; title: string; artist: string; genre: string | null; mood: string | null;
+  duration: number; file_url: string; cover_url: string | null; bpm: number | null;
+  key_scale: string | null; time_signature: string | null; quality_score: number | null;
+  prompt: string | null; lyrics: string | null; origin_source: string | null;
+  created_at: string; deleted_at: string | null;
+} : never;
+
+const toSongJson = (s: SongRow) => ({
   id: s.id, title: s.title, artist: s.artist, genre: s.genre, mood: s.mood,
   duration: s.duration, file_url: s.file_url, cover_url: s.cover_url,
   bpm: s.bpm, key_scale: s.key_scale, time_signature: s.time_signature,

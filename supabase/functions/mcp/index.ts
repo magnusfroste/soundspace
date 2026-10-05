@@ -221,10 +221,10 @@ var get_playlist_songs_default = defineTool7({
     const { data: songs, error: sErr } = await db.from("songs").select("*").in("id", ids);
     if (sErr) return { content: [{ type: "text", text: sErr.message }], isError: true };
     const byId = new Map((songs ?? []).map((s) => [s.id, s]));
-    const ordered = (links ?? []).map((l) => {
+    const ordered = (links ?? []).flatMap((l) => {
       const s = byId.get(l.song_id);
-      return s ? { position: l.position, id: s.id, title: s.title, artist: s.artist, genre: s.genre, mood: s.mood, duration: s.duration } : null;
-    }).filter(Boolean);
+      return s ? [{ position: l.position, id: s.id, title: s.title, artist: s.artist, genre: s.genre, mood: s.mood, duration: s.duration }] : [];
+    });
     return { content: [{ type: "text", text: JSON.stringify(ordered) }], structuredContent: { songs: ordered } };
   }
 });
