@@ -13,6 +13,19 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const sb = createClient(supabaseUrl, serviceKey);
 
+  // Only admins may change the agent schedule
+  const token = req.headers.get("Authorization")?.replace("Bearer ", "");
+  const { data: userData } = token ? await sb.auth.getUser(token) : { data: { user: null } };
+  const { data: isAdmin } = userData.user
+    ? await sb.rpc("has_role", { _user_id: userData.user.id, _role: "admin" })
+    : { data: false };
+  if (!isAdmin) {
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const { schedule } = await req.json();
 
