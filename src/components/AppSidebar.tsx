@@ -8,7 +8,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useModuleSettings } from "@/hooks/useModuleSettings";
 import { useProfile } from "@/hooks/useProfile";
-import { isIntegrationEnabled } from "@/lib/integrations-state";
 import {
   Sidebar,
   SidebarContent,
