@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LocalAICard, MubertCard, MusicgenCard, AceStepCard, OpenAICard, GeminiCard, LovableAICard, RevelatorCard, FugaCard, DistroKidCard, A2ACard, OpenClawCard } from "@/components/integrations";
+import { LocalAICard, MubertCard, MusicgenCard, AceStepCard, OpenAICard, GeminiCard, LovableAICard, RevelatorCard, FugaCard, DistroKidCard, OpenClawCard } from "@/components/integrations";
 
 interface ElevenLabsStatus {
   connected: boolean;
@@ -311,14 +311,6 @@ export default function AdminIntegrations() {
         description="Third-party agents that contribute tracks to your library"
       >
         <OpenClawCard />
-      </IntegrationSection>
-
-      <IntegrationSection
-        icon={Network}
-        title="A2A Protocol"
-        description="Agent-to-Agent protocol for agent discovery and communication"
-      >
-        <A2ACard />
       </IntegrationSection>
     </div>
   );
