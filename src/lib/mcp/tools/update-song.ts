@@ -30,6 +30,8 @@ export default defineTool({
     const { data, error } = await supabaseAdmin().from("songs").update(clean).eq("id", id).select().maybeSingle();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     if (!data) return { content: [{ type: "text", text: "Song not found" }], isError: true };
-    return { content: [{ type: "text", text: `Updated song ${id}` }], structuredContent: { song: data as unknown as Record<string, unknown> } };
+    const s = data;
+    const song = { id: s.id, title: s.title, artist: s.artist, genre: s.genre, mood: s.mood, prompt: s.prompt, lyrics: s.lyrics, bpm: s.bpm, key_scale: s.key_scale, time_signature: s.time_signature, cover_url: s.cover_url, quality_score: s.quality_score };
+    return { content: [{ type: "text", text: `Updated song ${id}` }], structuredContent: { song } };
   },
 });

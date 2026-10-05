@@ -18,6 +18,8 @@ export default defineTool({
       .insert({ title, description: description ?? null, cover_image_url: cover_image_url ?? null })
       .select().single();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
-    return { content: [{ type: "text", text: `Created playlist "${title}"` }], structuredContent: { playlist: data as unknown as Record<string, unknown> } };
+    const p = data;
+    const playlist = { id: p.id, title: p.title, description: p.description, cover_image_url: p.cover_image_url, created_at: p.created_at };
+    return { content: [{ type: "text", text: `Created playlist "${title}"` }], structuredContent: { playlist } };
   },
 });
