@@ -17,6 +17,11 @@ export const GENRE_MAP: Record<string, string> = {
   "piano": "Classical Piano", "classical piano": "Classical Piano", "orchestral": "Classical", "cinematic": "Classical",
   "world": "World", "world music": "World", "ethnic": "World",
   "soul": "Soul", "r&b": "R&B", "rnb": "R&B", "funk": "Funk", "blues": "Blues", "reggae": "Reggae",
+  "rock": "Rock", "alternative rock": "Rock", "indie rock": "Rock", "psychedelic": "Rock", "alternative": "Rock",
+  "film score": "Classical", "classical music": "Classical",
+  "dance-pop": "Pop", "jazz-pop": "Pop", "electropop": "Pop", "synthpop": "Pop",
+  "trance": "Electronic", "organic electronic": "Electronic", "minimal electronic": "Electronic",
+  "contemporary r&b": "R&B",
   "pop": "Pop", "art-pop": "Pop", "art pop": "Pop", "indie": "Pop", "indie pop": "Pop",
 };
 
@@ -31,7 +36,7 @@ export const MOOD_MAP: Record<string, string> = {
   "romantic": "Romantic", "intimate": "Romantic", "sensual": "Romantic",
   "dreamy": "Dreamy", "ethereal": "Dreamy", "floating": "Dreamy", "atmospheric": "Dreamy", "hypnotic": "Dreamy",
   "warm": "Warm", "cozy": "Warm", "inviting": "Warm",
-  "nostalgic": "Nostalgic",
+  "nostalgic": "Nostalgic", "longing": "Melancholic", "healing": "Calm", "focus": "Focused", "happiness": "Uplifting",
   "melancholic": "Melancholic", "sad": "Melancholic",
   "reflective": "Reflective", "introspective": "Reflective", "emotional": "Reflective",
 };
@@ -41,7 +46,7 @@ export const VALID_MOODS = [...new Set(Object.values(MOOD_MAP))].sort();
 
 function normalizeWith(map: Record<string, string>, valid: string[], raw: string | null | undefined): string | null {
   if (!raw) return null;
-  const clean = raw.toLowerCase().replace(/[‐‑–—]/g, "-").replace(/\s+/g, " ").trim();
+  const clean = raw.toLowerCase().replace(/[‐‑–—]/g, "-").replace(/_/g, " ").replace(/\s+/g, " ").trim();
   if (!clean || clean.length > 60) return null; // long text is a description, not a label
   if (map[clean]) return map[clean];
   const exact = valid.find((v) => v.toLowerCase() === clean);
