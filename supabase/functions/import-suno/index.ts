@@ -156,7 +156,7 @@ Deno.serve(async (req) => {
       .from('songs')
       .upload(fileName, uploadData, {
         contentType,
-        upsert: true,
+        upsert: false,
       });
 
     if (uploadError) {
