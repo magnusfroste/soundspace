@@ -1,4 +1,5 @@
 import { isSafePublicUrl, fetchLimited } from "../_shared/auth.ts";
+import { normalizeGenre, normalizeMood } from "../_shared/metadata.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import lamejs from "https://esm.sh/lamejs@1.2.1";
 
@@ -251,8 +252,8 @@ Deno.serve(async (req) => {
     const songData = {
       title: title.slice(0, 255),
       artist: ((body.artist as string) || "OpenClaw").slice(0, 255),
-      genre: (body.genre as string) || null,
-      mood: (body.mood as string) || null,
+      genre: normalizeGenre(body.genre as string),
+      mood: normalizeMood(body.mood as string),
       bpm: typeof body.bpm === "number" ? Math.round(body.bpm) : null,
       key_scale: (body.key_scale as string) || null,
       time_signature: (body.time_signature as string) || null,
