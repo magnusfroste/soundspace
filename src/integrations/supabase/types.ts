@@ -370,6 +370,24 @@ export type Database = {
           },
         ]
       }
+      internal_secrets: {
+        Row: {
+          created_at: string
+          key: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          key: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          key?: string
+          value?: string
+        }
+        Relationships: []
+      }
       pending_songs: {
         Row: {
           artist: string
