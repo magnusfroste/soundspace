@@ -7,11 +7,11 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders }
+    return new Response(null, { headers: corsHeaders });
+  }
 
   const auth = await authorize(req, { admin: true });
-  if (!auth.ok) return auth.response;);
-  }
+  if (!auth.ok) return auth.response;
 
   const ACESTEP_URL = Deno.env.get("ACESTEP_API_URL");
   const ACESTEP_KEY = Deno.env.get("ACESTEP_API_KEY");

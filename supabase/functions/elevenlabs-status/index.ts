@@ -9,11 +9,11 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders }
+    return new Response(null, { headers: corsHeaders });
+  }
 
   const auth = await authorize(req, { admin: true });
-  if (!auth.ok) return auth.response;);
-  }
+  if (!auth.ok) return auth.response;
 
   try {
     const ELEVENLABS_API_KEY = Deno.env.get("ELEVENLABS_API_KEY");

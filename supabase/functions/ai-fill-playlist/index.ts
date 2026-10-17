@@ -10,11 +10,11 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders }
+    return new Response("ok", { headers: corsHeaders });
+  }
 
   const auth = await authorize(req, {});
-  if (!auth.ok) return auth.response;);
-  }
+  if (!auth.ok) return auth.response;
 
   try {
     const { prompt, maxSongs = 10, excludeIds = [] } = await req.json();

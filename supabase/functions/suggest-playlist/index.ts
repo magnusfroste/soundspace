@@ -15,11 +15,11 @@ interface Playlist {
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders }
+    return new Response(null, { headers: corsHeaders });
+  }
 
   const auth = await authorize(req, {});
-  if (!auth.ok) return auth.response;);
-  }
+  if (!auth.ok) return auth.response;
 
   try {
     const { prompt, genre, mood, playlists } = await req.json();
