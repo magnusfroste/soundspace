@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { Sparkles } from "lucide-react";
 import type { AIProvider, GenerateOptions, GenerationResult, ProviderStatus } from "./types";
 
@@ -20,7 +21,7 @@ export const elevenlabsProvider: AIProvider = {
         headers: {
           "Content-Type": "application/json",
           apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ""}`,
         },
         body: JSON.stringify({
           prompt: fullPrompt,
