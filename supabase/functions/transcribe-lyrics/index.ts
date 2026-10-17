@@ -1,4 +1,4 @@
-import { authorize } from "../_shared/auth.ts";
+import { authorize, isSafePublicUrl, fetchLimited } from "../_shared/auth.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
@@ -78,16 +78,24 @@ Deno.serve(async (req) => {
 
     console.log(`Transcribing lyrics for song ${song_id} via ${sttProvider} from ${audio_url.slice(0, 80)}...`);
 
-    // Download the audio file
-    const audioRes = await fetch(audio_url);
-    if (!audioRes.ok) {
+    // Download the audio file (public URLs only, size-capped)
+    if (typeof audio_url !== 'string' || !isSafePublicUrl(audio_url)) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Failed to download audio file' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: 'audio_url must be a public http(s) URL' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    const audioBlob = await audioRes.blob();
+    let audioBlob: Blob;
+    try {
+      const { res: audioRes, bytes } = await fetchLimited(audio_url, 100 * 1024 * 1024);
+      if (!audioRes.ok) throw new Error('bad status');
+      audioBlob = new Blob([bytes], { type: audioRes.headers.get('content-type') || 'audio/mpeg' });
+    } catch {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Failed to download audio file' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Transcribe with selected provider
     let lyrics: string;

@@ -1,3 +1,4 @@
+import { isSafePublicUrl, fetchLimited } from "../_shared/auth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import lamejs from "https://esm.sh/lamejs@1.2.1";
 
@@ -197,15 +198,28 @@ Deno.serve(async (req) => {
 
     // ── Download audio ──
     console.log(`[upload-song] Downloading: ${audioUrl.slice(0, 120)}`);
-    const audioRes = await fetch(audioUrl);
-    if (!audioRes.ok) {
+    if (!isSafePublicUrl(audioUrl)) {
       return new Response(
-        JSON.stringify({ error: `Failed to download audio: HTTP ${audioRes.status}` }),
+        JSON.stringify({ error: "audio_url must be a public http(s) URL" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    const rawBuffer = await audioRes.arrayBuffer();
+    const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
+    let rawBuffer: ArrayBuffer;
+    try {
+      const { res: audioRes, bytes } = await fetchLimited(audioUrl, MAX_BYTES);
+      if (!audioRes.ok) throw new Error(`HTTP ${audioRes.status}`);
+      const ct = (audioRes.headers.get("content-type") || "").toLowerCase();
+      if (ct && !ct.startsWith("audio/") && !ct.includes("octet-stream") && !ct.includes("flac") && !ct.includes("wav")) {
+        throw new Error("URL did not return audio");
+      }
+      rawBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: `Failed to download audio: ${(e as Error).message}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
     const rawSize = rawBuffer.byteLength;
     console.log(`[upload-song] Downloaded ${(rawSize / 1024 / 1024).toFixed(1)} MB`);
 
