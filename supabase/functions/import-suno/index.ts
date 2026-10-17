@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
 
     const fileUrl = publicUrlData.publicUrl;
 
-    const genre = normalizeGenre(tags.map((t: string) => normalizeGenre(t)).find(Boolean) ?? null);
+    const genre = tags.map((t: string) => normalizeGenre(t)).find(Boolean) ?? null;
     const mood = tags.map((t: string) => normalizeMood(t)).find(Boolean) ?? null;
 
     const { data: insertedSong, error: insertError } = await supabase

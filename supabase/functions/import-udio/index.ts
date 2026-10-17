@@ -177,7 +177,7 @@ Deno.serve(async (req) => {
     const fileUrl = publicUrlData.publicUrl;
 
     // Derive genre/mood from tags
-    const genre = normalizeGenre(tags.map((t: string) => normalizeGenre(t)).find(Boolean) ?? null);
+    const genre = tags.map((t: string) => normalizeGenre(t)).find(Boolean) ?? null;
     const mood = tags.map((t: string) => normalizeMood(t)).find(Boolean) ?? null;
 
     // Insert into songs table

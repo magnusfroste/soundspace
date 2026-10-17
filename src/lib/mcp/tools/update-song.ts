@@ -1,5 +1,6 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
+import { normalizeGenre, normalizeMood, VALID_GENRES, VALID_MOODS } from "../../metadata";
 import { supabaseAdmin, requireAuth } from "../supabase";
 
 export default defineTool({
@@ -23,7 +24,15 @@ export default defineTool({
   annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
   handler: async ({ id, ...updates }, ctx) => {
     await requireAuth(ctx);
-    const clean = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined));
+    const clean: Record<string, unknown> = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined));
+    for (const [field, norm, valid] of [["genre", normalizeGenre, VALID_GENRES], ["mood", normalizeMood, VALID_MOODS]] as const) {
+      const v = clean[field];
+      if (typeof v === "string") {
+        const n = norm(v);
+        if (!n) return { content: [{ type: "text", text: `Unknown ${field} "${v}". Use one of: ${valid.join(", ")}` }], isError: true };
+        clean[field] = n;
+      }
+    }
     if (Object.keys(clean).length === 0) {
       return { content: [{ type: "text", text: "No fields to update" }], isError: true };
     }
