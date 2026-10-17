@@ -1,3 +1,4 @@
+import { authorize } from "../_shared/auth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import lamejs from "https://esm.sh/lamejs@1.2.1";
 
@@ -1321,7 +1322,7 @@ async function executeGenerate(args: any, supabaseUrl: string, anonKey: string, 
   }
 
   const acestepProxy = `${supabaseUrl}/functions/v1/acestep-proxy`;
-  const headers: Record<string, string> = { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` };
+  const headers: Record<string, string> = { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` };
   
   const caption = args.prompt;
   const duration = Math.min(Math.max(args.duration || 60, 30), 180);
@@ -1437,7 +1438,7 @@ async function executeAnalyze(args: { audio_url: string }, supabaseUrl: string, 
     return { error: "ACE-Step integration is disabled. Enable it in the Integrations panel to analyze tracks." };
   }
   const acestepProxy = `${supabaseUrl}/functions/v1/acestep-proxy`;
-  const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` };
+  const headers = { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` };
 
   const extracted = await analyzeAudioViaExtract(acestepProxy, headers, args.audio_url);
   if (!extracted) {
@@ -1997,7 +1998,7 @@ async function executeFindIncomplete(args: { limit?: number }, supabaseUrl: stri
 async function executeTranscribeSong(args: { song_id: string; audio_url: string }, supabaseUrl: string, anonKey: string, sttProvider: string = "elevenlabs") {
   const res = await fetch(`${supabaseUrl}/functions/v1/transcribe-lyrics`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${anonKey}` },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
     body: JSON.stringify({ song_id: args.song_id, audio_url: args.audio_url, provider: sttProvider }),
   });
   const data = await res.json();
@@ -2011,7 +2012,7 @@ async function executeGenerateSongCover(args: { song_id: string; title: string; 
   const coverPrompt = [args.title, args.genre && `${args.genre} music`, args.mood && `${args.mood} atmosphere`, args.prompt].filter(Boolean).join(", ");
   const res = await fetch(`${supabaseUrl}/functions/v1/generate-cover`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}` },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
     body: JSON.stringify({ prompt: coverPrompt, style: "modern abstract" }),
   });
   const data = await res.json();
@@ -2196,27 +2197,9 @@ Deno.serve(async (req) => {
   // Resolve user_id securely:
   // 1. Try JWT auth first (normal user requests)
   // 2. Only allow body user_id if caller authenticates with service role key (cron jobs)
-  let userId: string | null = null;
-  const authHeader = req.headers.get("authorization") || "";
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const anonKeyVal = Deno.env.get("SUPABASE_ANON_KEY");
-
-  if (authHeader.startsWith("Bearer ")) {
-    const token = authHeader.replace("Bearer ", "");
-
-    // Check if caller is using service role key — trusted internal caller (cron)
-    if (token === serviceRoleKey && bodyUserId) {
-      userId = bodyUserId;
-    } else if (token !== anonKeyVal) {
-      // Regular user JWT — extract user_id from token
-      try {
-        const sb = createClient(Deno.env.get("SUPABASE_URL")!, token);
-        const { data: { user } } = await sb.auth.getUser();
-        userId = user?.id || null;
-      } catch { /* invalid token */ }
-    }
-    // If token === anonKey and no valid JWT, userId stays null (anonymous)
-  }
+  const auth = await authorize(req, { admin: true });
+  if (!auth.ok) return auth.response;
+  const userId: string | null = auth.internal ? (bodyUserId || null) : auth.userId;
 
   console.log(`[sound-agent] Request: model=${chatModel}, messages=${messages?.length || 0}, conv=${conversation_id}, user=${userId}`);
 
@@ -2349,7 +2332,7 @@ Deno.serve(async (req) => {
               }
             } catch (e) { result = { error: `Tool error: ${e.message}` }; console.error(`[sound-agent] Tool ${fn} error:`, e.message); }
 
-            console.log(`[sound-agent] Tool ${fn} result: ${JSON.stringify(result).slice(0, 300)}`);
+            console.log(`[sound-agent] Tool ${fn} completed${result && typeof result === "object" && "error" in result ? " with error" : ""}`);
             llmMessages.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result) });
           }
         }
