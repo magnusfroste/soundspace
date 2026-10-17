@@ -67,7 +67,21 @@ Deno.serve(async (req) => {
       fetchOptions.body = JSON.stringify(jsonBody);
     }
 
-    const res = await fetch(`${baseUrl}${endpoint}`, fetchOptions);
+    let res: Response;
+    try {
+      res = await fetch(`${baseUrl}${endpoint}`, fetchOptions);
+    } catch (netErr) {
+      // DNS/connection failures: return a clean JSON error (200) so the UI can show "offline" instead of crashing
+      return new Response(
+        JSON.stringify({
+          error: "ACE-Step server unreachable",
+          detail: "The ACE-Step host is unreachable (DNS or connection failed). Check that the server and tunnel are running.",
+          offline: true,
+          cause: String((netErr as Error)?.message ?? netErr),
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     const contentType = res.headers.get("content-type") || "";
 
