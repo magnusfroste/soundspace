@@ -1,3 +1,4 @@
+import { normalizeGenre, normalizeMood, VALID_GENRES, VALID_MOODS } from "@/lib/metadata";
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Play, Pause, Music2, Sparkles, Plus, Trash2, Type, Loader2, Wand2, Download } from "lucide-react";
@@ -94,7 +95,17 @@ function EditableCell({
       setEditing(false);
       return;
     }
-    const newValue = trimmed || null;
+    let newValue: string | null = trimmed || null;
+    if (newValue && (field === "genre" || field === "mood")) {
+      const normalized = field === "genre" ? normalizeGenre(newValue) : normalizeMood(newValue);
+      if (!normalized) {
+        toast.error(`Unknown ${field}. Use one of: ${(field === "genre" ? VALID_GENRES : VALID_MOODS).join(", ")}`);
+        setDraft(value ?? "");
+        setEditing(false);
+        return;
+      }
+      newValue = normalized;
+    }
     if (newValue !== value) {
       updateSong.mutate({ id: songId, [field]: newValue });
     }
@@ -136,10 +147,10 @@ function EditableCell({
         e.stopPropagation();
         setEditing(true);
       }}
-      title="Click to edit"
+      title={value ? `${value} — click to edit` : "Click to edit"}
     >
       {asBadge && !isEmpty ? (
-        <Badge variant={badgeVariant} className="text-[10px] cursor-text">
+        <Badge variant={badgeVariant} className="text-[10px] cursor-text max-w-full truncate block whitespace-nowrap overflow-hidden">
           {display}
         </Badge>
       ) : (
