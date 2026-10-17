@@ -1,3 +1,4 @@
+import { normalizeGenre, normalizeMood, VALID_GENRES as SHARED_VALID_GENRES, VALID_MOODS as SHARED_VALID_MOODS } from "../_shared/metadata.ts";
 import { authorize } from "../_shared/auth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import lamejs from "https://esm.sh/lamejs@1.2.1";
@@ -835,73 +836,8 @@ async function isIntegrationEnabledServer(integrationId: string, supabaseUrl: st
 
 // ── Genre normalization ─────────────────────────────────────────────────
 
-const GENRE_NORMALIZATION_MAP: Record<string, string> = {
-  // Lounge variants
-  "lounge": "Lounge Jazz", "lounge jazz": "Lounge Jazz", "lounge_jazz": "Lounge Jazz",
-  "jazz lounge": "Lounge Jazz", "jazzy lounge": "Lounge Jazz",
-  "ambient lounge": "Ambient Lounge", "ambient_lounge": "Ambient Lounge",
-  "chill lounge": "Ambient Lounge", "lounge ambient": "Ambient Lounge",
-  // Jazz variants
-  "jazz": "Jazz", "smooth jazz": "Smooth Jazz", "smooth_jazz": "Smooth Jazz",
-  "bossa nova": "Bossa Nova", "bossa": "Bossa Nova",
-  "latin jazz": "Latin Jazz", "latin_jazz": "Latin Jazz",
-  // Ambient variants
-  "ambient": "Ambient", "ambient electronic": "Ambient Electronic",
-  "ambient_electronic": "Ambient Electronic", "dark ambient": "Dark Ambient",
-  // Lo-Fi variants
-  "lo-fi": "Lo-Fi", "lofi": "Lo-Fi", "lo fi": "Lo-Fi", "lo-fi hip hop": "Lo-Fi",
-  "lo-fi beats": "Lo-Fi", "lofi hip hop": "Lo-Fi", "chillhop": "Lo-Fi",
-  // Electronic variants
-  "electronic": "Electronic", "electronica": "Electronic", "synth": "Electronic",
-  "downtempo": "Downtempo", "trip-hop": "Trip-Hop", "trip hop": "Trip-Hop",
-  // Acoustic
-  "acoustic": "Acoustic", "folk": "Acoustic Folk", "singer-songwriter": "Acoustic",
-  // Classical
-  "classical": "Classical", "neo-classical": "Neo-Classical", "neoclassical": "Neo-Classical",
-  "piano": "Classical Piano", "orchestral": "Classical",
-  // World
-  "world": "World", "world music": "World", "ethnic": "World",
-  // Other
-  "soul": "Soul", "r&b": "R&B", "rnb": "R&B", "funk": "Funk",
-  "blues": "Blues", "reggae": "Reggae", "pop": "Pop",
-};
-
-const MOOD_NORMALIZATION_MAP: Record<string, string> = {
-  "relaxed": "Relaxed", "relaxing": "Relaxed", "chill": "Relaxed", "mellow": "Relaxed",
-  "calm": "Calm", "peaceful": "Calm", "serene": "Calm", "tranquil": "Calm",
-  "energetic": "Energetic", "upbeat": "Upbeat", "lively": "Energetic",
-  "focused": "Focused", "concentration": "Focused", "study": "Focused",
-  "uplifting": "Uplifting", "happy": "Uplifting", "joyful": "Uplifting",
-  "romantic": "Romantic", "intimate": "Romantic", "sensual": "Romantic",
-  "dreamy": "Dreamy", "ethereal": "Dreamy", "floating": "Dreamy",
-  "warm": "Warm", "cozy": "Warm", "nostalgic": "Nostalgic",
-  "melancholic": "Melancholic", "sad": "Melancholic", "reflective": "Reflective",
-};
-
-const VALID_GENRES = new Set(Object.values(GENRE_NORMALIZATION_MAP));
-const VALID_MOODS = new Set(Object.values(MOOD_NORMALIZATION_MAP));
-
-function normalizeGenre(genre: string | null | undefined): string | null {
-  if (!genre) return null;
-  const key = genre.toLowerCase().trim();
-  if (GENRE_NORMALIZATION_MAP[key]) return GENRE_NORMALIZATION_MAP[key];
-  // Check if already a valid normalized value
-  const titleCase = genre.trim().replace(/\b\w/g, c => c.toUpperCase());
-  if (VALID_GENRES.has(titleCase)) return titleCase;
-  // No match — return null instead of allowing arbitrary text
-  console.warn(`[normalizeGenre] Unknown genre rejected: "${genre}"`);
-  return null;
-}
-
-function normalizeMood(mood: string | null | undefined): string | null {
-  if (!mood) return null;
-  const key = mood.toLowerCase().trim();
-  if (MOOD_NORMALIZATION_MAP[key]) return MOOD_NORMALIZATION_MAP[key];
-  const titleCase = mood.trim().replace(/\b\w/g, c => c.toUpperCase());
-  if (VALID_MOODS.has(titleCase)) return titleCase;
-  console.warn(`[normalizeMood] Unknown mood rejected: "${mood}"`);
-  return null;
-}
+const VALID_GENRES = new Set(SHARED_VALID_GENRES);
+const VALID_MOODS = new Set(SHARED_VALID_MOODS);
 
 // ── Enhanced generation with real quality assessment ────────────────────
 

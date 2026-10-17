@@ -1,3 +1,4 @@
+import { normalizeGenre, normalizeMood } from "../_shared/metadata.ts";
 import { authorize } from "../_shared/auth.ts";
 import lamejs from "https://esm.sh/lamejs@1.2.1";
 
@@ -176,8 +177,8 @@ Deno.serve(async (req) => {
     const fileUrl = publicUrlData.publicUrl;
 
     // Derive genre/mood from tags
-    const genre = tags[0] || null;
-    const mood = tags[1] || null;
+    const genre = tags.map((t: string) => normalizeGenre(t)).find(Boolean) ?? null;
+    const mood = tags.map((t: string) => normalizeMood(t)).find(Boolean) ?? null;
 
     // Insert into songs table
     const { data: insertedSong, error: insertError } = await supabase
