@@ -1,3 +1,4 @@
+import { authorize } from "../_shared/auth.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
@@ -7,7 +8,10 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders }
+
+  const auth = await authorize(req, { admin: true });
+  if (!auth.ok) return auth.response;);
   }
 
   try {

@@ -1,3 +1,4 @@
+import { authorize } from "../_shared/auth.ts";
 import lamejs from "https://esm.sh/lamejs@1.2.1";
 
 const corsHeaders = {
@@ -56,7 +57,10 @@ function wavToMp3(wavBuffer: ArrayBuffer): Uint8Array {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders }
+
+  const auth = await authorize(req, { admin: true });
+  if (!auth.ok) return auth.response;);
   }
 
   try {
