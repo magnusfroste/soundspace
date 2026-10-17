@@ -170,7 +170,7 @@ async function downloadAudio(audioPath: string): Promise<Blob> {
     headers: {
       "Content-Type": "application/json",
       "apikey": supabaseKey,
-      "Authorization": `Bearer ${supabaseKey}`,
+      "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ""}`,
     },
     body: JSON.stringify({ endpoint: audioPath, method: "GET" }),
   });

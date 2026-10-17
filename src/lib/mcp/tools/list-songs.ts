@@ -35,11 +35,14 @@ export default defineTool({
     await requireAuth(ctx);
     let q = supabaseAdmin().from("songs").select("*").order("created_at", { ascending: false }).range(offset, offset + limit - 1);
     if (!include_trash) q = q.is("deleted_at", null);
-    if (search) q = q.or(`title.ilike.%${search}%,artist.ilike.%${search}%`);
+    if (search) {
+      const safe = search.replace(/[^\p{L}\p{N}\s\-'&.]/gu, " ").trim().slice(0, 100);
+      if (safe) q = q.or(`title.ilike.%${safe}%,artist.ilike.%${safe}%`);
+    }
     if (genre) q = q.eq("genre", genre);
     if (mood) q = q.eq("mood", mood);
     const { data, error } = await q;
-    if (error) return { content: [{ type: "text", text: error.message }], isError: true };
+    if (error) { console.error("[mcp] list_songs failed", error); return { content: [{ type: "text", text: "Failed to list songs" }], isError: true }; }
     const songs = (data ?? []).map((s) => toSongJson(s as SongRow));
     return { content: [{ type: "text", text: JSON.stringify(songs) }], structuredContent: { songs } };
   },

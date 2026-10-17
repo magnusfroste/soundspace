@@ -1,3 +1,4 @@
+import { authorize } from "../_shared/auth.ts";
 import lamejs from "https://esm.sh/lamejs@1.2.1";
 
 const corsHeaders = {
@@ -58,6 +59,9 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const auth = await authorize(req, { admin: true });
+  if (!auth.ok) return auth.response;
 
   try {
     const { url } = await req.json();
@@ -132,7 +136,7 @@ Deno.serve(async (req) => {
 
     let uploadData: Uint8Array | ArrayBuffer = audioBlob;
     const contentType = 'audio/mpeg';
-    const fileName = `suno-${songId}.mp3`;
+    const fileName = `suno-${songId}-${crypto.randomUUID().slice(0, 8)}.mp3`;
 
     if (isWav) {
       console.log(`Converting WAV (${audioBlob.byteLength} bytes) to MP3...`);
@@ -152,7 +156,7 @@ Deno.serve(async (req) => {
       .from('songs')
       .upload(fileName, uploadData, {
         contentType,
-        upsert: true,
+        upsert: false,
       });
 
     if (uploadError) {

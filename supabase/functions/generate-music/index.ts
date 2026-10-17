@@ -1,3 +1,4 @@
+import { authorize } from "../_shared/auth.ts";
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
@@ -79,6 +80,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const auth = await authorize(req, { admin: true });
+  if (!auth.ok) return auth.response;
 
   try {
     const { prompt, duration, lyrics } = await req.json();
