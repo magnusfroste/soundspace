@@ -1,7 +1,7 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { normalizeGenre, normalizeMood, VALID_GENRES, VALID_MOODS } from "../../metadata";
-import { supabaseAdmin, requireAuth } from "../supabase";
+import { supabaseForUser, requireAdmin } from "../supabase";
 
 export default defineTool({
   name: "update_song",
@@ -23,7 +23,7 @@ export default defineTool({
   },
   annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
   handler: async ({ id, ...updates }, ctx) => {
-    await requireAuth(ctx);
+    await requireAdmin(ctx);
     const clean: Record<string, unknown> = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined));
     for (const [field, norm, valid] of [["genre", normalizeGenre, VALID_GENRES], ["mood", normalizeMood, VALID_MOODS]] as const) {
       const v = clean[field];
@@ -36,7 +36,7 @@ export default defineTool({
     if (Object.keys(clean).length === 0) {
       return { content: [{ type: "text", text: "No fields to update" }], isError: true };
     }
-    const { data, error } = await supabaseAdmin().from("songs").update(clean).eq("id", id).select().maybeSingle();
+    const { data, error } = await supabaseForUser(ctx).from("songs").update(clean).eq("id", id).select().maybeSingle();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     if (!data) return { content: [{ type: "text", text: "Song not found" }], isError: true };
     const s = data;

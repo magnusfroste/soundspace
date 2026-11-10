@@ -11,27 +11,55 @@ import { z } from "npm:zod@^3.25.76";
 
 // src/lib/mcp/supabase.ts
 import { createClient } from "npm:@supabase/supabase-js@^2.95.3";
+import { ToolError } from "npm:@lovable.dev/mcp-js@3.0.4";
 function runtimeEnv(name) {
   const runtime = globalThis;
   return runtime.Deno?.env?.get?.(name) ?? runtime.process?.env?.[name];
 }
-function requiredEnv(name) {
-  const value = runtimeEnv(name)?.trim();
-  if (!value) throw new Error(`${name} is required`);
-  return value;
+function configuredEnv(names) {
+  for (const name of names) {
+    const value = runtimeEnv(name)?.trim();
+    if (value) return value;
+  }
+  return void 0;
 }
-function supabaseAdmin() {
-  return createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"), {
+function supabaseProjectUrl() {
+  const url = configuredEnv(["SUPABASE_URL", "VITE_SUPABASE_URL"]);
+  if (!url) throw new Error("SUPABASE_URL (or VITE_SUPABASE_URL) is required");
+  return url;
+}
+function supabasePublishableKey() {
+  const direct = configuredEnv(["SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY"]);
+  if (direct) return direct;
+  const keyset = runtimeEnv("SUPABASE_PUBLISHABLE_KEYS");
+  if (keyset) {
+    try {
+      const parsed = JSON.parse(keyset);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const keys = parsed;
+        const key = [keys.default, ...Object.values(keys)].find((v) => typeof v === "string" && v.trim().startsWith("sb_publishable_"))?.trim();
+        if (key) return key;
+      }
+    } catch {
+    }
+  }
+  const legacy = configuredEnv(["SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY"]);
+  if (legacy) return legacy;
+  throw new Error("SUPABASE_PUBLISHABLE_KEY, SUPABASE_PUBLISHABLE_KEYS, or SUPABASE_ANON_KEY is required");
+}
+function supabaseForUser(ctx) {
+  const token = ctx.getToken();
+  if (!token) throw new ToolError("Not authenticated");
+  return createClient(supabaseProjectUrl(), supabasePublishableKey(), {
+    global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false }
   });
 }
-async function requireAuth(ctx) {
-  const token = ctx.getToken();
-  if (!token) throw new Error("Missing bearer token");
-  const { data, error } = await supabaseAdmin().from("site_settings").select("value").eq("key", "mcp_api_token").maybeSingle();
-  if (error) throw new Error("Auth lookup failed: " + error.message);
-  const configured = typeof data?.value === "string" ? data.value : data?.value?.token;
-  if (!configured || configured !== token) throw new Error("Invalid MCP API token");
+async function requireAdmin(ctx) {
+  const userId = ctx.getUserId();
+  if (!ctx.isAuthenticated() || !userId) throw new ToolError("Not authenticated");
+  const { data, error } = await supabaseForUser(ctx).rpc("has_role", { _user_id: userId, _role: "admin" });
+  if (error || data !== true) throw new ToolError("Admin role required");
 }
 
 // src/lib/mcp/tools/list-songs.ts
@@ -68,8 +96,8 @@ var list_songs_default = defineTool({
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: async ({ search, genre, mood, include_trash, limit = 100, offset = 0 }, ctx) => {
-    await requireAuth(ctx);
-    let q = supabaseAdmin().from("songs").select("*").order("created_at", { ascending: false }).range(offset, offset + limit - 1);
+    await requireAdmin(ctx);
+    let q = supabaseForUser(ctx).from("songs").select("*").order("created_at", { ascending: false }).range(offset, offset + limit - 1);
     if (!include_trash) q = q.is("deleted_at", null);
     if (search) {
       const safe = search.replace(/[^\p{L}\p{N}\s\-'&.]/gu, " ").trim().slice(0, 100);
@@ -97,8 +125,8 @@ var get_song_default = defineTool2({
   inputSchema: { id: z2.string().uuid().describe("Song ID.") },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: async ({ id }, ctx) => {
-    await requireAuth(ctx);
-    const { data, error } = await supabaseAdmin().from("songs").select("*").eq("id", id).maybeSingle();
+    await requireAdmin(ctx);
+    const { data, error } = await supabaseForUser(ctx).from("songs").select("*").eq("id", id).maybeSingle();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     if (!data) return { content: [{ type: "text", text: "Song not found" }], isError: true };
     const s = data;
@@ -284,7 +312,7 @@ var update_song_default = defineTool3({
   },
   annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
   handler: async ({ id, ...updates }, ctx) => {
-    await requireAuth(ctx);
+    await requireAdmin(ctx);
     const clean = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== void 0));
     for (const [field, norm, valid] of [["genre", normalizeGenre, VALID_GENRES], ["mood", normalizeMood, VALID_MOODS]]) {
       const v = clean[field];
@@ -297,7 +325,7 @@ var update_song_default = defineTool3({
     if (Object.keys(clean).length === 0) {
       return { content: [{ type: "text", text: "No fields to update" }], isError: true };
     }
-    const { data, error } = await supabaseAdmin().from("songs").update(clean).eq("id", id).select().maybeSingle();
+    const { data, error } = await supabaseForUser(ctx).from("songs").update(clean).eq("id", id).select().maybeSingle();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     if (!data) return { content: [{ type: "text", text: "Song not found" }], isError: true };
     const s = data;
@@ -316,8 +344,8 @@ var delete_song_default = defineTool4({
   inputSchema: { id: z4.string().uuid() },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async ({ id }, ctx) => {
-    await requireAuth(ctx);
-    const { error } = await supabaseAdmin().from("songs").update({ deleted_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("id", id);
+    await requireAdmin(ctx);
+    const { error } = await supabaseForUser(ctx).from("songs").update({ deleted_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("id", id);
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     return { content: [{ type: "text", text: `Song ${id} moved to trash` }] };
   }
@@ -333,8 +361,8 @@ var restore_song_default = defineTool5({
   inputSchema: { id: z5.string().uuid() },
   annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
   handler: async ({ id }, ctx) => {
-    await requireAuth(ctx);
-    const { error } = await supabaseAdmin().from("songs").update({ deleted_at: null }).eq("id", id);
+    await requireAdmin(ctx);
+    const { error } = await supabaseForUser(ctx).from("songs").update({ deleted_at: null }).eq("id", id);
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     return { content: [{ type: "text", text: `Song ${id} restored` }] };
   }
@@ -349,8 +377,8 @@ var list_playlists_default = defineTool6({
   inputSchema: {},
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: async (_args, ctx) => {
-    await requireAuth(ctx);
-    const db = supabaseAdmin();
+    await requireAdmin(ctx);
+    const db = supabaseForUser(ctx);
     const { data: playlists, error } = await db.from("playlists").select("*").order("title");
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     const { data: ps } = await db.from("playlist_songs").select("playlist_id");
@@ -380,8 +408,8 @@ var get_playlist_songs_default = defineTool7({
   inputSchema: { playlist_id: z6.string().uuid() },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: async ({ playlist_id }, ctx) => {
-    await requireAuth(ctx);
-    const db = supabaseAdmin();
+    await requireAdmin(ctx);
+    const db = supabaseForUser(ctx);
     const { data: links, error } = await db.from("playlist_songs").select("song_id, position").eq("playlist_id", playlist_id).order("position");
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     const ids = (links ?? []).map((l) => l.song_id);
@@ -411,8 +439,8 @@ var create_playlist_default = defineTool8({
   },
   annotations: { readOnlyHint: false, openWorldHint: false },
   handler: async ({ title, description, cover_image_url }, ctx) => {
-    await requireAuth(ctx);
-    const { data, error } = await supabaseAdmin().from("playlists").insert({ title, description: description ?? null, cover_image_url: cover_image_url ?? null }).select().single();
+    await requireAdmin(ctx);
+    const { data, error } = await supabaseForUser(ctx).from("playlists").insert({ title, description: description ?? null, cover_image_url: cover_image_url ?? null }).select().single();
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     const p = data;
     const playlist = { id: p.id, title: p.title, description: p.description, cover_image_url: p.cover_image_url, created_at: p.created_at };
@@ -435,10 +463,10 @@ var update_playlist_default = defineTool9({
   },
   annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
   handler: async ({ id, ...updates }, ctx) => {
-    await requireAuth(ctx);
+    await requireAdmin(ctx);
     const clean = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== void 0));
     if (Object.keys(clean).length === 0) return { content: [{ type: "text", text: "No fields to update" }], isError: true };
-    const { error } = await supabaseAdmin().from("playlists").update(clean).eq("id", id);
+    const { error } = await supabaseForUser(ctx).from("playlists").update(clean).eq("id", id);
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     return { content: [{ type: "text", text: `Playlist ${id} updated` }] };
   }
@@ -454,8 +482,8 @@ var delete_playlist_default = defineTool10({
   inputSchema: { id: z9.string().uuid() },
   annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
   handler: async ({ id }, ctx) => {
-    await requireAuth(ctx);
-    const db = supabaseAdmin();
+    await requireAdmin(ctx);
+    const db = supabaseForUser(ctx);
     await db.from("playlist_songs").delete().eq("playlist_id", id);
     const { error } = await db.from("playlists").delete().eq("id", id);
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
@@ -476,8 +504,8 @@ var add_song_to_playlist_default = defineTool11({
   },
   annotations: { readOnlyHint: false, openWorldHint: false },
   handler: async ({ playlist_id, song_id }, ctx) => {
-    await requireAuth(ctx);
-    const db = supabaseAdmin();
+    await requireAdmin(ctx);
+    const db = supabaseForUser(ctx);
     const { data: existing } = await db.from("playlist_songs").select("id").eq("playlist_id", playlist_id).eq("song_id", song_id).maybeSingle();
     if (existing) return { content: [{ type: "text", text: "Song already in playlist" }], isError: true };
     const { data: maxPos } = await db.from("playlist_songs").select("position").eq("playlist_id", playlist_id).order("position", { ascending: false }).limit(1).maybeSingle();
@@ -500,8 +528,8 @@ var remove_song_from_playlist_default = defineTool12({
   },
   annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
   handler: async ({ playlist_id, song_id }, ctx) => {
-    await requireAuth(ctx);
-    const { error } = await supabaseAdmin().from("playlist_songs").delete().eq("playlist_id", playlist_id).eq("song_id", song_id);
+    await requireAdmin(ctx);
+    const { error } = await supabaseForUser(ctx).from("playlist_songs").delete().eq("playlist_id", playlist_id).eq("song_id", song_id);
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     return { content: [{ type: "text", text: "Song removed from playlist" }] };
   }
@@ -516,8 +544,8 @@ var library_stats_default = defineTool13({
   inputSchema: {},
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: async (_args, ctx) => {
-    await requireAuth(ctx);
-    const db = supabaseAdmin();
+    await requireAdmin(ctx);
+    const db = supabaseForUser(ctx);
     const [{ count: total }, { count: trashed }, { count: playlists }, { data: songs }] = await Promise.all([
       db.from("songs").select("*", { count: "exact", head: true }).is("deleted_at", null),
       db.from("songs").select("*", { count: "exact", head: true }).not("deleted_at", "is", null),

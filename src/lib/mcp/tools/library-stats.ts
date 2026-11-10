@@ -1,6 +1,6 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
-import { supabaseAdmin, requireAuth } from "../supabase";
+import { supabaseForUser, requireAdmin } from "../supabase";
 
 export default defineTool({
   name: "library_stats",
@@ -9,8 +9,8 @@ export default defineTool({
   inputSchema: {},
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: async (_args, ctx) => {
-    await requireAuth(ctx);
-    const db = supabaseAdmin();
+    await requireAdmin(ctx);
+    const db = supabaseForUser(ctx);
     const [{ count: total }, { count: trashed }, { count: playlists }, { data: songs }] = await Promise.all([
       db.from("songs").select("*", { count: "exact", head: true }).is("deleted_at", null),
       db.from("songs").select("*", { count: "exact", head: true }).not("deleted_at", "is", null),
