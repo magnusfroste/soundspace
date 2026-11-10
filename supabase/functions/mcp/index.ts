@@ -3,7 +3,7 @@
 // supabase function: mcp
 // Bundled from src/lib/mcp/index.ts by @lovable.dev/mcp-js.
 // src/lib/mcp/index.ts
-import { defineMcp } from "npm:@lovable.dev/mcp-js@3.0.4";
+import { auth, defineMcp } from "npm:@lovable.dev/mcp-js@3.0.4";
 
 // src/lib/mcp/tools/list-songs.ts
 import { defineTool } from "npm:@lovable.dev/mcp-js@3.0.4";
@@ -564,11 +564,16 @@ var library_stats_default = defineTool13({
 });
 
 // src/lib/mcp/index.ts
+var projectRef = "labyxrmiqjinatvpqoto";
 var mcp_default = defineMcp({
-  name: "sound-space",
-  title: "sound-space",
+  name: "soundspace",
+  title: "SoundSpace",
   version: "1.0.0",
-  instructions: "Tools for the sound-space music library. Authenticate with the MCP API token as a bearer token. Use list_songs/get_song to browse the catalog, update_song to edit metadata (title, artist, genre, mood, prompt, lyrics, BPM, key), delete_song/restore_song for trash management, and the playlist tools to curate playlists.",
+  instructions: "Tools for the SoundSpace music library. Sign in with an admin account via OAuth. Use list_songs/get_song to browse the catalog, update_song to edit metadata (title, artist, genre, mood, prompt, lyrics, BPM, key), delete_song/restore_song for trash management, and the playlist tools to curate playlists.",
+  auth: auth.oauth.issuer({
+    issuer: `https://${projectRef}.supabase.co/auth/v1`,
+    acceptedAudiences: "authenticated"
+  }),
   tools: [
     list_songs_default,
     get_song_default,

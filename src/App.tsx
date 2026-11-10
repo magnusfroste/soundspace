@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
+import { oauthReturnPath } from "@/lib/oauth-return-path";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PlayerProvider } from "@/contexts/PlayerContext";
 import { AppLayout } from "@/components/AppLayout";
@@ -21,6 +22,7 @@ import MyPlaylists from "@/pages/MyPlaylists";
 import MyPlaylistDetail from "@/pages/MyPlaylistDetail";
 import NotFound from "@/pages/NotFound";
 import ProfilePage from "@/pages/ProfilePage";
+import OAuthConsent from "@/pages/OAuthConsent";
 
 // Lazy-loaded admin pages — only fetched when an admin navigates there
 const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
@@ -55,7 +57,10 @@ function ProtectedRoutes() {
 function AuthGuard() {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (user) return <Navigate to="/app" replace />;
+  if (user) {
+    const next = oauthReturnPath(new URLSearchParams(window.location.search).get("next"));
+    return <Navigate to={next !== "/" ? next : "/app"} replace />;
+  }
   return <AuthPage />;
 }
 
@@ -77,6 +82,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<AuthGuard />} />
+              <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
               <Route path="/onboarding" element={<OnboardingGuard />} />
               <Route element={<ProtectedRoutes />}>
                 <Route path="/app" element={<HomePage />} />

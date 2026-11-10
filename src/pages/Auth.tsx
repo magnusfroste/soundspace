@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { oauthReturnPath } from "@/lib/oauth-return-path";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,9 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const { signIn, signUp } = useAuth();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const nextParam = params.get("next");
+  const next = nextParam ? oauthReturnPath(nextParam) : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -46,6 +50,7 @@ export default function AuthPage() {
           }
           return;
         }
+        if (next && next !== "/") { navigate(next, { replace: true }); return; }
         // Check role to route appropriately
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -59,7 +64,7 @@ export default function AuthPage() {
           navigate("/app");
         }
       } else {
-        const { error } = await signUp(email, password);
+        const { error } = await signUp(email, password, next && next !== "/" ? new URL(next, window.location.origin).href : undefined);
         if (error) {
           if (error.message.includes("already registered")) {
             toast.error("This email is already registered. Try signing in.");
