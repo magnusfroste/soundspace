@@ -1,6 +1,6 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
-import { supabaseAdmin, requireAuth } from "../supabase";
+import { supabaseForUser, requireAdmin } from "../supabase";
 
 interface SongRow {
   id: string; title: string; artist: string; genre: string | null; mood: string | null;
@@ -32,8 +32,8 @@ export default defineTool({
   },
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: async ({ search, genre, mood, include_trash, limit = 100, offset = 0 }, ctx) => {
-    await requireAuth(ctx);
-    let q = supabaseAdmin().from("songs").select("*").order("created_at", { ascending: false }).range(offset, offset + limit - 1);
+    await requireAdmin(ctx);
+    let q = supabaseForUser(ctx).from("songs").select("*").order("created_at", { ascending: false }).range(offset, offset + limit - 1);
     if (!include_trash) q = q.is("deleted_at", null);
     if (search) {
       const safe = search.replace(/[^\p{L}\p{N}\s\-'&.]/gu, " ").trim().slice(0, 100);

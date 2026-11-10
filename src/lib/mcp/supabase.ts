@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { ToolContext } from "@lovable.dev/mcp-js";
+import { ToolError, type ToolContext } from "@lovable.dev/mcp-js";
 
 type RuntimeGlobals = typeof globalThis & {
   Deno?: { env?: { get?: (name: string) => string | undefined } };
@@ -11,30 +11,57 @@ function runtimeEnv(name: string): string | undefined {
   return runtime.Deno?.env?.get?.(name) ?? runtime.process?.env?.[name];
 }
 
-function requiredEnv(name: string): string {
-  const value = runtimeEnv(name)?.trim();
-  if (!value) throw new Error(`${name} is required`);
-  return value;
+function configuredEnv(names: readonly string[]): string | undefined {
+  for (const name of names) {
+    const value = runtimeEnv(name)?.trim();
+    if (value) return value;
+  }
+  return undefined;
 }
 
-// Service-role client: the MCP endpoint is protected by our own bearer token
-// (site_settings.mcp_api_token), validated per request in requireAuth.
-export function supabaseAdmin() {
-  return createClient(requiredEnv("SUPABASE_URL"), requiredEnv("SUPABASE_SERVICE_ROLE_KEY"), {
+function supabaseProjectUrl(): string {
+  const url = configuredEnv(["SUPABASE_URL", "VITE_SUPABASE_URL"]);
+  if (!url) throw new Error("SUPABASE_URL (or VITE_SUPABASE_URL) is required");
+  return url;
+}
+
+function supabasePublishableKey(): string {
+  const direct = configuredEnv(["SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY"]);
+  if (direct) return direct;
+  const keyset = runtimeEnv("SUPABASE_PUBLISHABLE_KEYS");
+  if (keyset) {
+    try {
+      const parsed: unknown = JSON.parse(keyset);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const keys = parsed as Record<string, unknown>;
+        const key = [keys.default, ...Object.values(keys)]
+          .find((v): v is string => typeof v === "string" && v.trim().startsWith("sb_publishable_"))
+          ?.trim();
+        if (key) return key;
+      }
+    } catch {
+      // ignore malformed keyset
+    }
+  }
+  const legacy = configuredEnv(["SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY"]);
+  if (legacy) return legacy;
+  throw new Error("SUPABASE_PUBLISHABLE_KEY, SUPABASE_PUBLISHABLE_KEYS, or SUPABASE_ANON_KEY is required");
+}
+
+// Caller-scoped client: queries run as the signed-in OAuth user, so RLS applies.
+export function supabaseForUser(ctx: ToolContext) {
+  const token = ctx.getToken();
+  if (!token) throw new ToolError("Not authenticated");
+  return createClient(supabaseProjectUrl(), supabasePublishableKey(), {
+    global: { headers: { Authorization: `Bearer ${token}` } },
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
 
-// Validates the caller's bearer token against the configured MCP API token.
-export async function requireAuth(ctx: ToolContext): Promise<void> {
-  const token = ctx.getToken();
-  if (!token) throw new Error("Missing bearer token");
-  const { data, error } = await supabaseAdmin()
-    .from("site_settings")
-    .select("value")
-    .eq("key", "mcp_api_token")
-    .maybeSingle();
-  if (error) throw new Error("Auth lookup failed: " + error.message);
-  const configured = typeof data?.value === "string" ? data.value : data?.value?.token;
-  if (!configured || configured !== token) throw new Error("Invalid MCP API token");
+// Requires a verified OAuth caller who holds the admin role in user_roles.
+export async function requireAdmin(ctx: ToolContext): Promise<void> {
+  const userId = ctx.getUserId();
+  if (!ctx.isAuthenticated() || !userId) throw new ToolError("Not authenticated");
+  const { data, error } = await supabaseForUser(ctx).rpc("has_role", { _user_id: userId, _role: "admin" });
+  if (error || data !== true) throw new ToolError("Admin role required");
 }

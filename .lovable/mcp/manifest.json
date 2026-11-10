@@ -3,13 +3,17 @@
   "sdk_version": "3.0.4",
   "path": "/functions/v1/mcp",
   "auth": {
-    "type": "none"
+    "type": "oauth",
+    "issuer": "https://labyxrmiqjinatvpqoto.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
   },
   "mcp": {
     "server": {
-      "name": "sound-space",
+      "name": "soundspace",
       "version": "1.0.0",
-      "title": "sound-space"
+      "title": "SoundSpace"
     },
     "tools": [
       {

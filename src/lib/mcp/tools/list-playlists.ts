@@ -1,6 +1,6 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
-import { supabaseAdmin, requireAuth } from "../supabase";
+import { supabaseForUser, requireAdmin } from "../supabase";
 
 export default defineTool({
   name: "list_playlists",
@@ -9,8 +9,8 @@ export default defineTool({
   inputSchema: {},
   annotations: { readOnlyHint: true, openWorldHint: false },
   handler: async (_args, ctx) => {
-    await requireAuth(ctx);
-    const db = supabaseAdmin();
+    await requireAdmin(ctx);
+    const db = supabaseForUser(ctx);
     const { data: playlists, error } = await db.from("playlists").select("*").order("title");
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     const { data: ps } = await db.from("playlist_songs").select("playlist_id");

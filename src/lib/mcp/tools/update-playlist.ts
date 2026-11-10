@@ -1,6 +1,6 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
-import { supabaseAdmin, requireAuth } from "../supabase";
+import { supabaseForUser, requireAdmin } from "../supabase";
 
 export default defineTool({
   name: "update_playlist",
@@ -14,10 +14,10 @@ export default defineTool({
   },
   annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: false },
   handler: async ({ id, ...updates }, ctx) => {
-    await requireAuth(ctx);
+    await requireAdmin(ctx);
     const clean = Object.fromEntries(Object.entries(updates).filter(([, v]) => v !== undefined));
     if (Object.keys(clean).length === 0) return { content: [{ type: "text", text: "No fields to update" }], isError: true };
-    const { error } = await supabaseAdmin().from("playlists").update(clean).eq("id", id);
+    const { error } = await supabaseForUser(ctx).from("playlists").update(clean).eq("id", id);
     if (error) return { content: [{ type: "text", text: error.message }], isError: true };
     return { content: [{ type: "text", text: `Playlist ${id} updated` }] };
   },
